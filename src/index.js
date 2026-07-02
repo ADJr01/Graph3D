@@ -9,4 +9,14 @@ export { Graph3DRegistry, registry } from './core/Graph3DRegistry.js';
 export { CapabilityProbe } from './core/CapabilityProbe.js';
 export { FrameBudget } from './core/FrameBudget.js';
 export { WorkerPool } from './core/WorkerPool.js';
+export {
+  scale,
+  interpolate,
+  interpolateNumber,
+  interpolateRgb,
+  interpolateHsl,
+  interpolateLab,
+  interpolateArray,
+  interpolateObject,
+} from './compose/index.js';
 export { registerWorkerTask, createWorkerFactory } from './core/worker/workerBlob.js';
