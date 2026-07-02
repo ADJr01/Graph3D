@@ -1,7 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="33557d05-3974-4e5d-9972-8791b8163414" name="Changes" comment="" />
+    <list default="true" id="33557d05-3974-4e5d-9972-8791b8163414" name="Changes" comment="graph3D created">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/BUILD_PLAN.md" beforeDir="false" afterPath="$PROJECT_DIR$/BUILD_PLAN.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/object/GraphInstancedObject.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/object/GraphInstancedObject.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/object/GraphObject.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/object/GraphObject.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/object/GraphInstancedObject.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/object/GraphInstancedObject.test.js" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -57,11 +63,24 @@
       <workItem from="1782881432704" duration="17000" />
       <workItem from="1782886197625" duration="91000" />
       <workItem from="1782913354811" duration="19229000" />
-      <workItem from="1782969139938" duration="1168000" />
+      <workItem from="1782969139938" duration="6895000" />
     </task>
+    <task id="LOCAL-00001" summary="graph3D created">
+      <option name="closed" value="true" />
+      <created>1782972272764</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1782972272764</updated>
+    </task>
+    <option name="localTasksCounter" value="2" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="graph3D created" />
+    <option name="LAST_COMMIT_MESSAGE" value="graph3D created" />
   </component>
 </project>

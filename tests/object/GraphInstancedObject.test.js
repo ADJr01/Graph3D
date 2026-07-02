@@ -142,15 +142,127 @@ describe('GraphInstancedObject.setInstanceCount', () => {
     expect(obj.three.count).toBe(3);
   });
 
-  it('throws RangeError when n exceeds capacity', () => {
-    const obj = makeInstanced({ count: 10 });
-    expect(() => obj.setInstanceCount(11)).toThrow(RangeError);
-  });
-
   it('throws TypeError for a negative or non-integer n', () => {
     const obj = makeInstanced({ count: 10 });
     expect(() => obj.setInstanceCount(-1)).toThrow(TypeError);
     expect(() => obj.setInstanceCount(1.5)).toThrow(TypeError);
+  });
+});
+
+// ── Capacity growth ───────────────────────────────────────────────────────────
+
+describe('GraphInstancedObject capacity growth', () => {
+  it('grows capacity to the next power of two when n exceeds it', () => {
+    const obj = makeInstanced({ count: 10 });
+    obj.setInstanceCount(20);
+    expect(obj.capacity).toBe(32);
+    expect(obj.three.count).toBe(20);
+  });
+
+  it('does not grow when n is within the current capacity', () => {
+    const obj = makeInstanced({ count: 32 });
+    const mesh = obj.three;
+    obj.setInstanceCount(20);
+    expect(obj.capacity).toBe(32);
+    expect(obj.three).toBe(mesh);
+  });
+
+  it('preserves existing instance transforms, colors, and custom attributes after growth', () => {
+    const obj = makeInstanced({ count: 4 });
+    obj.setInstancePosition(0, 1, 2, 3);
+    obj.setInstanceScale(0, 2, 2, 2);
+    obj.setInstanceColor(0, 0xff0000);
+    obj.defineAttribute('pulsePhase', 1);
+    obj.setInstanceAttribute(0, 'pulsePhase', 0.5);
+
+    obj.setInstanceCount(10);
+
+    const position = new THREE.Vector3();
+    const quaternion = new THREE.Quaternion();
+    const scale = new THREE.Vector3();
+    const readBack = new THREE.Matrix4();
+    obj.three.getMatrixAt(0, readBack);
+    readBack.decompose(position, quaternion, scale);
+    expect(position.toArray()).toEqual([1, 2, 3]);
+    expect(scale.toArray()).toEqual([2, 2, 2]);
+
+    const color = new THREE.Color();
+    obj.three.getColorAt(0, color);
+    expect(color.getHex()).toBe(0xff0000);
+
+    expect(obj.three.geometry.getAttribute('pulsePhase').getX(0)).toBeCloseTo(0.5);
+  });
+
+  it('replaces .three with a new InstancedMesh in the same scene slot', () => {
+    const scene = new THREE.Scene();
+    const obj = makeInstanced({ scene, count: 4 });
+    const oldMesh = obj.three;
+
+    obj.setInstanceCount(10);
+
+    expect(obj.three).not.toBe(oldMesh);
+    expect(obj.three).toBeInstanceOf(THREE.InstancedMesh);
+    expect(scene.children).toContain(obj.three);
+    expect(scene.children).not.toContain(oldMesh);
+    expect(obj.three.name).toBe(oldMesh.name);
+  });
+
+  it('reassigns sequential instanceId values across the full grown capacity', () => {
+    const obj = makeInstanced({ count: 4 });
+    obj.setInstanceCount(10); // ceilPowerOfTwo(10) === 16
+    const attribute = obj.three.geometry.getAttribute('instanceId');
+    expect(Array.from(attribute.array)).toEqual(Array.from({ length: 16 }, (_, i) => i));
+  });
+
+  it('new slots beyond the old capacity are unpositioned — no stale octree entry', () => {
+    const obj = makeInstanced({ count: 2 });
+    obj.setInstanceMatrix(0, new THREE.Matrix4().makeTranslation(100, 100, 100));
+    obj.commitMatrix();
+    obj.setInstanceCount(5);
+
+    // New slots (e.g. index 3) default to THREE.InstancedMesh's own
+    // identity-matrix convention for a never-positioned instance — sitting
+    // right at the origin — but must still have no octree entry, so a ray
+    // through the origin finds nothing instead of wrongly hitting index 3.
+    const raycaster = new THREE.Raycaster();
+    raycaster.set(new THREE.Vector3(0, 0, 5), new THREE.Vector3(0, 0, -1));
+    expect(obj.pick(raycaster)).toBeNull();
+  });
+
+  it('keeps octree entries valid — a moved instance is still pickable at the same index after growth', () => {
+    const obj = makeInstanced({ count: 2 });
+    obj.setInstanceMatrix(0, new THREE.Matrix4().makeTranslation(3, 0, 0));
+    obj.commitMatrix();
+
+    obj.setInstanceCount(8);
+
+    const raycaster = new THREE.Raycaster();
+    raycaster.set(new THREE.Vector3(3, 0, 5), new THREE.Vector3(0, 0, -1));
+    expect(obj.pick(raycaster)).toBe(0);
+  });
+
+  it('dispatches a dispose event on the outgoing mesh and disposes the outgoing geometry', () => {
+    const obj = makeInstanced({ count: 4 });
+    const oldMesh = obj.three;
+    const oldGeometry = oldMesh.geometry;
+    const meshListener = vi.fn();
+    const geometrySpy = vi.spyOn(oldGeometry, 'dispose');
+    oldMesh.addEventListener('dispose', meshListener);
+
+    obj.setInstanceCount(10);
+
+    expect(meshListener).toHaveBeenCalledOnce();
+    expect(geometrySpy).toHaveBeenCalledOnce();
+  });
+
+  it('growing while frustum culling is enabled does not throw and keeps new slots culled', () => {
+    const obj = makeInstanced({ count: 2 });
+    obj.setInstanceMatrix(0, new THREE.Matrix4());
+    obj.commitMatrix();
+    obj.enableInstanceCulling({ camera: makeCamera() });
+
+    expect(() => obj.setInstanceCount(6)).not.toThrow();
+    expect(() => obj.setInstancePosition(4, 1, 1, 1)).not.toThrow();
   });
 });
 
@@ -216,6 +328,68 @@ describe('GraphInstancedObject transform setters', () => {
   });
 });
 
+// ── Bulk transform (typed-array) ─────────────────────────────────────────────
+
+describe('GraphInstancedObject.setAllPositions / setAllScales', () => {
+  it('setAllPositions writes every instance position, preserving prior scale/rotation', () => {
+    const obj = makeInstanced({ count: 2 });
+    obj.setInstanceScale(0, 2, 2, 2);
+    obj.setAllPositions(new Float32Array([1, 2, 3, 4, 5, 6]));
+
+    const position = new THREE.Vector3();
+    const quaternion = new THREE.Quaternion();
+    const scale = new THREE.Vector3();
+    const readBack = new THREE.Matrix4();
+
+    obj.three.getMatrixAt(0, readBack);
+    readBack.decompose(position, quaternion, scale);
+    expect(position.toArray()).toEqual([1, 2, 3]);
+    expect(scale.toArray()).toEqual([2, 2, 2]);
+
+    obj.three.getMatrixAt(1, readBack);
+    readBack.decompose(position, quaternion, scale);
+    expect(position.toArray()).toEqual([4, 5, 6]);
+  });
+
+  it('setAllScales writes every instance scale, preserving prior position', () => {
+    const obj = makeInstanced({ count: 2 });
+    obj.setInstancePosition(1, 9, 9, 9);
+    obj.setAllScales(new Float32Array([1, 1, 1, 2, 3, 4]));
+
+    const position = new THREE.Vector3();
+    const quaternion = new THREE.Quaternion();
+    const scale = new THREE.Vector3();
+    const readBack = new THREE.Matrix4();
+
+    obj.three.getMatrixAt(1, readBack);
+    readBack.decompose(position, quaternion, scale);
+    expect(scale.toArray()).toEqual([2, 3, 4]);
+    expect(position.toArray()).toEqual([9, 9, 9]);
+  });
+
+  it('setAllPositions/setAllScales throw TypeError for the wrong typed-array length', () => {
+    const obj = makeInstanced({ count: 2 });
+    expect(() => obj.setAllPositions(new Float32Array(5))).toThrow(TypeError);
+    expect(() => obj.setAllScales(new Float32Array(5))).toThrow(TypeError);
+  });
+
+  it('setAllPositions/setAllScales throw TypeError for a non-Float32Array', () => {
+    const obj = makeInstanced({ count: 2 });
+    expect(() => obj.setAllPositions([1, 2, 3, 4, 5, 6])).toThrow(TypeError);
+    expect(() => obj.setAllScales([1, 1, 1, 1, 1, 1])).toThrow(TypeError);
+  });
+
+  it('setAllPositions keeps the octree in sync — a moved instance is pickable at its new spot', () => {
+    const obj = makeInstanced({ count: 2 });
+    obj.setAllPositions(new Float32Array([0, 0, 0, 50, 0, 0]));
+    obj.commitMatrix();
+
+    const raycaster = new THREE.Raycaster();
+    raycaster.set(new THREE.Vector3(50, 0, 5), new THREE.Vector3(0, 0, -1));
+    expect(obj.pick(raycaster)).toBe(1);
+  });
+});
+
 // ── Per-instance color ─────────────────────────────────────────────────────────
 
 describe('GraphInstancedObject.setInstanceColor', () => {
@@ -240,6 +414,32 @@ describe('GraphInstancedObject.setInstanceColor', () => {
   it('throws RangeError for an out-of-bounds index', () => {
     const obj = makeInstanced({ count: 5 });
     expect(() => obj.setInstanceColor(5, 'white')).toThrow(RangeError);
+  });
+});
+
+describe('GraphInstancedObject.setAllColors', () => {
+  it('writes every instance color directly from a flat RGB Float32Array', () => {
+    const obj = makeInstanced({ count: 2 });
+    obj.setAllColors(new Float32Array([1, 0, 0, 0, 1, 0]));
+
+    const readBack = new THREE.Color();
+    obj.three.getColorAt(0, readBack);
+    expect(readBack.toArray()).toEqual([1, 0, 0]);
+    obj.three.getColorAt(1, readBack);
+    expect(readBack.toArray()).toEqual([0, 1, 0]);
+  });
+
+  it('creates the instanceColor InstancedBufferAttribute on first use', () => {
+    const obj = makeInstanced({ count: 2 });
+    expect(obj.three.instanceColor).toBeNull();
+    obj.setAllColors(new Float32Array([1, 1, 1, 1, 1, 1]));
+    expect(obj.three.instanceColor).toBeInstanceOf(THREE.InstancedBufferAttribute);
+  });
+
+  it('throws TypeError for the wrong typed-array length or a non-Float32Array', () => {
+    const obj = makeInstanced({ count: 2 });
+    expect(() => obj.setAllColors(new Float32Array(5))).toThrow(TypeError);
+    expect(() => obj.setAllColors([1, 1, 1, 1, 1, 1])).toThrow(TypeError);
   });
 });
 
@@ -632,7 +832,10 @@ describe('GraphInstancedObject disposal', () => {
     expect(() => obj.setInstancePosition(0, 0, 0, 0)).toThrow(pattern);
     expect(() => obj.setInstanceRotation(0, new THREE.Euler())).toThrow(pattern);
     expect(() => obj.setInstanceScale(0, 1, 1, 1)).toThrow(pattern);
+    expect(() => obj.setAllPositions(new Float32Array(3))).toThrow(pattern);
+    expect(() => obj.setAllScales(new Float32Array(3))).toThrow(pattern);
     expect(() => obj.setInstanceColor(0, 'white')).toThrow(pattern);
+    expect(() => obj.setAllColors(new Float32Array(3))).toThrow(pattern);
     expect(() => obj.setInstanceUserData(0, {})).toThrow(pattern);
     expect(() => obj.getInstanceUserData(0)).toThrow(pattern);
     expect(() => obj.defineAttribute('pulsePhase', 1)).toThrow(pattern);

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Graph3D — Phase 3 Instanced Bars</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { overflow: hidden; background: #000; font-family: system-ui, sans-serif; }
+      canvas { display: block; }
+
+      #panel {
+        position: fixed;
+        top: 12px;
+        left: 12px;
+        background: rgba(20, 20, 24, 0.75);
+        color: #eee;
+        padding: 12px 14px;
+        border-radius: 8px;
+        font-size: 13px;
+        backdrop-filter: blur(6px);
+      }
+      #panel .row { display: flex; gap: 8px; margin-bottom: 4px; }
+      #panel .label { opacity: 0.6; width: 90px; }
+      #status {
+        margin-top: 6px;
+        font-size: 11px;
+        color: #ff8080;
+        white-space: pre-wrap;
+        min-height: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="panel">
+      <div class="row"><span class="label">Instances</span><span id="count"></span></div>
+      <div class="row"><span class="label">FPS</span><span id="fps"></span></div>
+      <div id="status"></div>
+    </div>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

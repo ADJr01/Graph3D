@@ -78,12 +78,17 @@ Layers are ordered bottom-to-top. A layer may only import from layers **below** 
 **Prompts:** 31–40  
 **Exit criteria:**
 - [x] `GraphObject` base wrapper: holds `THREE.Object3D`, exposes `dispose()`, supports user-defined metadata
-- [ ] `GraphInstancedObject` extends `GraphObject` for instanced rendering (>50 datums threshold); per-instance setters for matrix/position/rotation/scale/color/user data (Prompt 37), custom shader attributes (Prompt 38), a stable `instanceId` attribute + octree-backed `pick(raycaster)` (Prompt 39, upgraded Prompt 45), and throttled per-instance frustum culling via `enableInstanceCulling`/`updateCulling`, now octree-backed and live-updating as instances move (Prompt 40, upgraded Prompt 45) landed — capacity-doubling-on-overflow strategy is Prompt 49, not yet implemented
+- [x] `GraphInstancedObject` extends `GraphObject` for instanced rendering (>50 datums threshold); per-instance setters for matrix/position/rotation/scale/color/user data (Prompt 37), custom shader attributes (Prompt 38), a stable `instanceId` attribute + octree-backed `pick(raycaster)` (Prompt 39, upgraded Prompt 45), throttled per-instance frustum culling via `enableInstanceCulling`/`updateCulling`, octree-backed and live-updating as instances move (Prompt 40, upgraded Prompt 45), and a capacity-grow strategy (Prompt 49): `setInstanceCount(n)` beyond capacity reallocates at `ceilPowerOfTwo(n)` and copies every attribute (including custom ones from Prompt 38), preserving the octree index mapping
 - [x] `Octree` (Prompt 44): `insert`/`remove`/`queryFrustum`/`queryRay`/`queryRadius`/`queryAABB`, spatial index for fast frustum culling and picking on large instance sets — wired into `GraphInstancedObject` in Prompt 45, updated incrementally by every `setInstanceMatrix`/`Position`/`Rotation`/`Scale` call
 - [x] Loader (`GraphObjectLoader`, Prompt 43) supports GLTF/GLB (+ Draco/KTX2, config-gated — see `.claude/TODO.md`), OBJ (+ MTL), and FBX; ref-counted per-URL cache avoids re-fetching, each caller gets an independent disposable clone; progress-event callbacks not yet exposed (not required by Prompt 43's own spec)
-- [ ] Disposal tests: instance buffer attributes return to baseline count after dispose
+- [x] Disposal tests: instance buffer attributes return to baseline count after dispose (`tests/integration/GraphInstancedObject-disposal.test.js`); a 1,000,000-instance create+dispose cycle is covered leak-free by `tests/integration/phase3.test.js` (Prompt 52)
 - [x] `GraphMesh extends GraphObject` (Prompt 42): individual-mesh transform/vertex mutation API, `clone()`/`deepClone()`
 - [x] `GraphObjectFactory` (Prompt 41): `createBars`/`createPoints`/`createLineSegments`/`createSurfaceTiles`/`createNodes`, dispatching on `count` vs. the configurable `INSTANCING_THRESHOLD` (default 50) to either `GraphMesh[]` or one `GraphInstancedObject`
+- [x] Examples: `examples/03-instanced/main.js` (100,000 shader-spun bars, Prompt 50) and `examples/03-million/main.js` (1,000,000 noise-placed point spheres, octree-backed hover picking, Prompt 51)
+- [x] Phase 3 integration tests (Prompt 52): 1M instance create+dispose leak-free; instance picking correct for known positions; octree matches brute-force on 10K points; capacity grow preserves all attributes; ≤50 → meshes / >50 → InstancedObject boundary honored — all in `tests/integration/phase3.test.js`
+- [x] `docs/concepts/object.md` documents the object/mesh layer and the instancing decision table (Prompt 53)
+
+**Phase 3 — DONE.**
 
 ---
 

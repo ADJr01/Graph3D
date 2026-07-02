@@ -73,7 +73,7 @@ export class GraphInstancedObject extends GraphObject {
   /** @type {THREE.InstancedMesh} */
   #mesh;
 
-  /** @type {number} allocated instance slots — grown only by re-construction until Prompt 49 */
+  /** @type {number} allocated instance slots — setInstanceCount grows this via #growCapacity */
   #capacity;
 
   /** @type {Array<*>} per-instance user data, parallel to the instance buffers */
@@ -193,9 +193,9 @@ export class GraphInstancedObject extends GraphObject {
   }
 
   /**
-   * Number of instance slots allocated at construction. `setInstanceCount`
-   * may render anywhere from 0 up to this many; it never grows on its own
-   * (see `.claude/TODO.md`, Prompt 49 covers capacity growth).
+   * Number of instance slots currently allocated. `setInstanceCount` may
+   * render anywhere from 0 up to this many, and grows it automatically
+   * (reallocating at the next power of two) when asked to render more.
    * @returns {number}
    */
   get capacity() {
@@ -210,15 +210,19 @@ export class GraphInstancedObject extends GraphObject {
   // ── Bulk state ─────────────────────────────────────────────────────────────
 
   /**
-   * Set how many of the allocated instance slots are actually rendered.
-   * Must not exceed the capacity passed to the constructor — capacity growth
-   * is a separate, later concern (reallocating a new `GraphInstancedObject`).
+   * Set how many of the allocated instance slots are actually rendered. If
+   * `n` exceeds the current `capacity`, first grows capacity to the next
+   * power of two at or above `n` (`THREE.MathUtils.ceilPowerOfTwo`),
+   * reallocating `instanceMatrix`/`instanceColor` and every geometry-level
+   * per-instance attribute (`instanceId`, plus any defined via
+   * `defineAttribute`) and copying every existing instance's data across.
+   * Existing instance indices — and their octree entries — keep their
+   * meaning across a grow; nothing is remapped.
    * @param {number} n
    * @returns {this}
    * @throws {TypeError} If `n` is not a non-negative integer.
-   * @throws {RangeError} If `n` exceeds the allocated capacity.
    * @throws {Error} If called after `dispose()`.
-   * @example bars.setInstanceCount(42);
+   * @example bars.setInstanceCount(42); // grows capacity first if 42 > bars.capacity
    */
   setInstanceCount(n) {
     this.#assertNotDisposed('setInstanceCount');
@@ -228,9 +232,7 @@ export class GraphInstancedObject extends GraphObject {
       );
     }
     if (n > this.#capacity) {
-      throw new RangeError(
-        `GraphInstancedObject.setInstanceCount: ${n} exceeds allocated capacity ${this.#capacity}.`,
-      );
+      this.#growCapacity(THREE.MathUtils.ceilPowerOfTwo(n));
     }
     this.#mesh.count = n;
     return this;
@@ -276,12 +278,7 @@ export class GraphInstancedObject extends GraphObject {
     this.#assertNotDisposed('setInstancePosition');
     this.#assertIndex('setInstancePosition', i);
     this.#assertFiniteNumbers('setInstancePosition', x, y, z);
-    this.#mesh.getMatrixAt(i, this.#matrixScratch);
-    this.#matrixScratch.decompose(this.#positionScratch, this.#quaternionScratch, this.#scaleScratch);
-    this.#positionScratch.set(x, y, z);
-    this.#matrixScratch.compose(this.#positionScratch, this.#quaternionScratch, this.#scaleScratch);
-    this.#mesh.setMatrixAt(i, this.#matrixScratch);
-    this.#syncOctree(i, this.#positionScratch, Math.max(this.#scaleScratch.x, this.#scaleScratch.y, this.#scaleScratch.z));
+    this.#writePosition(i, x, y, z);
     return this;
   }
 
@@ -326,12 +323,51 @@ export class GraphInstancedObject extends GraphObject {
     this.#assertNotDisposed('setInstanceScale');
     this.#assertIndex('setInstanceScale', i);
     this.#assertFiniteNumbers('setInstanceScale', sx, sy, sz);
-    this.#mesh.getMatrixAt(i, this.#matrixScratch);
-    this.#matrixScratch.decompose(this.#positionScratch, this.#quaternionScratch, this.#scaleScratch);
-    this.#scaleScratch.set(sx, sy, sz);
-    this.#matrixScratch.compose(this.#positionScratch, this.#quaternionScratch, this.#scaleScratch);
-    this.#mesh.setMatrixAt(i, this.#matrixScratch);
-    this.#syncOctree(i, this.#positionScratch, Math.max(this.#scaleScratch.x, this.#scaleScratch.y, this.#scaleScratch.z));
+    this.#writeScale(i, sx, sy, sz);
+    return this;
+  }
+
+  // ── Bulk transform (typed-array, zero-allocation) ─────────────────────────
+
+  /**
+   * Overwrite every instance's position in one pass, preserving each
+   * instance's current rotation and scale. Reuses this object's scratch
+   * matrix/vector/quaternion across the whole array — no per-instance
+   * allocation — so chart `update()` should call this instead of looping
+   * `setInstancePosition` over tens of thousands of instances.
+   * @param {Float32Array} positions - Flat `[x0, y0, z0, x1, y1, z1, ...]`, length `capacity * 3`.
+   * @returns {this}
+   * @throws {TypeError} If `positions` is not a `Float32Array` of length `capacity * 3`.
+   * @throws {Error} If called after `dispose()`.
+   * @example bars.setAllPositions(new Float32Array([0, 0, 0, 1, 0, 0])); // capacity === 2
+   */
+  setAllPositions(positions) {
+    this.#assertNotDisposed('setAllPositions');
+    this.#assertTypedArray('setAllPositions', positions, this.#capacity * 3);
+    for (let i = 0; i < this.#capacity; i++) {
+      const o = i * 3;
+      this.#writePosition(i, positions[o], positions[o + 1], positions[o + 2]);
+    }
+    return this;
+  }
+
+  /**
+   * Overwrite every instance's scale in one pass, preserving each instance's
+   * current position and rotation. Reuses this object's scratch matrix/
+   * vector/quaternion across the whole array — no per-instance allocation.
+   * @param {Float32Array} scales - Flat `[sx0, sy0, sz0, sx1, sy1, sz1, ...]`, length `capacity * 3`.
+   * @returns {this}
+   * @throws {TypeError} If `scales` is not a `Float32Array` of length `capacity * 3`.
+   * @throws {Error} If called after `dispose()`.
+   * @example bars.setAllScales(new Float32Array([1, 2, 1, 1, 3, 1])); // capacity === 2
+   */
+  setAllScales(scales) {
+    this.#assertNotDisposed('setAllScales');
+    this.#assertTypedArray('setAllScales', scales, this.#capacity * 3);
+    for (let i = 0; i < this.#capacity; i++) {
+      const o = i * 3;
+      this.#writeScale(i, scales[o], scales[o + 1], scales[o + 2]);
+    }
     return this;
   }
 
@@ -352,6 +388,29 @@ export class GraphInstancedObject extends GraphObject {
     this.#assertIndex('setInstanceColor', i);
     this.#colorScratch.set(color);
     this.#mesh.setColorAt(i, this.#colorScratch);
+    return this;
+  }
+
+  /**
+   * Overwrite every instance's color in one pass via a direct typed-array
+   * copy into the underlying `InstancedBufferAttribute` — no per-instance
+   * `THREE.Color` allocation, unlike looping `setInstanceColor`. Values are
+   * written as-is (same raw RGB floats `THREE.Color.toArray()` produces),
+   * so build `colors` with `THREE.Color` up front if conversion from
+   * hex/CSS strings is needed.
+   * @param {Float32Array} colors - Flat `[r0, g0, b0, r1, g1, b1, ...]`, length `capacity * 3`.
+   * @returns {this}
+   * @throws {TypeError} If `colors` is not a `Float32Array` of length `capacity * 3`.
+   * @throws {Error} If called after `dispose()`.
+   * @example bars.setAllColors(new Float32Array([1, 0, 0, 0, 1, 0])); // capacity === 2
+   */
+  setAllColors(colors) {
+    this.#assertNotDisposed('setAllColors');
+    this.#assertTypedArray('setAllColors', colors, this.#capacity * 3);
+    if (this.#mesh.instanceColor === null) {
+      this.#mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(this.#capacity * 3), 3);
+    }
+    this.#mesh.instanceColor.array.set(colors);
     return this;
   }
 
@@ -681,6 +740,111 @@ export class GraphInstancedObject extends GraphObject {
   }
 
   // ── Private ────────────────────────────────────────────────────────────────
+
+  /**
+   * Reallocate every capacity-scoped GPU resource — `instanceMatrix`,
+   * `instanceColor`, and every geometry-level per-instance attribute
+   * (`instanceId` plus any defined via `defineAttribute`) — at `newCapacity`,
+   * copying each existing instance's data across. Static per-vertex geometry
+   * data (position/normal/uv/index) is untouched. The octree is untouched
+   * too: every existing instance keeps its current index, so its octree
+   * entry (if any) stays valid without remapping.
+   * @param {number} newCapacity
+   */
+  #growCapacity(newCapacity) {
+    const oldMesh = this.#mesh;
+    const oldGeometry = oldMesh.geometry;
+    const oldCapacity = this.#capacity;
+
+    const newGeometry = oldGeometry.clone();
+    for (const name of Object.keys(newGeometry.attributes)) {
+      const oldAttribute = oldGeometry.getAttribute(name);
+      if (!oldAttribute.isInstancedBufferAttribute) continue;
+
+      const itemSize = oldAttribute.itemSize;
+      const grownArray = new Float32Array(newCapacity * itemSize);
+      if (name === 'instanceId') {
+        // Every slot needs a stable id, not just the ones carried over.
+        for (let i = 0; i < newCapacity; i++) grownArray[i] = i;
+      } else {
+        grownArray.set(oldAttribute.array);
+      }
+      const grownAttribute = new THREE.InstancedBufferAttribute(grownArray, itemSize);
+      grownAttribute.setUsage(oldAttribute.usage);
+      newGeometry.setAttribute(name, grownAttribute);
+    }
+
+    const newMesh = new THREE.InstancedMesh(newGeometry, oldMesh.material, newCapacity);
+    newMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    newMesh.instanceMatrix.array.set(oldMesh.instanceMatrix.array);
+    if (oldMesh.instanceColor !== null) {
+      newMesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(newCapacity * 3).fill(1), 3);
+      newMesh.instanceColor.array.set(oldMesh.instanceColor.array);
+    }
+    newMesh.count = oldMesh.count;
+
+    // Every instance's data now lives in newMesh/newGeometry — safe to
+    // release the old GPU buffers: instanceMatrix/instanceColor via the old
+    // mesh's own 'dispose' event (mirrors dispose()), everything else
+    // (instanceId, custom attributes, position/normal/uv/index) via the old
+    // geometry's, since it's being fully discarded in favor of the clone.
+    oldMesh.dispatchEvent({ type: 'dispose' });
+    oldGeometry.dispose();
+
+    this._replaceThree(newMesh);
+    this.#mesh = newMesh;
+    this.#pickMeshScratch.geometry = newGeometry;
+    this.#instanceUserData.length = newCapacity;
+    if (this.#cullingEnabled) {
+      // New slots have no captured transform yet; a degenerate default keeps
+      // them consistent with an instance that has never been positioned —
+      // #applyCulling never marks them visible until the octree gets an
+      // entry for them, at which point #syncOctree recaptures the real one.
+      for (let i = oldCapacity; i < newCapacity; i++) this.#cullingBaseMatrices.push(new THREE.Matrix4());
+    }
+    this.#capacity = newCapacity;
+  }
+
+  /**
+   * Decompose/recompose instance `i`'s matrix around a new position,
+   * preserving its current rotation and scale. Shared by `setInstancePosition`
+   * and `setAllPositions` so the decompose/compose/octree-sync sequence has
+   * one authoritative implementation.
+   * @param {number} i @param {number} x @param {number} y @param {number} z
+   */
+  #writePosition(i, x, y, z) {
+    this.#mesh.getMatrixAt(i, this.#matrixScratch);
+    this.#matrixScratch.decompose(this.#positionScratch, this.#quaternionScratch, this.#scaleScratch);
+    this.#positionScratch.set(x, y, z);
+    this.#matrixScratch.compose(this.#positionScratch, this.#quaternionScratch, this.#scaleScratch);
+    this.#mesh.setMatrixAt(i, this.#matrixScratch);
+    this.#syncOctree(i, this.#positionScratch, Math.max(this.#scaleScratch.x, this.#scaleScratch.y, this.#scaleScratch.z));
+  }
+
+  /**
+   * Decompose/recompose instance `i`'s matrix around a new scale, preserving
+   * its current position and rotation. Shared by `setInstanceScale` and
+   * `setAllScales`.
+   * @param {number} i @param {number} sx @param {number} sy @param {number} sz
+   */
+  #writeScale(i, sx, sy, sz) {
+    this.#mesh.getMatrixAt(i, this.#matrixScratch);
+    this.#matrixScratch.decompose(this.#positionScratch, this.#quaternionScratch, this.#scaleScratch);
+    this.#scaleScratch.set(sx, sy, sz);
+    this.#matrixScratch.compose(this.#positionScratch, this.#quaternionScratch, this.#scaleScratch);
+    this.#mesh.setMatrixAt(i, this.#matrixScratch);
+    this.#syncOctree(i, this.#positionScratch, Math.max(sx, sy, sz));
+  }
+
+  /** @param {string} method @param {*} array @param {number} expectedLength @throws {TypeError} */
+  #assertTypedArray(method, array, expectedLength) {
+    if (!(array instanceof Float32Array) || array.length !== expectedLength) {
+      const received = array instanceof Float32Array ? `Float32Array(${array.length})` : JSON.stringify(array);
+      throw new TypeError(
+        `GraphInstancedObject.${method}: expected a Float32Array of length ${expectedLength}, received ${received}.`,
+      );
+    }
+  }
 
   /** Query the octree for which instances are inside the current camera frustum right now. */
   #applyCulling() {

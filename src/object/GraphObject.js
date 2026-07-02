@@ -96,6 +96,33 @@ export class GraphObject {
     return false;
   }
 
+  // ── Subclass hooks ─────────────────────────────────────────────────────────
+
+  /**
+   * Swap the wrapped `THREE.Object3D` for a new one, carrying over the
+   * current `name` and scene attachment. For subclasses that must
+   * reallocate their underlying Three.js object in place — e.g.
+   * `GraphInstancedObject` rebuilding a larger `InstancedMesh` when growing
+   * capacity — instead of disposing and reconstructing the whole wrapper.
+   * Does not dispose the outgoing object; the caller releases its GPU
+   * resources before or after calling this.
+   * @param {THREE.Object3D} three
+   * @returns {void}
+   * @throws {TypeError} If `three` is not a `THREE.Object3D`.
+   * @throws {Error} If called after `dispose()`.
+   * @protected
+   */
+  _replaceThree(three) {
+    this.#assertNotDisposed('_replaceThree');
+    if (!(three instanceof THREE.Object3D)) {
+      throw new TypeError('GraphObject._replaceThree: three must be a THREE.Object3D instance.');
+    }
+    this.#scene.remove(this.#three);
+    this.#three = three;
+    this.#three.name = this.#name;
+    this.#scene.add(this.#three);
+  }
+
   // ── Naming ─────────────────────────────────────────────────────────────────
 
   /**
