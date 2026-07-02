@@ -92,17 +92,18 @@ Layers are ordered bottom-to-top. A layer may only import from layers **below** 
 
 ---
 
-### Phase 4 — Compositional Core
+### Phase 4 — Compositional Core — **DONE**
 **Scope:** `src/compose/`  
-**Prompts:** 41–55  
+**Prompts:** 41–55, 74–85 (Selection/join and Axis/annotation were pulled forward into Phase 4 as v3 additions — see `prompts.md`)  
 **Exit criteria:**
-- [ ] Scales: `linear`, `log`, `pow`, `sqrt`, `band`, `point`, `ordinal`, `time` — all with `.domain()`, `.range()`, `.nice()`, `.clamp()`, `.ticks()`, `.tickFormat()` per D3 convention
-- [ ] Generators: `generator.line`, `generator.area`, `generator.arc`, `generator.symbol` returning Three.js geometries
-- [ ] Layouts: `force`, `tree`, `pack`, `treemap`, `stack` — operate on plain data arrays, return position arrays
-- [ ] Color palettes: `viridis`, `plasma`, `inferno`, `magma`, `cividis`, `turbo` built-in; `palette.sequential`, `palette.diverging`, `palette.categorical`; user-extensible
-- [ ] Axis: `GraphAxis` renders tick lines, labels (SDF text after Phase 6), and gridlines; subscribes to scale changes
-- [ ] All `compose/` modules are pure functions or classes with no Three.js import (Three.js objects are output only from generators)
-- [ ] Coverage ≥ 85% lines, ≥ 80% branches across `src/compose/`
+- [x] Scales: `linear`, `log`, `pow`, `sqrt`, `band`, `point`, `ordinal`, `time` — all with `.domain()`, `.range()`, `.nice()`, `.clamp()`, `.ticks()`, `.tickFormat()` per D3 convention
+- [x] Generators: `generator.line`, `generator.bar`, `generator.point`, `generator.surface`, `generator.arc` returning Three.js-ready buffers/geometry
+- [x] Layouts: `force`, `tree`, `pack`, `stack`, `grid` — operate on plain data arrays, return position arrays
+- [x] Color palettes: `viridis`, `plasma`, `inferno`, `magma`, `cividis`, `turbo` built-in; `color.sequential`, `color.diverging`, `color.categorical`; user-extensible via `palette.custom`/`fromCSS`
+- [x] Axis: `Axis` renders tick lines, labels (SDF text after Phase 6), and a spine; consumes the scale's own `.ticks()`/`.tickFormat()`
+- [x] Selection & the data join: `Selection`/`.data(newData, keyFn).join(...)` (v3 addition) — the flagship capstone (`docs/concepts/compose.md`, `examples/04-compose/`) proves Selection + join + scales + palettes compose without a chart class
+- [x] All `compose/` modules are pure functions or classes with no Three.js import (Three.js objects are output only from generators) — except the three sanctioned carve-outs (`compose/selection`, `compose/axis`, `compose/annotation`), documented in `CLAUDE.md` §1.4
+- [x] Coverage ≥ 85% lines, ≥ 80% branches across `src/compose/`
 
 ---
 

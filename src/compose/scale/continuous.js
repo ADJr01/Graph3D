@@ -56,12 +56,16 @@ const identity = (x) => x;
  * close over a mutable value (e.g. `pow()`'s `exponent`) that changes later.
  * @param {(x: number) => number} [transform] Applied to domain values before interpolating.
  * @param {(x: number) => number} [untransform] `transform`'s inverse, applied after `invert()`.
+ * @param {(a: *, b: *) => (t: number) => *} [interpolator] Per-segment interpolator factory,
+ *   applied to each adjacent range pair. Defaults to the generic `interpolate()` dispatcher;
+ *   overridden by `palette.interpolateRGB/HSL/LAB` (Prompt 63) to pick a color space without
+ *   duplicating this piecewise/bisect engine (CLAUDE.md §1.1 DRY).
  * @returns {ContinuousScale}
  * @example
  * const s = continuous().domain([0, 100]).range([0, 1]);
  * s(50); // 0.5
  */
-export function continuous(transform = identity, untransform = identity) {
+export function continuous(transform = identity, untransform = identity, interpolator = interpolate) {
   let domainArr = [0, 1];
   let rangeArr = [0, 1];
   let clampEnabled = false;
@@ -74,7 +78,7 @@ export function continuous(transform = identity, untransform = identity) {
     const t = td0 === td1 ? 0 : (transform(v) - td0) / (td1 - td0);
     // Routed through the interpolate module (not a local lerp) so non-numeric
     // ranges — colors, e.g. `.range(['#ff0000', '#0000ff'])` — work for free.
-    return interpolate(rangeArr[i - 1], rangeArr[i])(t);
+    return interpolator(rangeArr[i - 1], rangeArr[i])(t);
   }
 
   scale.domain = function (arr) {
@@ -152,7 +156,7 @@ export function continuous(transform = identity, untransform = identity) {
   };
 
   scale.copy = function () {
-    return continuous(transform, untransform).domain(domainArr).range(rangeArr).clamp(clampEnabled);
+    return continuous(transform, untransform, interpolator).domain(domainArr).range(rangeArr).clamp(clampEnabled);
   };
 
   return scale;

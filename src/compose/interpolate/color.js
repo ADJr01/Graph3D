@@ -195,6 +195,35 @@ function labToRgb(lab) {
 }
 
 /**
+ * Formats 0–255 RGB channels as a `'#rrggbb'` hex string — the low-level
+ * hex formatter, exposed so palette formulas (`compose/palette/`, Prompt 61)
+ * can build colors without duplicating hex-formatting math (CLAUDE.md §1.1 DRY).
+ * @param {number} r
+ * @param {number} g
+ * @param {number} b
+ * @returns {string}
+ * @example hex(255, 0, 0); // '#ff0000'
+ */
+export function hex(r, g, b) {
+  return rgbToHex({ r, g, b });
+}
+
+/**
+ * Formats an `{h, s, l}` triple (`h` in degrees, any real number; `s`/`l` in
+ * `0..1`) as a `'#rrggbb'` hex string — the low-level HSL formatter, exposed
+ * so palette formulas (`compose/palette/`, Prompt 61) can build colors
+ * without duplicating HSL math (CLAUDE.md §1.1 DRY).
+ * @param {number} h Hue in degrees; wrapped into `[0, 360)`.
+ * @param {number} s Saturation, `0..1`.
+ * @param {number} l Lightness, `0..1`.
+ * @returns {string}
+ * @example hsl(0, 1, 0.5); // '#ff0000'
+ */
+export function hsl(h, s, l) {
+  return rgbToHex(hslToRgb({ h: ((h % 360) + 360) % 360, s, l }));
+}
+
+/**
  * Interpolates two colors through RGB space (straight per-channel lerp).
  * The default color space used by the generic `interpolate()` dispatcher.
  * @param {string|{r: number, g: number, b: number}} a

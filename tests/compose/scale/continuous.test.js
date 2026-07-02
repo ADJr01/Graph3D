@@ -85,6 +85,12 @@ describe('continuous with a color range', () => {
     expect(s(100)).toBe('#0000ff');
     expect(s(50)).toBe('#800080');
   });
+
+  it('accepts a custom per-segment interpolator, used by palette.interpolateRGB/HSL/LAB', () => {
+    const customInterpolator = () => () => '#123456';
+    const s = continuous(undefined, undefined, customInterpolator).domain([0, 1]).range(['#ff0000', '#0000ff']);
+    expect(s(0.5)).toBe('#123456');
+  });
 });
 
 // ── copy ───────────────────────────────────────────────────────────────────

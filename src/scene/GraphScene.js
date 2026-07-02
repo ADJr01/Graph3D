@@ -6,43 +6,19 @@ import { GraphSceneShadows } from './GraphSceneShadows.js';
 import { GraphSceneClipping } from './GraphSceneClipping.js';
 import { THEMES, VALID_THEMES, buildTheme } from './GraphSceneThemes.js';
 import { getSceneObjectsByName } from './GraphSceneRegistry.js';
+import { disposeMaterial, disposeObjectTree } from '../core/GraphDisposal.js';
+// scene/ importing from compose/selection is a sanctioned exception (CLAUDE.md
+// §1.4's scene/ row) — Selection is the join-ready read/write handle
+// selectAll() below hands out, wrapping selectByName's existing matches.
+import { Selection } from '../compose/selection/index.js';
 
 /** @type {{x:number,y:number,width:number,height:number}} */
 const FULL_CANVAS_VIEWPORT = Object.freeze({ x: 0, y: 0, width: 1, height: 1 });
 
-/**
- * Disposes a material and all THREE.Texture values it references.
- * Handles both single materials and arrays of materials.
- * @param {THREE.Material|THREE.Material[]} material
- */
-export function disposeMaterial(material) {
-  if (Array.isArray(material)) {
-    for (const m of material) disposeMaterial(m);
-    return;
-  }
-  for (const value of Object.values(material)) {
-    if (value instanceof THREE.Texture) value.dispose();
-  }
-  material.dispose();
-}
-
-/**
- * Walks an Object3D subtree and disposes every geometry/material reachable
- * from it. Shared by `GraphScene.dispose()` (the whole-scene safety net) and
- * any object wrapper whose own `dispose()` needs to release a multi-mesh
- * hierarchy it doesn't otherwise track piece by piece (e.g. a loaded model).
- * @param {THREE.Object3D} object3D
- */
-export function disposeObjectTree(object3D) {
-  object3D.traverse((object) => {
-    if (object.geometry) {
-      object.geometry.dispose();
-    }
-    if (object.material) {
-      disposeMaterial(object.material);
-    }
-  });
-}
+// Re-exported for backward compatibility — these moved to core/GraphDisposal.js
+// (see that file's doc comment for why) but scene/index.js and existing
+// callers still import them from here.
+export { disposeMaterial, disposeObjectTree };
 
 /**
  * Wraps a THREE.Scene with managed defaults and rigorous disposal.
@@ -419,6 +395,58 @@ export class GraphScene {
       );
     }
     return getSceneObjectsByName(this.#scene, name);
+  }
+
+  /**
+   * A `Selection` over every `GraphObject` registered under `name` — the
+   * join-ready counterpart to `selectByName` (which hands back raw wrapper
+   * instances). Auto-chooses the backend from what's actually registered:
+   * one `GraphInstancedObject` → an `'instanced'` backend spanning its
+   * currently rendered instances (`object.count`); one or more `GraphMesh`es
+   * → a `'meshes'` backend. `selectByName`/`selectInstance` remain the
+   * low-level escape hatches beneath this — reach for them directly when you
+   * need the raw wrapper instances rather than a `Selection`.
+   *
+   * Nothing registered under `name` returns an empty, template-less
+   * `Selection` — reading it (`size`, `data`, ...) works, but joining new
+   * data onto it and calling `.enter()` throws, since there's no mesh
+   * template or `GraphInstancedObject` to materialize new members into
+   * (construct a `Selection` directly with a template, or create the
+   * initial batch via `GraphObjectFactory` first, then `selectAll` finds it).
+   * @param {string} name
+   * @returns {Selection}
+   * @throws {TypeError} If `name` is not a non-empty string.
+   * @throws {Error} If `name` resolves to a mix of instanced and non-instanced
+   *   objects, or more than one instanced object.
+   * @throws {Error} If called after `dispose()`.
+   * @example scene.selectAll('bars').attr('color', (d) => palette(d.category));
+   */
+  selectAll(name) {
+    this.#assertNotDisposed('selectAll');
+    if (typeof name !== 'string' || name.length === 0) {
+      throw new TypeError(`GraphScene.selectAll: name must be a non-empty string, received ${JSON.stringify(name)}.`);
+    }
+    const matches = getSceneObjectsByName(this.#scene, name);
+    if (matches.length === 0) {
+      return new Selection({ type: 'meshes', meshes: [] });
+    }
+
+    const instanced = matches.filter((object) => object.isInstanced);
+    if (instanced.length > 0) {
+      if (instanced.length > 1 || matches.length > instanced.length) {
+        throw new Error(
+          `GraphScene.selectAll: '${name}' must resolve to either one instanced object or only ` +
+            `non-instanced objects, found ${matches.length} objects (${instanced.length} instanced) in scene '${this.#name}'.`,
+        );
+      }
+      const object = instanced[0];
+      return new Selection({
+        type: 'instanced',
+        object,
+        indices: Uint32Array.from({ length: object.count }, (_, i) => i),
+      });
+    }
+    return new Selection({ type: 'meshes', meshes: matches });
   }
 
   /**

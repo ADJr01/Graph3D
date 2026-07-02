@@ -1,5 +1,7 @@
 import { GraphObject } from './GraphObject.js';
-import { disposeObjectTree } from '../scene/index.js';
+// Imports core/GraphDisposal.js directly, not '../scene/index.js' — see
+// GraphObject.js's identical note on why object/ must not import that barrel.
+import { disposeObjectTree } from '../core/GraphDisposal.js';
 
 /**
  * Ref-counted per-format model cache: the network fetch + parse for a given

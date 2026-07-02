@@ -11,6 +11,16 @@ export { FrameBudget } from './core/FrameBudget.js';
 export { WorkerPool } from './core/WorkerPool.js';
 export {
   scale,
+  color,
+  palette,
+  generator,
+  layout,
+  Selection,
+  Axis,
+  annotation,
+  accessor,
+  accessorField,
+  buildBuffers,
   interpolate,
   interpolateNumber,
   interpolateRgb,

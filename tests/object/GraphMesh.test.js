@@ -170,6 +170,33 @@ describe('GraphMesh transform', () => {
     const mesh = makeMesh();
     expect(() => mesh.lookAt(NaN, 0, 0)).toThrow(TypeError);
   });
+
+  it('getPosition/getRotation/getScale return fresh copies reflecting current state', () => {
+    const mesh = makeMesh();
+    mesh.setPosition(1, 2, 3).setRotation(new THREE.Euler(0, Math.PI / 2, 0)).setScale(4, 5, 6);
+
+    const position = mesh.getPosition();
+    expect(position.toArray()).toEqual([1, 2, 3]);
+    position.x = 999; // mutating the copy must not affect the mesh
+    expect(mesh.three.position.x).toBe(1);
+
+    expect(mesh.getRotation().y).toBeCloseTo(Math.PI / 2);
+    expect(mesh.getScale().toArray()).toEqual([4, 5, 6]);
+  });
+
+  it('setVisible toggles THREE.Object3D.visible', () => {
+    const mesh = makeMesh();
+    expect(mesh.three.visible).toBe(true);
+    mesh.setVisible(false);
+    expect(mesh.three.visible).toBe(false);
+    mesh.setVisible(true);
+    expect(mesh.three.visible).toBe(true);
+  });
+
+  it('setVisible throws TypeError for a non-boolean', () => {
+    const mesh = makeMesh();
+    expect(() => mesh.setVisible(0)).toThrow(TypeError);
+  });
 });
 
 // ── Vertex-level ───────────────────────────────────────────────────────────────
@@ -319,5 +346,9 @@ describe('GraphMesh disposal', () => {
     expect(() => mesh.clone()).toThrow(pattern);
     expect(() => mesh.deepClone()).toThrow(pattern);
     expect(() => mesh.material).toThrow(pattern);
+    expect(() => mesh.getPosition()).toThrow(pattern);
+    expect(() => mesh.getRotation()).toThrow(pattern);
+    expect(() => mesh.getScale()).toThrow(pattern);
+    expect(() => mesh.setVisible(true)).toThrow(pattern);
   });
 });

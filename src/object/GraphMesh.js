@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { GraphObject } from './GraphObject.js';
-import { disposeMaterial } from '../scene/index.js';
+// Imports core/GraphDisposal.js directly, not '../scene/index.js' — see
+// GraphObject.js's identical note on why object/ must not import that barrel.
+import { disposeMaterial } from '../core/GraphDisposal.js';
 
 /**
  * Mutation API for a single mesh — the low-instance-count path
@@ -70,6 +72,44 @@ export class GraphMesh extends GraphObject {
   }
 
   // ── Transform ──────────────────────────────────────────────────────────────
+
+  /**
+   * Read the mesh's current position — a fresh `THREE.Vector3` (mutating it
+   * has no effect on the mesh; call `setPosition` to write changes back).
+   * Exists for read-modify-write callers (e.g. `Selection.attr('position.x', ...)`,
+   * Prompt 75) that need to change one component without disturbing the others.
+   * @returns {THREE.Vector3}
+   * @throws {Error} If called after `dispose()`.
+   * @example const p = mesh.getPosition(); mesh.setPosition(p.x + 1, p.y, p.z);
+   */
+  getPosition() {
+    this.#assertNotDisposed('getPosition');
+    return this.#mesh.position.clone();
+  }
+
+  /**
+   * Read the mesh's current rotation — a fresh `THREE.Euler` (mutating it has
+   * no effect on the mesh; call `setRotation` to write changes back).
+   * @returns {THREE.Euler}
+   * @throws {Error} If called after `dispose()`.
+   * @example const r = mesh.getRotation(); r.y += Math.PI / 2; mesh.setRotation(r);
+   */
+  getRotation() {
+    this.#assertNotDisposed('getRotation');
+    return this.#mesh.rotation.clone();
+  }
+
+  /**
+   * Read the mesh's current scale — a fresh `THREE.Vector3` (mutating it has
+   * no effect on the mesh; call `setScale` to write changes back).
+   * @returns {THREE.Vector3}
+   * @throws {Error} If called after `dispose()`.
+   * @example const s = mesh.getScale(); mesh.setScale(s.x, s.y * 2, s.z);
+   */
+  getScale() {
+    this.#assertNotDisposed('getScale');
+    return this.#mesh.scale.clone();
+  }
 
   /**
    * Set the mesh's position.
@@ -194,6 +234,24 @@ export class GraphMesh extends GraphObject {
     this.#assertNotDisposed('lookAt');
     this.#assertFiniteNumbers('lookAt', x, y, z);
     this.#mesh.lookAt(x, y, z);
+    return this;
+  }
+
+  /**
+   * Show or hide the mesh (`THREE.Object3D.visible`) without removing it
+   * from the scene or disturbing its transform.
+   * @param {boolean} visible
+   * @returns {this}
+   * @throws {TypeError} If `visible` is not a boolean.
+   * @throws {Error} If called after `dispose()`.
+   * @example mesh.setVisible(false);
+   */
+  setVisible(visible) {
+    this.#assertNotDisposed('setVisible');
+    if (typeof visible !== 'boolean') {
+      throw new TypeError(`GraphMesh.setVisible: expected a boolean, received ${JSON.stringify(visible)}.`);
+    }
+    this.#mesh.visible = visible;
     return this;
   }
 

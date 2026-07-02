@@ -408,6 +408,66 @@ describe('GraphScene.selectInstance()', () => {
   });
 });
 
+describe('GraphScene.selectAll()', () => {
+  let scene;
+  beforeEach(() => {
+    scene = new GraphScene({ graph3d: makeG3d(), name: 'main' });
+  });
+
+  it('returns a meshes-backend Selection over every GraphMesh registered under the name', () => {
+    const a = new GraphMesh({ scene: scene.three, name: 'pt', geometry: new THREE.BoxGeometry(), material: new THREE.MeshBasicMaterial() });
+    a.setUserData('datum', { v: 1 });
+    const b = new GraphMesh({ scene: scene.three, name: 'pt', geometry: new THREE.BoxGeometry(), material: new THREE.MeshBasicMaterial() });
+    b.setUserData('datum', { v: 2 });
+
+    const selection = scene.selectAll('pt');
+    expect(selection.size()).toBe(2);
+    expect(selection.data()).toEqual([{ v: 1 }, { v: 2 }]);
+  });
+
+  it('returns an instanced-backend Selection spanning object.count (not capacity)', () => {
+    const bars = new GraphInstancedObject({
+      scene: scene.three,
+      name: 'bars',
+      geometry: new THREE.BoxGeometry(),
+      material: new THREE.MeshBasicMaterial(),
+      count: 10,
+    });
+    bars.setInstanceCount(3);
+    bars.setInstanceUserData(0, 'a').setInstanceUserData(1, 'b').setInstanceUserData(2, 'c');
+
+    const selection = scene.selectAll('bars');
+    expect(selection.size()).toBe(3);
+    expect(selection.data()).toEqual(['a', 'b', 'c']);
+  });
+
+  it('returns an empty Selection when nothing is registered under the name', () => {
+    const selection = scene.selectAll('nonexistent');
+    expect(selection.empty()).toBe(true);
+  });
+
+  it('throws TypeError for a non-string name', () => {
+    expect(() => scene.selectAll(42)).toThrow(TypeError);
+  });
+
+  it('throws when a mix of instanced and non-instanced objects share a name', () => {
+    new GraphInstancedObject({ scene: scene.three, name: 'mixed', geometry: new THREE.BoxGeometry(), material: new THREE.MeshBasicMaterial(), count: 4 });
+    new GraphMesh({ scene: scene.three, name: 'mixed', geometry: new THREE.BoxGeometry(), material: new THREE.MeshBasicMaterial() });
+    expect(() => scene.selectAll('mixed')).toThrow(/must resolve to either one instanced object or only/);
+  });
+
+  it('throws when more than one instanced object shares a name', () => {
+    new GraphInstancedObject({ scene: scene.three, name: 'dup', geometry: new THREE.BoxGeometry(), material: new THREE.MeshBasicMaterial(), count: 4 });
+    new GraphInstancedObject({ scene: scene.three, name: 'dup', geometry: new THREE.BoxGeometry(), material: new THREE.MeshBasicMaterial(), count: 4 });
+    expect(() => scene.selectAll('dup')).toThrow(/must resolve to either one instanced object or only/);
+  });
+
+  it('throws after dispose()', () => {
+    scene.dispose();
+    expect(() => scene.selectAll('bars')).toThrow(/disposed/);
+  });
+});
+
 // ── dispose() ─────────────────────────────────────────────────────────────────
 
 describe('GraphScene.dispose()', () => {

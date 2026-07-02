@@ -5,6 +5,8 @@ import {
   interpolateRgb,
   interpolateHsl,
   interpolateLab,
+  hex,
+  hsl,
 } from '../../../src/compose/interpolate/color.js';
 
 describe('isColorLike', () => {
@@ -64,5 +66,28 @@ describe('interpolateLab', () => {
     const i = interpolateLab('#336699', '#cc3300');
     expect(i(0)).toBe('#336699');
     expect(i(1)).toBe('#cc3300');
+  });
+});
+
+describe('hex', () => {
+  it('formats 0-255 RGB channels as a hex string', () => {
+    expect(hex(255, 0, 0)).toBe('#ff0000');
+    expect(hex(0, 255, 0)).toBe('#00ff00');
+  });
+
+  it('clamps and rounds out-of-range/fractional channels', () => {
+    expect(hex(-10, 300, 127.6)).toBe('#00ff80');
+  });
+});
+
+describe('hsl', () => {
+  it('formats an {h, s, l} triple as a hex string', () => {
+    expect(hsl(0, 1, 0.5)).toBe('#ff0000');
+    expect(hsl(120, 1, 0.5)).toBe('#00ff00');
+  });
+
+  it('wraps hue outside [0, 360), including negative values', () => {
+    expect(hsl(-360, 1, 0.5)).toBe(hsl(0, 1, 0.5));
+    expect(hsl(480, 1, 0.5)).toBe(hsl(120, 1, 0.5));
   });
 });

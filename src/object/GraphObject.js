@@ -1,5 +1,9 @@
 import * as THREE from 'three';
-import { registerSceneObject, unregisterSceneObject } from '../scene/index.js';
+// Imports the leaf registry file directly, not '../scene/index.js' — that
+// barrel also re-exports GraphScene, and GraphScene now imports Selection
+// from compose/selection (Prompt 81), which imports GraphObject/GraphMesh —
+// importing the barrel here would close that into a cycle.
+import { registerSceneObject, unregisterSceneObject } from '../scene/GraphSceneRegistry.js';
 
 /**
  * Base wrapper for any scene entity. Every chart-facing object type (meshes,

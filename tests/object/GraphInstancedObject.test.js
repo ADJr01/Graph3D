@@ -127,6 +127,20 @@ describe('GraphInstancedObject.capacity', () => {
   });
 });
 
+describe('GraphInstancedObject.count', () => {
+  it('defaults to the count passed to the constructor', () => {
+    const obj = makeInstanced({ count: 42 });
+    expect(obj.count).toBe(42);
+  });
+
+  it('reflects setInstanceCount without changing capacity', () => {
+    const obj = makeInstanced({ count: 42 });
+    obj.setInstanceCount(10);
+    expect(obj.count).toBe(10);
+    expect(obj.capacity).toBe(42);
+  });
+});
+
 describe('GraphInstancedObject.isInstanced', () => {
   it('is true — GraphInstancedObject supports indexed instance access', () => {
     expect(makeInstanced().isInstanced).toBe(true);
@@ -325,6 +339,72 @@ describe('GraphInstancedObject transform setters', () => {
     expect(() => obj.setInstancePosition(-1, 0, 0, 0)).toThrow(RangeError);
     expect(() => obj.setInstanceRotation(5, new THREE.Euler())).toThrow(RangeError);
     expect(() => obj.setInstanceScale(5, 1, 1, 1)).toThrow(RangeError);
+  });
+});
+
+describe('GraphInstancedObject transform getters', () => {
+  it('getInstancePosition/getInstanceRotation/getInstanceScale reflect current state', () => {
+    const obj = makeInstanced();
+    obj.setInstancePosition(0, 1, 2, 3);
+    obj.setInstanceRotation(0, new THREE.Euler(0, Math.PI / 2, 0));
+    obj.setInstanceScale(0, 4, 5, 6);
+
+    const position = obj.getInstancePosition(0);
+    expect(position.toArray()).toEqual([1, 2, 3]);
+    position.x = 999; // mutating the copy must not affect the instance
+    expect(obj.getInstancePosition(0).x).toBe(1);
+
+    expect(obj.getInstanceRotation(0).y).toBeCloseTo(Math.PI / 2);
+    expect(obj.getInstanceScale(0).toArray()).toEqual([4, 5, 6]);
+  });
+
+  it('all transform getters throw RangeError for an out-of-bounds index', () => {
+    const obj = makeInstanced({ count: 5 });
+    expect(() => obj.getInstancePosition(5)).toThrow(RangeError);
+    expect(() => obj.getInstanceRotation(-1)).toThrow(RangeError);
+    expect(() => obj.getInstanceScale(5)).toThrow(RangeError);
+  });
+});
+
+describe('GraphInstancedObject.setInstanceVisible', () => {
+  it('hiding zeroes the matrix; showing restores the captured transform', () => {
+    const obj = makeInstanced();
+    obj.setInstancePosition(0, 1, 2, 3).setInstanceScale(0, 4, 5, 6);
+
+    obj.setInstanceVisible(0, false);
+    const hidden = new THREE.Matrix4();
+    obj.three.getMatrixAt(0, hidden);
+    expect(hidden.elements).toEqual(new Array(16).fill(0));
+
+    obj.setInstanceVisible(0, true);
+    expect(obj.getInstancePosition(0).toArray()).toEqual([1, 2, 3]);
+    expect(obj.getInstanceScale(0).toArray()).toEqual([4, 5, 6]);
+  });
+
+  it('showing an already-visible instance is a no-op', () => {
+    const obj = makeInstanced();
+    obj.setInstancePosition(0, 1, 2, 3);
+    obj.setInstanceVisible(0, true);
+    expect(obj.getInstancePosition(0).toArray()).toEqual([1, 2, 3]);
+  });
+
+  it('hiding an already-hidden instance does not overwrite the captured transform', () => {
+    const obj = makeInstanced();
+    obj.setInstancePosition(0, 1, 2, 3);
+    obj.setInstanceVisible(0, false);
+    obj.setInstanceVisible(0, false); // second hide must not capture the now-zeroed matrix
+    obj.setInstanceVisible(0, true);
+    expect(obj.getInstancePosition(0).toArray()).toEqual([1, 2, 3]);
+  });
+
+  it('throws TypeError for a non-boolean', () => {
+    const obj = makeInstanced();
+    expect(() => obj.setInstanceVisible(0, 1)).toThrow(TypeError);
+  });
+
+  it('throws RangeError for an out-of-bounds index', () => {
+    const obj = makeInstanced({ count: 5 });
+    expect(() => obj.setInstanceVisible(5, false)).toThrow(RangeError);
   });
 });
 
@@ -753,6 +833,14 @@ describe('GraphInstancedObject.defineAttribute / setInstanceAttribute', () => {
     expect(() => obj.setInstanceAttribute(5, 'pulsePhase', 1)).toThrow(RangeError);
   });
 
+  it('hasAttribute reflects defineAttribute and the built-in instanceId', () => {
+    const obj = makeInstanced();
+    expect(obj.hasAttribute('pulsePhase')).toBe(false);
+    obj.defineAttribute('pulsePhase', 1);
+    expect(obj.hasAttribute('pulsePhase')).toBe(true);
+    expect(obj.hasAttribute('instanceId')).toBe(true);
+  });
+
   it('commitAttribute bumps the attribute version', () => {
     const obj = makeInstanced();
     obj.defineAttribute('pulsePhase', 1);
@@ -848,5 +936,11 @@ describe('GraphInstancedObject disposal', () => {
     expect(() => obj.disableInstanceCulling()).toThrow(pattern);
     expect(() => obj.updateCulling()).toThrow(pattern);
     expect(() => obj.material).toThrow(pattern);
+    expect(() => obj.count).toThrow(pattern);
+    expect(() => obj.getInstancePosition(0)).toThrow(pattern);
+    expect(() => obj.getInstanceRotation(0)).toThrow(pattern);
+    expect(() => obj.getInstanceScale(0)).toThrow(pattern);
+    expect(() => obj.setInstanceVisible(0, false)).toThrow(pattern);
+    expect(() => obj.hasAttribute('pulsePhase')).toThrow(pattern);
   });
 });

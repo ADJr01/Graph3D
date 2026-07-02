@@ -46,12 +46,7 @@ function build({ scene, name, geometry, material, count, instancingThreshold }) 
   if (count <= threshold) {
     const objects = new Array(count);
     for (let i = 0; i < count; i++) {
-      objects[i] = new GraphMesh({
-        scene,
-        name: `${name}_${i}`,
-        geometry: geometry.clone(),
-        material: cloneMaterial(material),
-      });
+      objects[i] = GraphObjectFactory.createMesh(`${name}_${i}`, { scene, geometry, material });
     }
     return objects;
   }
@@ -73,6 +68,23 @@ function build({ scene, name, geometry, material, count, instancingThreshold }) 
  * // points is a GraphMesh[] of length 12 — points[0].setPosition(...), etc.
  */
 export class GraphObjectFactory {
+  /**
+   * A single independently-disposable `GraphMesh`, cloning `geometry`/
+   * `material` so it owns them outright (matches the per-mesh cloning `build()`
+   * already does below `instancingThreshold` — factored out here so the join
+   * system's enter-materialization (`compose/selection/join.js`, Prompt 79)
+   * can create one new mesh at a time without duplicating that clone logic,
+   * CLAUDE.md §1.1 DRY two-strike rule).
+   * @param {string} name
+   * @param {{ scene: THREE.Scene, geometry: THREE.BufferGeometry, material: THREE.Material|THREE.Material[] }} options
+   * @returns {GraphMesh}
+   * @throws {TypeError} If `geometry`/`material` don't match `GraphMesh`'s constructor requirements.
+   * @example GraphObjectFactory.createMesh('bar_3', { scene, geometry, material });
+   */
+  static createMesh(name, { scene, geometry, material }) {
+    return new GraphMesh({ scene, name, geometry: geometry.clone(), material: cloneMaterial(material) });
+  }
+
   /**
    * Bar-chart bars: unit boxes, meant to be scaled per datum along Y.
    * @param {number} count

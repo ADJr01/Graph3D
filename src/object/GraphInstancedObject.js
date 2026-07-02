@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { GraphObject } from './GraphObject.js';
-import { disposeMaterial } from '../scene/index.js';
+// Imports core/GraphDisposal.js directly, not '../scene/index.js' — see
+// GraphObject.js's identical note on why object/ must not import that barrel.
+import { disposeMaterial } from '../core/GraphDisposal.js';
 import { loop } from '../core/Graph3DLoop.js';
 import { Octree } from './Octree.js';
 
@@ -87,6 +89,9 @@ export class GraphInstancedObject extends GraphObject {
 
   /** @type {Set<number>} indices with a live octree entry — lets #syncOctree tell insert from update */
   #octreePositioned = new Set();
+
+  /** @type {Map<number, THREE.Matrix4>} real transform captured for indices currently hidden via setInstanceVisible(i, false), restored on setInstanceVisible(i, true) */
+  #hiddenMatrices = new Map();
 
   /** @type {number} geometry.boundingSphere.radius, cached once at construction */
   #geometryBoundingRadius;
@@ -200,6 +205,21 @@ export class GraphInstancedObject extends GraphObject {
    */
   get capacity() {
     return this.#capacity;
+  }
+
+  /**
+   * Number of instance slots currently rendered (`THREE.InstancedMesh.count`)
+   * — always `<= capacity`. Slots at or beyond this index aren't drawn even
+   * if allocated. Complements `capacity`/`setInstanceCount`; exists for
+   * callers (e.g. `GraphScene.selectAll`, the join system's slot allocator)
+   * that need to know how much of the batch is "live" right now.
+   * @returns {number}
+   * @throws {Error} If called after `dispose()`.
+   * @example bars.count; // 42
+   */
+  get count() {
+    this.#assertNotDisposed('count');
+    return this.#mesh.count;
   }
 
   /** @returns {true} */
@@ -327,6 +347,97 @@ export class GraphInstancedObject extends GraphObject {
     return this;
   }
 
+  /**
+   * Read one instance's current position — a fresh `THREE.Vector3` (mutating
+   * it has no effect on the instance). Exists for read-modify-write callers
+   * (e.g. `Selection.attr('position.x', ...)`, Prompt 75) that need to change
+   * one component without disturbing the others.
+   * @param {number} i
+   * @returns {THREE.Vector3}
+   * @throws {RangeError} If `i` is out of bounds.
+   * @throws {Error} If called after `dispose()`.
+   * @example const p = bars.getInstancePosition(0);
+   */
+  getInstancePosition(i) {
+    this.#assertNotDisposed('getInstancePosition');
+    this.#assertIndex('getInstancePosition', i);
+    this.#mesh.getMatrixAt(i, this.#matrixScratch);
+    this.#matrixScratch.decompose(this.#positionScratch, this.#quaternionScratch, this.#scaleScratch);
+    return this.#positionScratch.clone();
+  }
+
+  /**
+   * Read one instance's current rotation — a fresh `THREE.Euler` (mutating it
+   * has no effect on the instance).
+   * @param {number} i
+   * @returns {THREE.Euler}
+   * @throws {RangeError} If `i` is out of bounds.
+   * @throws {Error} If called after `dispose()`.
+   * @example const r = bars.getInstanceRotation(0);
+   */
+  getInstanceRotation(i) {
+    this.#assertNotDisposed('getInstanceRotation');
+    this.#assertIndex('getInstanceRotation', i);
+    this.#mesh.getMatrixAt(i, this.#matrixScratch);
+    this.#matrixScratch.decompose(this.#positionScratch, this.#quaternionScratch, this.#scaleScratch);
+    return new THREE.Euler().setFromQuaternion(this.#quaternionScratch);
+  }
+
+  /**
+   * Read one instance's current scale — a fresh `THREE.Vector3` (mutating it
+   * has no effect on the instance).
+   * @param {number} i
+   * @returns {THREE.Vector3}
+   * @throws {RangeError} If `i` is out of bounds.
+   * @throws {Error} If called after `dispose()`.
+   * @example const s = bars.getInstanceScale(0);
+   */
+  getInstanceScale(i) {
+    this.#assertNotDisposed('getInstanceScale');
+    this.#assertIndex('getInstanceScale', i);
+    this.#mesh.getMatrixAt(i, this.#matrixScratch);
+    this.#matrixScratch.decompose(this.#positionScratch, this.#quaternionScratch, this.#scaleScratch);
+    return this.#scaleScratch.clone();
+  }
+
+  // ── Per-instance visibility ────────────────────────────────────────────────
+
+  /**
+   * Show or hide one instance without shifting any other instance's index
+   * (unlike `setInstanceCount`). Hiding captures the instance's real
+   * transform and swaps in the same degenerate zero matrix
+   * `enableInstanceCulling` uses to cull instances out of the frustum;
+   * showing restores the captured transform. Call `commitMatrix()` after a
+   * batch of calls to upload the change.
+   * @param {number} i
+   * @param {boolean} visible
+   * @returns {this}
+   * @throws {RangeError} If `i` is out of bounds.
+   * @throws {TypeError} If `visible` is not a boolean.
+   * @throws {Error} If called after `dispose()`.
+   * @example bars.setInstanceVisible(0, false).commitMatrix();
+   */
+  setInstanceVisible(i, visible) {
+    this.#assertNotDisposed('setInstanceVisible');
+    this.#assertIndex('setInstanceVisible', i);
+    if (typeof visible !== 'boolean') {
+      throw new TypeError(`GraphInstancedObject.setInstanceVisible: expected a boolean, received ${JSON.stringify(visible)}.`);
+    }
+    if (visible) {
+      const restored = this.#hiddenMatrices.get(i);
+      if (restored !== undefined) {
+        this.#mesh.setMatrixAt(i, restored);
+        this.#hiddenMatrices.delete(i);
+      }
+    } else if (!this.#hiddenMatrices.has(i)) {
+      const captured = new THREE.Matrix4();
+      this.#mesh.getMatrixAt(i, captured);
+      this.#hiddenMatrices.set(i, captured);
+      this.#mesh.setMatrixAt(i, ZERO_MATRIX);
+    }
+    return this;
+  }
+
   // ── Bulk transform (typed-array, zero-allocation) ─────────────────────────
 
   /**
@@ -415,6 +526,21 @@ export class GraphInstancedObject extends GraphObject {
   }
 
   // ── Custom per-instance attributes ────────────────────────────────────────
+
+  /**
+   * Whether a per-instance attribute named `name` already exists — either
+   * built-in (`instanceId`) or previously defined via `defineAttribute`.
+   * Lets a caller (e.g. `Selection.attr`, Prompt 75) avoid `defineAttribute`'s
+   * "already exists" throw when it may run more than once for the same name.
+   * @param {string} name
+   * @returns {boolean}
+   * @throws {Error} If called after `dispose()`.
+   * @example if (!bars.hasAttribute('pulsePhase')) bars.defineAttribute('pulsePhase', 1);
+   */
+  hasAttribute(name) {
+    this.#assertNotDisposed('hasAttribute');
+    return this.#mesh.geometry.getAttribute(name) instanceof THREE.InstancedBufferAttribute;
+  }
 
   /**
    * Define a new per-instance attribute backed by an `InstancedBufferAttribute`,
