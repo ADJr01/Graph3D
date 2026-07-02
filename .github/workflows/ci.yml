@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Bundle size check
+        run: |
+          node -e "
+          const {statSync}=require('fs');
+          const LIMIT=100*1024;
+          const files=['dist/graph3d.esm.js','dist/graph3d.esm.min.js','dist/graph3d.umd.js'];
+          let fail=false;
+          for(const f of files){
+            const {size}=statSync(f);
+            const kb=(size/1024).toFixed(1);
+            const over=f.endsWith('.min.js')&&size>LIMIT;
+            if(over)fail=true;
+            console.log((over?'FAIL':'PASS')+' '+f+': '+kb+' KB');
+          }
+          if(fail){console.error('Minified bundle exceeds '+LIMIT/1024+' KB limit');process.exit(1);}
+          "
+
+      - name: Benchmark
+        run: npm run bench
+        continue-on-error: true
+
+      - name: Benchmark regression check
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          ARTIFACT_ID=$(gh api "repos/${GH_REPO}/actions/artifacts?name=bench-baseline&per_page=1" \
+            --jq '.artifacts[0].id // empty' 2>/dev/null || true)
+          if [ -n "$ARTIFACT_ID" ]; then
+            ARTIFACT_URL=$(gh api "repos/${GH_REPO}/actions/artifacts/${ARTIFACT_ID}" \
+              --jq '.archive_download_url')
+            curl -sL -H "Authorization: Bearer ${GH_TOKEN}" "$ARTIFACT_URL" -o baseline.zip
+            unzip -q baseline.zip -d bench-baseline/
+            node scripts/bench-regression.js bench-baseline/bench-results.json bench-results.json
+          else
+            echo "No baseline artifact found, skipping regression check"
+          fi
+
+      - name: Upload bench baseline
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-baseline
+          path: bench-results.json
+          if-no-files-found: ignore
+          overwrite: true
+
+      - name: Upload bench results
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-${{ github.sha }}
+          path: bench-results.json
+          if-no-files-found: ignore

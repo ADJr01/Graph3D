@@ -1,0 +1,41 @@
+{
+  "name": "graph3d.js",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "A developer-first 3D data visualization framework that treats charts as fully inspectable, fully controllable Three.js scenes — not black-box widgets.",
+  "main": "src/index.js",
+  "sideEffects": false,
+  "keywords": [
+    "3d",
+    "visualization",
+    "threejs",
+    "charts",
+    "webgl"
+  ],
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite examples/playground --config vite.config.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "build": "rollup -c",
+    "lint": "eslint src",
+    "format": "prettier --write src",
+    "bench": "node bench/harness.js"
+  },
+  "peerDependencies": {
+    "three": ">=0.150.0"
+  },
+  "devDependencies": {
+    "@rollup/plugin-node-resolve": "^16.0.3",
+    "@rollup/plugin-terser": "^1.0.0",
+    "@vitest/coverage-v8": "^4.1.9",
+    "eslint": "^10.6.0",
+    "jsdom": "^29.1.1",
+    "prettier": "^3.9.3",
+    "rollup": "^4.62.2",
+    "three": "^0.185.0",
+    "vite": "^8.1.0",
+    "vitest": "^4.1.9"
+  }
+}
