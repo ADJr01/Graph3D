@@ -1,7 +1,15 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import * as THREE from 'three';
 import { GraphInstancedObject } from '../../src/object/GraphInstancedObject.js';
 import { loop } from '../../src/core/Graph3DLoop.js';
+
+// vi.spyOn(loop, ...) is idempotent — spying on an already-spied method
+// returns the *same* mock and keeps accumulating its call history — so every
+// test that spies on the shared `loop` singleton must restore it afterward,
+// or a later test's spy would inherit earlier tests' calls.
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 const ZERO_MATRIX_ELEMENTS = new Array(16).fill(0);
 
@@ -497,6 +505,33 @@ describe('GraphInstancedObject.setInstanceColor', () => {
   });
 });
 
+describe('GraphInstancedObject.getInstanceColor', () => {
+  it('reads back a value written via setInstanceColor', () => {
+    const obj = makeInstanced();
+    obj.setInstanceColor(1, '#112233');
+    expect(obj.getInstanceColor(1).getHexString()).toBe('112233');
+  });
+
+  it('defaults to the shared material color before any per-instance color is set', () => {
+    const material = new THREE.MeshBasicMaterial({ color: '#ff0000' });
+    const obj = new GraphInstancedObject({ scene: new THREE.Scene(), name: 'a', geometry: new THREE.BoxGeometry(), material, count: 3 });
+    expect(obj.getInstanceColor(0).getHexString()).toBe('ff0000');
+  });
+
+  it('returns a fresh THREE.Color (mutating it has no effect on the instance)', () => {
+    const obj = makeInstanced();
+    obj.setInstanceColor(0, '#ffffff');
+    const color = obj.getInstanceColor(0);
+    color.set('#000000');
+    expect(obj.getInstanceColor(0).getHexString()).toBe('ffffff');
+  });
+
+  it('throws RangeError for an out-of-bounds index', () => {
+    const obj = makeInstanced({ count: 5 });
+    expect(() => obj.getInstanceColor(5)).toThrow(RangeError);
+  });
+});
+
 describe('GraphInstancedObject.setAllColors', () => {
   it('writes every instance color directly from a flat RGB Float32Array', () => {
     const obj = makeInstanced({ count: 2 });
@@ -520,6 +555,124 @@ describe('GraphInstancedObject.setAllColors', () => {
     const obj = makeInstanced({ count: 2 });
     expect(() => obj.setAllColors(new Float32Array(5))).toThrow(TypeError);
     expect(() => obj.setAllColors([1, 1, 1, 1, 1, 1])).toThrow(TypeError);
+  });
+});
+
+// ── Bulk setters: animated (Prompt 92) ──────────────────────────────────────
+// The bulk setters' `{ duration }` path registers a per-frame callback with
+// the shared `loop` instead of writing immediately. Since `loop.add` still
+// calls through to the real (jsdom) requestAnimationFrame, tests capture the
+// exact callback `loop.add` was given (mirroring the existing
+// enableInstanceCulling spy convention above) and invoke it directly with a
+// synthetic `deltaSeconds`, rather than waiting on a real RAF tick.
+
+describe('GraphInstancedObject bulk setters: animated', () => {
+  it('setAllPositions animates from the current positions toward the target, committing once per frame', () => {
+    const obj = makeInstanced({ count: 2 });
+    obj.setAllPositions(new Float32Array([0, 0, 0, 10, 0, 0]));
+    const commitSpy = vi.spyOn(obj, 'commitMatrix');
+    const addSpy = vi.spyOn(loop, 'add');
+
+    obj.setAllPositions(new Float32Array([10, 0, 0, 20, 0, 0]), { duration: 1000 });
+    const tick = addSpy.mock.calls[0][0];
+
+    tick(0.5); // 500ms of 1000ms elapsed
+    expect(obj.getInstancePosition(0).x).toBeCloseTo(5);
+    expect(obj.getInstancePosition(1).x).toBeCloseTo(15);
+    expect(commitSpy).toHaveBeenCalledTimes(1);
+
+    tick(0.5); // 1000ms elapsed -> lands exactly on target
+    expect(obj.getInstancePosition(0).x).toBeCloseTo(10);
+    expect(obj.getInstancePosition(1).x).toBeCloseTo(20);
+  });
+
+  it('setAllScales animates from the current scales toward the target', () => {
+    const obj = makeInstanced({ count: 1 });
+    obj.setAllScales(new Float32Array([1, 1, 1]));
+    const addSpy = vi.spyOn(loop, 'add');
+
+    obj.setAllScales(new Float32Array([3, 3, 3]), { duration: 1000 });
+    const tick = addSpy.mock.calls[0][0];
+    tick(0.5);
+    expect(obj.getInstanceScale(0).x).toBeCloseTo(2);
+  });
+
+  it('setAllColors animates from the shared material color when never previously set', () => {
+    const material = new THREE.MeshBasicMaterial({ color: '#ffffff' });
+    const obj = new GraphInstancedObject({ scene: new THREE.Scene(), name: 'a', geometry: new THREE.BoxGeometry(), material, count: 1 });
+    const addSpy = vi.spyOn(loop, 'add');
+
+    obj.setAllColors(new Float32Array([0, 0, 0]), { duration: 1000 });
+    const tick = addSpy.mock.calls[0][0];
+    tick(0.5);
+    expect(obj.getInstanceColor(0).r).toBeCloseTo(0.5);
+    tick(0.5);
+    expect(obj.getInstanceColor(0).r).toBeCloseTo(0);
+  });
+
+  it('setAllColors animates from a previously-set instanceColor buffer', () => {
+    const obj = makeInstanced({ count: 1 });
+    obj.setAllColors(new Float32Array([1, 0, 0]));
+    const addSpy = vi.spyOn(loop, 'add');
+
+    obj.setAllColors(new Float32Array([0, 1, 0]), { duration: 1000 });
+    const tick = addSpy.mock.calls[0][0];
+    tick(0.5);
+    expect(obj.getInstanceColor(0).r).toBeCloseTo(0.5);
+    expect(obj.getInstanceColor(0).g).toBeCloseTo(0.5);
+  });
+
+  it('applies the configured easing', () => {
+    const obj = makeInstanced({ count: 1 });
+    const addSpy = vi.spyOn(loop, 'add');
+    obj.setAllPositions(new Float32Array([10, 0, 0]), { duration: 1000, easing: 'easeInQuad' });
+    const tick = addSpy.mock.calls[0][0];
+    tick(0.5); // easeInQuad(0.5) === 0.25
+    expect(obj.getInstancePosition(0).x).toBeCloseTo(2.5);
+  });
+
+  it('unregisters from the shared loop once the transition finishes', () => {
+    const obj = makeInstanced({ count: 1 });
+    const addSpy = vi.spyOn(loop, 'add');
+    const removeSpy = vi.spyOn(loop, 'remove');
+    obj.setAllPositions(new Float32Array([10, 0, 0]), { duration: 100 });
+    const tick = addSpy.mock.calls[0][0];
+    tick(0.2); // 200ms > 100ms duration
+    expect(removeSpy).toHaveBeenCalledWith(tick);
+  });
+
+  it('a later call on the same bulk setter cancels an in-flight one instead of fighting it', () => {
+    const obj = makeInstanced({ count: 1 });
+    const addSpy = vi.spyOn(loop, 'add');
+    const removeSpy = vi.spyOn(loop, 'remove');
+    obj.setAllPositions(new Float32Array([10, 0, 0]), { duration: 1000 });
+    const firstTick = addSpy.mock.calls[0][0];
+    obj.setAllPositions(new Float32Array([0, 10, 0]), { duration: 1000 });
+    expect(removeSpy).toHaveBeenCalledWith(firstTick);
+  });
+
+  it('duration: 0 (the default) still writes immediately, unaffected', () => {
+    const obj = makeInstanced({ count: 1 });
+    obj.setAllPositions(new Float32Array([5, 0, 0]));
+    expect(obj.getInstancePosition(0).x).toBeCloseTo(5);
+  });
+
+  it('throws TypeError for a negative duration', () => {
+    const obj = makeInstanced({ count: 1 });
+    expect(() => obj.setAllPositions(new Float32Array([0, 0, 0]), { duration: -1 })).toThrow(TypeError);
+  });
+
+  it('throws TypeError for an unresolvable easing', () => {
+    const obj = makeInstanced({ count: 1 });
+    expect(() => obj.setAllPositions(new Float32Array([0, 0, 0]), { duration: 100, easing: 'nope' })).toThrow(TypeError);
+  });
+
+  it('dispose() cancels any in-flight bulk transition', () => {
+    const obj = makeInstanced({ count: 1 });
+    const removeSpy = vi.spyOn(loop, 'remove');
+    obj.setAllPositions(new Float32Array([10, 0, 0]), { duration: 1000 });
+    obj.dispose();
+    expect(removeSpy).toHaveBeenCalled();
   });
 });
 
@@ -833,6 +986,34 @@ describe('GraphInstancedObject.defineAttribute / setInstanceAttribute', () => {
     expect(() => obj.setInstanceAttribute(5, 'pulsePhase', 1)).toThrow(RangeError);
   });
 
+  it('getInstanceAttribute reads back a scalar (itemSize 1) as a single number', () => {
+    const obj = makeInstanced({ count: 5 });
+    obj.defineAttribute('pulsePhase', 1);
+    obj.setInstanceAttribute(2, 'pulsePhase', 0.75);
+    expect(obj.getInstanceAttribute(2, 'pulsePhase')).toBeCloseTo(0.75);
+  });
+
+  it('getInstanceAttribute reads back a vector (itemSize > 1) as a plain array', () => {
+    const obj = makeInstanced({ count: 5 });
+    obj.defineAttribute('categoryColor', 3);
+    obj.setInstanceAttribute(1, 'categoryColor', [0.1, 0.2, 0.3]);
+    const value = obj.getInstanceAttribute(1, 'categoryColor');
+    expect(value[0]).toBeCloseTo(0.1);
+    expect(value[1]).toBeCloseTo(0.2);
+    expect(value[2]).toBeCloseTo(0.3);
+  });
+
+  it('getInstanceAttribute throws when the attribute was never defined', () => {
+    const obj = makeInstanced();
+    expect(() => obj.getInstanceAttribute(0, 'missing')).toThrow(/call defineAttribute/);
+  });
+
+  it('getInstanceAttribute throws RangeError for an out-of-bounds index', () => {
+    const obj = makeInstanced({ count: 5 });
+    obj.defineAttribute('pulsePhase', 1);
+    expect(() => obj.getInstanceAttribute(5, 'pulsePhase')).toThrow(RangeError);
+  });
+
   it('hasAttribute reflects defineAttribute and the built-in instanceId', () => {
     const obj = makeInstanced();
     expect(obj.hasAttribute('pulsePhase')).toBe(false);
@@ -923,11 +1104,13 @@ describe('GraphInstancedObject disposal', () => {
     expect(() => obj.setAllPositions(new Float32Array(3))).toThrow(pattern);
     expect(() => obj.setAllScales(new Float32Array(3))).toThrow(pattern);
     expect(() => obj.setInstanceColor(0, 'white')).toThrow(pattern);
+    expect(() => obj.getInstanceColor(0)).toThrow(pattern);
     expect(() => obj.setAllColors(new Float32Array(3))).toThrow(pattern);
     expect(() => obj.setInstanceUserData(0, {})).toThrow(pattern);
     expect(() => obj.getInstanceUserData(0)).toThrow(pattern);
     expect(() => obj.defineAttribute('pulsePhase', 1)).toThrow(pattern);
     expect(() => obj.setInstanceAttribute(0, 'pulsePhase', 1)).toThrow(pattern);
+    expect(() => obj.getInstanceAttribute(0, 'pulsePhase')).toThrow(pattern);
     expect(() => obj.commitMatrix()).toThrow(pattern);
     expect(() => obj.commitColor()).toThrow(pattern);
     expect(() => obj.commitAttribute('pulsePhase')).toThrow(pattern);

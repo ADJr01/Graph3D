@@ -4,6 +4,7 @@ import { applyAttr } from './attr.js';
 import { applyStyle } from './style.js';
 import { filterBackend, sortBackend, mergeBackend } from './combinators.js';
 import { computeJoin, materializeEnter, removeBackend } from './join.js';
+import { SelectionTransition } from './SelectionTransition.js';
 
 /**
  * @param {*} backend
@@ -330,14 +331,19 @@ export class Selection {
   }
 
   /**
-   * Not implemented yet — the animation/timeline engine lands in Phase 5.
-   * Throws rather than silently no-op-ing (CLAUDE.md §1.5 Fail Fast); once
-   * wired, this will return a `SelectionTransition` for animated `.attr()`/
-   * `.style()` writes.
-   * @throws {Error} Always — requires Phase 5.
+   * A `SelectionTransition` (Prompt 91) over this selection's members —
+   * `.attr()`/`.style()` on it animate toward the given values (interpolating
+   * from each node's current value) instead of snapping, driven by the
+   * shared `anim` engine (Phase 5). `.remove()` on it defers removal until
+   * every scheduled write completes.
+   * @returns {SelectionTransition}
+   * @example
+   * joined.exit().transition().duration(400).attr('opacity', 0).remove();
+   * @example
+   * selection.transition().duration(600).delay((d, i) => i * 40).attr('position.y', (d) => d.value);
    */
   transition() {
-    throw new Error('Selection.transition: requires Phase 5 (the animation/timeline engine) — not implemented yet.');
+    return new SelectionTransition(this.#backend, this.size(), (index) => this.datum(index));
   }
 
   /**

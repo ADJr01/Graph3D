@@ -107,27 +107,46 @@ Layers are ordered bottom-to-top. A layer may only import from layers **below** 
 
 ---
 
-### Phase 5 — Animation & Transitions
+### Phase 5 — Animation & Transitions — **DONE**
 **Scope:** `src/anim/`  
-**Prompts:** 56–65  
+**Prompts:** 86–99 (renumbered from the original 56–65 as `prompts.md` grew during Phase 4's v3 additions — see `prompts.md`)  
 **Exit criteria:**
-- [ ] `GraphAnim` drives property tweens per-frame via the singleton loop; no `setTimeout`/`setInterval`
-- [ ] `GraphAnimTimeline` sequences multiple tweens with overlap and delay
-- [ ] `GraphAnimCurve` provides built-in easings: `linear`, `easeIn`, `easeOut`, `easeInOut`, `easeInBack`, `easeOutBounce`, `easeInElastic`; user-extensible
-- [ ] `GraphChartTransition` routes `.data(newData)` through a tween before re-binding; cancels in-flight tween on re-call
-- [ ] Camera tour (`CameraTour`) sequences `focusOn`, `dollyZoom`, `follow` waypoints with easing
+- [x] `GraphAnimCurve` (Prompt 86): every in/out/inOut easing family, `spring`, `bezier`, `noise`, `resolve(nameOrFn)`
+- [x] `GraphAnimKeyframe` (Prompt 87): per-property track with dot-paths; all interpolation delegates to `compose/interpolate` (no local lerp)
+- [x] `GraphAnimTimeline` (Prompt 88): `to`/`from`/`wait`/`then`/`play`/`pause`/`stop`/`reverse`/`seek`/`loop`; parallel by default, sequential after `.then()`
+- [x] `GraphAnim` (Prompt 89): engine root, one shared RAF tick drives every registered timeline; `timeline()`/`add()`/`remove()`, global `pause()`/`resume()`, `dispose()`
+- [x] `Transition` (Prompt 90): D3-flavored `.duration()`/`.delay()`/`.easing()`/`.on('start'|'end'|'interrupt')`
+- [x] `Selection.transition()` → `SelectionTransition` (Prompt 91): animated `.attr()`/`.style()`/`.remove()` over the join system, staggering via a per-datum `.delay()` function, batched per-frame buffer commits (never per-instance) on the instanced backend
+- [x] `GraphInstancedObject.setAllPositions`/`setAllScales`/`setAllColors` (Prompt 92): optional `{duration, easing}` animates the whole bulk array instead of memcpy-ing it
+- [x] Interrupt semantics (Prompt 93): a new `Transition`/`SelectionTransition` on the same target+path (or node+path) fires `'interrupt'` on the one it supersedes and picks up from the current interpolated state — `GraphAnimTimeline.interruptPath()` is the shared primitive underneath both
+- [x] `CameraTour` (Prompt 94): waypoint interpolation (position + lookAt + FOV), per-segment duration/easing, `pause`/`resume`/`skipToNext`/`cancel`, presets `.orbit()`/`.flyTo()`/`.cinematicReveal()`
+- [x] `GraphAnim.respectReducedMotion` (Prompt 95): registered timelines snap to their end values instead of animating; `GraphAnim.tween(from, to, options, onUpdate)` ad-hoc helper
+- [x] Keyframe groups (Prompt 96): `GraphAnimTimeline.onGroupComplete()` — one completion event per `.then()`-delimited parallel group, independent of the timeline's overall `onComplete`; `Transition.runningOn(target)`/`cancelAllOn(target)` are the introspection primitive a future `chart.runningTransitions()`/`cancelTransitions()` (Phase 8) will wrap — no `src/chart/` layer exists yet to attach those to directly
+- [x] `examples/05-transitions/main.js` (Prompt 97): a live data join re-transitioning every 2s (staggered enter, morphing update, dissolving exit) plus a `CameraTour.flyTo()` reframing on the new tallest bar
+- [x] Phase 5 cross-cutting tests (Prompt 98, `tests/integration/phase5.test.js`): targets reached within tolerance; `.then()` sequencing; interrupt state pickup; reduced-motion snap; `SelectionTransition` parity meshes vs. instanced; per-datum stagger delay; exit `.remove()` frees instanced slots only after completion
+- [x] `docs/concepts/anim.md` (Prompt 99): flat sugar API, timeline, and `SelectionTransition` documented side by side
 
 ---
 
-### Phase 6 — Materials & Procedural FX
-**Scope:** `src/material/`  
-**Prompts:** 66–80  
+### Phase 6 — Materials & Procedural FX — **DONE**
+**Scope:** `src/material/`
+**Prompts:** 100–115 (renumbered from this section's stale original range of 66–80 — corrected when the phase was completed, mirroring Phase 5's same correction)
 **Exit criteria:**
-- [ ] PBR material presets: `matte`, `gloss`, `metal`, `glass`, `emissive`, `holographic`, `wireframe-overlay`
-- [ ] SDF text (`SDFText.create`): GPU-rendered, resolution-independent; replaces canvas-sprite text
-- [ ] Procedural textures: gradient, noise (Perlin/simplex), checkerboard — returned as `THREE.DataTexture`
-- [ ] Every material preset has a disposal test (textures return to baseline)
-- [ ] No canvas-sprite text anywhere after this phase is complete
+- [x] `GraphObjectMaterial` (Prompt 100): `.set()`, `.applyShader()` (with dev-mode `preserveUniforms` hot-reload, Prompt 112), `.bindUniforms()` (`'auto'` time/resolution), `.setMap()` — all ref-counting-aware for shared textures (Prompt 111, `core/GraphDisposal.js`'s `retainTexture`/`releaseTexture`)
+- [x] PBR pass-through presets (Prompt 101): `standard`, `physical`, `basic`, `lambert`, `phong`, `toon`, `matcap`
+- [x] Custom-shader looks: `holographic` (Prompt 102), `crystal` (Prompt 103, chromatic-dispersion refraction), `glow` (Prompt 104)
+- [x] `glass`/`frostedGlass` (Prompt 103, real `transmission` + thin-film `iridescence`)
+- [x] `neon`/`pulse` (bloom-friendly emissive, breathing), `velvet` (Prompt 104)
+- [x] Metals & coated dielectrics: `liquidMercury`, `chrome`, `gold`, `copper`, `pearl`, `obsidian` (Prompt 105)
+- [x] `dataDriven` (Prompt 106): per-instance/per-vertex palette lookup; completes the Prompt 77 `Selection.style` per-instance `opacity`/`emissiveIntensity` link
+- [x] The `material`/`texture` namespaces assembled and re-exported from `src/index.js` (Prompt 107)
+- [x] SDF text (`SDFText.create`, Prompt 108): GPU-rendered, resolution-independent MSDF layout/shader engine — the bundled Roboto atlas binary itself is a known, documented gap (no MSDF tool/font available in this environment; same category as Phase 2's missing HDR assets)
+- [x] Procedural textures (Prompt 110): `gradient`, `noise`, `voronoi`, `cellular`, `checkerboard`, `dots`, `lines`, `paletteTexture` — all `THREE.DataTexture`
+- [x] `addPlanarReflection` (Prompt 111) and `setPaletteForAttribute` (Prompt 112) convenience helpers
+- [x] `examples/06-materials/main.js` (Prompt 113): 4×4 grid, one preset per bar, `studio-dark` themed, verified live in a browser
+- [x] Phase 6 cross-cutting tests (Prompt 114, `tests/integration/phase6.test.js`): every material renders/disposes clean, SDF crispness proxied structurally, palette texture matches its source fn, `dataDriven` samples correctly, `Selection.style('color')` backend parity
+- [x] `docs/concepts/material.md` (Prompt 115) with a material-picker gallery
+- [ ] No canvas-sprite text anywhere after this phase — not fully verifiable yet: `SDFText` exists and is the mandated replacement, but it isn't wired into `Axis`/`annotation.label` (still the Phase 4 metadata stub; see `docs/concepts/material.md`'s SDFText section for why) and no canvas-sprite text was ever added elsewhere, so there's nothing to replace today
 
 ---
 

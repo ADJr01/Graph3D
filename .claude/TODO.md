@@ -1,5 +1,17 @@
 # Deferred work, observed refactors, unreproducible bugs
 
+## `types/index.d.ts` has never existed (noticed during Phase 5, Prompts 86–90)
+
+CLAUDE.md §4's Definition of Done requires "Public API additions are reflected
+in `types/index.d.ts`," and JSDoc is described as "checked against
+`types/index.d.ts` in CI" (§1.6). No such file exists anywhere in the repo —
+not for Phase 1–4's public API either, so this predates Phase 5 and isn't
+specific to it. Every phase so far has shipped its public surface via JSDoc
++ `src/index.js`/layer `index.js` exports only. Not resolved during Phase 5:
+deciding whether to hand-write it, generate it from JSDoc (e.g. via
+`tsc --emitDeclarationOnly --allowJs`), or drop that Definition-of-Done line
+is a call bigger than one prompt's scope.
+
 ## Missing built-in HDR binary assets (Phase 2, Prompt 27)
 
 `GraphSceneEnvironment`'s built-in preset names (`studio-1k`, `cinema-night`, `daylight`)
@@ -64,15 +76,53 @@ data-driven instead of a fixed guess, or `setInstancePosition` should assert
 the position falls within the configured octree bounds (Fail Fast) instead
 of silently degrading query accuracy.
 
-## `GraphMesh.material`/`GraphInstancedObject.material` return the raw THREE.Material, not GraphObjectMaterial (Phase 3, Prompt 46)
+## `GraphMesh.material`/`GraphInstancedObject.material` return the raw THREE.Material, not GraphObjectMaterial (Phase 3, Prompt 46) — RESOLVED, permanently, not as originally framed
 
 Prompt 46 asked for these lazy getters to return a `GraphObjectMaterial`
 wrapper (Phase 6, `src/material/`). Since `object/` (Phase 3) cannot import
 from `material/` (Phase 6) without violating the layering rule in
 `CLAUDE.md` §1.4 (a lower layer must not depend on a higher one), both
 getters currently return the raw `THREE.Material`/`THREE.Material[]`
-instead. Once `src/material/GraphObjectMaterial.js` exists, update both
-getters (`src/object/GraphMesh.js`, `src/object/GraphInstancedObject.js`) to
-wrap and return that instead — `material/` importing `object/` types is the
-allowed direction, so the actual wiring belongs in Phase 6's own work, not
-retrofitted from Phase 3.
+instead.
+
+**Resolved during Phase 6 (Prompt 100), but not the way this note originally
+assumed:** `src/material/GraphObjectMaterial.js` now exists, and it does wrap
+a `GraphMesh`/`GraphInstancedObject` — but the wrapping happens by
+*constructing* `new GraphObjectMaterial(mesh)` from the caller's side
+(`material/` importing `object/`, the allowed direction), not by changing
+what `mesh.material`/`object.material` themselves return. Those two getters
+will **never** return a `GraphObjectMaterial` — that direction of import
+(`object/` → `material/`) is permanently forbidden, not a temporary gap
+waiting on Phase 6. See `skipping_list.md`'s Phase 3 section for the
+corresponding entry.
+
+## Missing bundled Roboto MSDF text atlas (Phase 6, Prompt 108)
+
+`src/material/text/SDFText.js`'s `SDFText.create()` lazy-loads
+`src/material/text/assets/roboto-msdf.png` (the multi-channel signed-distance
+atlas image) and `roboto-msdf.json` (BMFont-style glyph metrics) — neither
+file exists in this repo. Same category of gap as the missing HDR assets
+above: generating a real MSDF atlas needs an actual font-to-MSDF tool (e.g.
+`msdf-bmfont-xml`) run against a Roboto TTF, neither of which is available in
+this environment. `SDFText.create()` rejects with a clear, actionable error
+identifying exactly what's missing and where it's expected — it does not
+silently render blank/broken text. The rendering/layout engine itself
+(atlas loading + caching, per-glyph quad layout with kerning/letterSpacing/
+align, an MSDF shader with outline/glow support) is fully built and unit
+tested against a mock atlas; only the real binary asset is missing. Add the
+two files under `src/material/text/assets/` to make real text rendering
+work.
+
+Downstream consequence: Prompt 109 ("wire SDF text into Phase 4 Axis
+labels") could not be completed as literally specified — `Axis.render()` and
+`annotation.label()` are both synchronous today, and `SDFText.create()` is
+necessarily async (loading a texture + JSON is inherently asynchronous), so
+wiring them together would require either (a) an API-breaking `Axis.render()`
+becoming async (touching every existing sync call site, test, and example
+across Phases 4/5), or (b) a "render sync now, upgrade to real SDF text
+asynchronously when ready" two-phase design. Given the atlas is missing
+regardless of which design is picked — text can't actually render either way
+right now — the stub (`{type:'label', text, position, style}`) was left in
+place rather than taking on either risk for a feature that can't be visually
+confirmed yet. Revisit once the atlas assets above are added and a concrete
+decision is made on sync vs. async `Axis`/`annotation.label` semantics.

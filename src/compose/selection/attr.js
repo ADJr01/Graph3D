@@ -1,16 +1,30 @@
 import { accessor } from '../generator/index.js';
 
-const VECTOR_COMPONENTS = new Set(['x', 'y', 'z']);
-const TRANSFORM_BASES = new Set(['position', 'rotation', 'scale']);
+export const VECTOR_COMPONENTS = new Set(['x', 'y', 'z']);
+export const TRANSFORM_BASES = new Set(['position', 'rotation', 'scale']);
+
+/**
+ * `get`/`set` method-name pairs for each transform base, on both backends —
+ * the single source of truth for "which `GraphMesh`/`GraphInstancedObject`
+ * method reads/writes `position`/`rotation`/`scale`". Exported so
+ * `SelectionTransition` (Prompt 91) can read a "from" value through the same
+ * mapping `applyTransformComponent` writes through, rather than a second
+ * copy of this table (CLAUDE.md §1.1 DRY two-strike rule).
+ */
+export const TRANSFORM_ACCESSORS = {
+  position: { get: 'getPosition', set: 'setPosition', instanceGet: 'getInstancePosition', instanceSet: 'setInstancePosition' },
+  rotation: { get: 'getRotation', set: 'setRotation', instanceGet: 'getInstanceRotation', instanceSet: 'setInstanceRotation' },
+  scale: { get: 'getScale', set: 'setScale', instanceGet: 'getInstanceScale', instanceSet: 'setInstanceScale' },
+};
 
 /** @param {string} path @returns {[string, (string|null)]} */
-function splitPath(path) {
+export function splitPath(path) {
   const dot = path.indexOf('.');
   return dot === -1 ? [path, null] : [path.slice(0, dot), path.slice(dot + 1)];
 }
 
 /** @param {*} value @param {string} path @throws {TypeError} */
-function assertFiniteNumber(value, path) {
+export function assertFiniteNumber(value, path) {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     throw new TypeError(`Selection.attr('${path}'): expected a finite number, received ${JSON.stringify(value)}.`);
   }
@@ -27,15 +41,14 @@ function assertBoolean(value, path) {
  * @param {THREE.Material|THREE.Material[]} material
  * @returns {THREE.Material[]}
  */
-function materialsOf(material) {
+export function materialsOf(material) {
   return Array.isArray(material) ? material : [material];
 }
 
 // ── position.*/rotation.*/scale.* ───────────────────────────────────────────
 
 function applyTransformComponent(backend, size, datumAt, resolve, path, base, component) {
-  const getter = { position: 'getPosition', rotation: 'getRotation', scale: 'getScale' }[base];
-  const setter = { position: 'setPosition', rotation: 'setRotation', scale: 'setScale' }[base];
+  const { get: getter, set: setter, instanceGet: instanceGetter, instanceSet: instanceSetter } = TRANSFORM_ACCESSORS[base];
 
   if (backend.type === 'meshes') {
     for (let i = 0; i < size; i++) {
@@ -49,8 +62,6 @@ function applyTransformComponent(backend, size, datumAt, resolve, path, base, co
     return;
   }
 
-  const instanceGetter = { position: 'getInstancePosition', rotation: 'getInstanceRotation', scale: 'getInstanceScale' }[base];
-  const instanceSetter = { position: 'setInstancePosition', rotation: 'setInstanceRotation', scale: 'setInstanceScale' }[base];
   const { object, indices } = backend;
   for (let i = 0; i < size; i++) {
     const value = resolve(datumAt(i), i);

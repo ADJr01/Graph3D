@@ -111,7 +111,7 @@ joined.exit().size();    // prior data with no match in newData
 
 `.enter()`/`.exit()` materialize lazily and cache — real `GraphMesh`es are created (meshes backend) or real instance slots allocated (instanced backend, recycling freed slots via a free-list before growing capacity) only the first time `.enter()` is called, and only if there's something to enter.
 
-`.join(enterFn, updateFn, exitFn)` applies the full d3-style cycle in one call, defaulting any omitted callback: entering members appear as-is (no animation engine until Phase 5); exiting members are `.remove()`d immediately.
+`.join(enterFn, updateFn, exitFn)` applies the full d3-style cycle in one call, defaulting any omitted callback: entering members appear as-is (animate them explicitly via `enter.transition()...` if desired — see below); exiting members are `.remove()`d immediately.
 
 ```js
 selection = selection.data(newData, (d) => d.id).join(
@@ -125,7 +125,13 @@ Note the reassignment: `.join()` returns the merge of entered + updated members,
 
 ### Other Selection operations
 
-`filter(predicateFn)`, `sort(comparator)`, `each(fn)`, `merge(other)`, `call(fn, ...args)`, `nodes()` (returns `SelectionNode` handles exposing `.datum`/`.index`), and `remove()` (permanent — disposes/frees every member, not just an `.exit()` result). `transition()`/`on(event, handler)` are stubbed to throw a clear "requires Phase 5/9" error rather than silently no-op — the animation engine and picking/interaction state machine don't exist yet.
+`filter(predicateFn)`, `sort(comparator)`, `each(fn)`, `merge(other)`, `call(fn, ...args)`, `nodes()` (returns `SelectionNode` handles exposing `.datum`/`.index`), and `remove()` (permanent — disposes/frees every member, not just an `.exit()` result). `on(event, handler)` is still stubbed to throw a clear "requires Phase 9" error — picking/the interaction state machine doesn't exist yet.
+
+`transition()` (Prompt 91) returns a `SelectionTransition`: the animated counterpart to `attr()`/`style()`/`remove()`, built on the Phase 5 animation engine (`src/anim/`, see the forthcoming `docs/concepts/anim.md`). Each node's current value is captured as the tween's start; `.duration(ms)`/`.delay(msOrFn)`/`.easing(name)` configure the schedule (`delay` accepts a per-datum function for staggering), and `.on('start'|'end', handler)` observes it. A `.remove()` on the transition defers removal until every scheduled write completes — the idiom for an exit fade:
+
+```js
+joined.exit().transition().duration(400).attr('opacity', 0).remove();
+```
 
 ---
 

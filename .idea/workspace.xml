@@ -1,9 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="33557d05-3974-4e5d-9972-8791b8163414" name="Changes" comment="graph3D phase3 completed">
+    <list default="true" id="33557d05-3974-4e5d-9972-8791b8163414" name="Changes" comment="graph3D phase4">
+      <change beforePath="$PROJECT_DIR$/.claude/TODO.md" beforeDir="false" afterPath="$PROJECT_DIR$/.claude/TODO.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/BUILD_PLAN.md" beforeDir="false" afterPath="$PROJECT_DIR$/BUILD_PLAN.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CLAUDE.md" beforeDir="false" afterPath="$PROJECT_DIR$/CLAUDE.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/concepts/compose.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/concepts/compose.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/concepts/object.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/concepts/object.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/skipping_list.md" beforeDir="false" afterPath="$PROJECT_DIR$/skipping_list.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/compose/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/index.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/compose/selection/Selection.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/selection/Selection.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/compose/selection/attr.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/selection/attr.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/compose/selection/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/selection/index.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/compose/selection/style.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/selection/style.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/core/GraphDisposal.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/GraphDisposal.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/index.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/object/GraphInstancedObject.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/object/GraphInstancedObject.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/compose/selection/Selection.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/compose/selection/Selection.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/object/GraphInstancedObject.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/object/GraphInstancedObject.test.js" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -62,6 +77,9 @@
       <workItem from="1782913354811" duration="19229000" />
       <workItem from="1782969139938" duration="7381000" />
       <workItem from="1782981633359" duration="4102000" />
+      <workItem from="1782986967441" duration="2552000" />
+      <workItem from="1782997533672" duration="16176000" />
+      <workItem from="1783055593824" duration="24833000" />
     </task>
     <task id="LOCAL-00001" summary="graph3D created">
       <option name="closed" value="true" />
@@ -79,7 +97,15 @@
       <option name="project" value="LOCAL" />
       <updated>1782977394821</updated>
     </task>
-    <option name="localTasksCounter" value="3" />
+    <task id="LOCAL-00003" summary="graph3D phase4">
+      <option name="closed" value="true" />
+      <created>1782987002623</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1782987002623</updated>
+    </task>
+    <option name="localTasksCounter" value="4" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -88,6 +114,7 @@
   <component name="VcsManagerConfiguration">
     <MESSAGE value="graph3D created" />
     <MESSAGE value="graph3D phase3 completed" />
-    <option name="LAST_COMMIT_MESSAGE" value="graph3D phase3 completed" />
+    <MESSAGE value="graph3D phase4" />
+    <option name="LAST_COMMIT_MESSAGE" value="graph3D phase4" />
   </component>
 </project>

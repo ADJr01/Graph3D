@@ -16,6 +16,7 @@ export {
   generator,
   layout,
   Selection,
+  SelectionTransition,
   Axis,
   annotation,
   accessor,
@@ -30,3 +31,17 @@ export {
   interpolateObject,
 } from './compose/index.js';
 export { registerWorkerTask, createWorkerFactory } from './core/worker/workerBlob.js';
+export {
+  curve,
+  spring,
+  bezier,
+  noise,
+  resolve,
+  GraphAnimKeyframe,
+  GraphAnimTimeline,
+  GraphAnim,
+  anim,
+  Transition,
+  CameraTour,
+} from './anim/index.js';
+export { GraphObjectMaterial, material, SDFText, texture } from './material/index.js';

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import { Selection } from '../../../src/compose/selection/Selection.js';
+import { SelectionTransition } from '../../../src/compose/selection/SelectionTransition.js';
 import { GraphMesh } from '../../../src/object/GraphMesh.js';
 import { GraphInstancedObject } from '../../../src/object/GraphInstancedObject.js';
 
@@ -159,12 +160,16 @@ describe('Selection.remove', () => {
   });
 });
 
-// ── transition() / on() stubs (Prompt 80) ──────────────────────────────────
+// ── transition() (Prompt 91) ────────────────────────────────────────────────
+// Full SelectionTransition behavior is covered in SelectionTransition.test.js;
+// this just confirms Selection wires the two together correctly.
 
 describe('Selection.transition', () => {
-  it('throws a clear "requires Phase 5" error', () => {
-    const selection = new Selection({ type: 'meshes', meshes: [] });
-    expect(() => selection.transition()).toThrow(/Phase 5/);
+  it('returns a SelectionTransition over this selection', () => {
+    const scene = new THREE.Scene();
+    const selection = new Selection({ type: 'meshes', meshes: [makeMesh(scene, 'a', { value: 1 })] });
+    const transition = selection.transition();
+    expect(transition).toBeInstanceOf(SelectionTransition);
   });
 });
 

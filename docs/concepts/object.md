@@ -80,6 +80,12 @@ bars.commitMatrix().commitColor(); // one GPU upload per batch, not per instance
 
 `setAllPositions`/`setAllScales`/`setAllColors` accept a flat `Float32Array` covering every instance in one pass, reusing internal scratch objects — the path a chart's `update()` should take over looping the single-instance setters across tens of thousands of datums.
 
+Pass `{ duration, easing }` (Prompt 92) to animate instead of snapping: the current array is captured as the tween start, and the whole buffer interpolates toward the target once per frame (via the shared RAF loop, `easing` resolved through `anim/GraphAnimCurve`) until `duration` (milliseconds) elapses, committing automatically — no manual `commit*()` call needed for that path. A later call on the same bulk setter cancels an in-flight one rather than fighting it.
+
+```js
+bars.setAllPositions(nextPositions, { duration: 600, easing: 'easeOutCubic' });
+```
+
 ### Custom per-instance attributes
 
 `defineAttribute(name, itemSize)` adds an `InstancedBufferAttribute` for driving custom vertex-shader effects (a per-bar pulse phase, a per-point category id) via `onBeforeCompile` shader injection — see `examples/03-instanced/main.js` for the full pattern (a single `rotationPhase` attribute plus a shared time uniform spinning 100,000 bars with zero per-frame CPU matrix writes).

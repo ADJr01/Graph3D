@@ -5,6 +5,12 @@ import { GraphObject } from './GraphObject.js';
 import { disposeMaterial } from '../core/GraphDisposal.js';
 import { loop } from '../core/Graph3DLoop.js';
 import { Octree } from './Octree.js';
+// Sanctioned exception (CLAUDE.md §1.4, object/ row) — see setAllPositions/
+// setAllScales/setAllColors below (Prompt 92): resolving a named easing curve
+// is the one thing `anim/GraphAnimCurve` exists for, and it's a pure,
+// stateless function with zero knowledge of THREE.js or object/'s types.
+// Re-implementing an easing table here would violate CLAUDE.md §1.1 DRY.
+import { resolve as resolveEasing } from '../anim/GraphAnimCurve.js';
 
 // instanceMatrix/instanceColor live directly on the mesh (Prompt 37), not in
 // geometry.attributes — defineAttribute() must not shadow those names.
@@ -58,6 +64,12 @@ const DEFAULT_OCTREE_BOUNDS = new THREE.Box3(
  * `commitMatrix()`/`commitColor()`/`commitAttribute()` once after a batch of
  * writes to flag the attributes for upload — this keeps a chart's `update()`
  * loop to a single GPU sync per frame instead of one per datum.
+ *
+ * The bulk setters (`setAllPositions`/`setAllScales`/`setAllColors`) accept
+ * an optional `{ duration, easing }` (Prompt 92): with `duration` set, the
+ * whole array animates toward its target over the shared RAF loop instead of
+ * writing immediately, self-committing every frame — no manual `commit*()`
+ * call needed for that path.
  *
  * @example
  * const bars = new GraphInstancedObject({
@@ -128,6 +140,15 @@ export class GraphInstancedObject extends GraphObject {
   #cullingLoopCallback = null;
   /** @type {THREE.Matrix4[]|null} each instance's real transform, captured at enable time */
   #cullingBaseMatrices = null;
+
+  /**
+   * @type {{position: (function(number): void)|null, scale: (function(number): void)|null, color: (function(number): void)|null}}
+   * The exact loop callback reference in flight for each bulk setter (Prompt
+   * 92), keyed by which buffer it animates — lets a new bulk call cancel a
+   * prior in-flight one on the same buffer instead of both fighting over it
+   * every frame.
+   */
+  #bulkTransitionCallbacks = { position: null, scale: null, color: null };
 
   /**
    * @param {{ scene: THREE.Scene, name: string, geometry: THREE.BufferGeometry,
@@ -446,19 +467,53 @@ export class GraphInstancedObject extends GraphObject {
    * matrix/vector/quaternion across the whole array — no per-instance
    * allocation — so chart `update()` should call this instead of looping
    * `setInstancePosition` over tens of thousands of instances.
+   *
+   * With `options.duration` set (Prompt 92), this doesn't memcpy `positions`
+   * in immediately: it snapshots every instance's *current* position as the
+   * tween start, then interpolates the whole array toward `positions` once
+   * per frame (via the shared RAF loop — no `setTimeout`) until `duration`
+   * elapses, at which point it lands exactly on `positions`. A later call to
+   * any `setAllPositions`/`setInstancePosition` cancels an in-flight one.
    * @param {Float32Array} positions - Flat `[x0, y0, z0, x1, y1, z1, ...]`, length `capacity * 3`.
+   * @param {{duration?: number, easing?: (string|((t:number)=>number))}} [options]
+   *   `duration` in milliseconds (`0`, the default, writes immediately).
    * @returns {this}
    * @throws {TypeError} If `positions` is not a `Float32Array` of length `capacity * 3`.
+   * @throws {TypeError} If `duration` is not a non-negative number, or `easing` doesn't resolve.
    * @throws {Error} If called after `dispose()`.
    * @example bars.setAllPositions(new Float32Array([0, 0, 0, 1, 0, 0])); // capacity === 2
+   * @example bars.setAllPositions(nextPositions, { duration: 600, easing: 'easeOutCubic' });
    */
-  setAllPositions(positions) {
+  setAllPositions(positions, options = {}) {
     this.#assertNotDisposed('setAllPositions');
     this.#assertTypedArray('setAllPositions', positions, this.#capacity * 3);
-    for (let i = 0; i < this.#capacity; i++) {
-      const o = i * 3;
-      this.#writePosition(i, positions[o], positions[o + 1], positions[o + 2]);
+    const { duration = 0, easing = 'linear' } = options;
+    this.#assertBulkTransitionDuration('setAllPositions', duration);
+    this.#cancelBulkTransition('position');
+
+    if (duration === 0) {
+      for (let i = 0; i < this.#capacity; i++) {
+        const o = i * 3;
+        this.#writePosition(i, positions[o], positions[o + 1], positions[o + 2]);
+      }
+      return this;
     }
+
+    const from = this.#snapshotPositions();
+    const easingFn = resolveEasing(easing);
+    const count = positions.length / 3;
+    this.#runBulkTransition('position', duration, easingFn, (t) => {
+      for (let i = 0; i < count; i++) {
+        const o = i * 3;
+        this.#writePosition(
+          i,
+          from[o] + (positions[o] - from[o]) * t,
+          from[o + 1] + (positions[o + 1] - from[o + 1]) * t,
+          from[o + 2] + (positions[o + 2] - from[o + 2]) * t,
+        );
+      }
+      this.commitMatrix();
+    });
     return this;
   }
 
@@ -466,19 +521,50 @@ export class GraphInstancedObject extends GraphObject {
    * Overwrite every instance's scale in one pass, preserving each instance's
    * current position and rotation. Reuses this object's scratch matrix/
    * vector/quaternion across the whole array — no per-instance allocation.
+   *
+   * With `options.duration` set (Prompt 92), animates the whole array toward
+   * `scales` over time instead of writing it immediately — see
+   * `setAllPositions`'s doc for the exact behavior; same conventions apply here.
    * @param {Float32Array} scales - Flat `[sx0, sy0, sz0, sx1, sy1, sz1, ...]`, length `capacity * 3`.
+   * @param {{duration?: number, easing?: (string|((t:number)=>number))}} [options]
+   *   `duration` in milliseconds (`0`, the default, writes immediately).
    * @returns {this}
    * @throws {TypeError} If `scales` is not a `Float32Array` of length `capacity * 3`.
+   * @throws {TypeError} If `duration` is not a non-negative number, or `easing` doesn't resolve.
    * @throws {Error} If called after `dispose()`.
    * @example bars.setAllScales(new Float32Array([1, 2, 1, 1, 3, 1])); // capacity === 2
+   * @example bars.setAllScales(nextScales, { duration: 600 });
    */
-  setAllScales(scales) {
+  setAllScales(scales, options = {}) {
     this.#assertNotDisposed('setAllScales');
     this.#assertTypedArray('setAllScales', scales, this.#capacity * 3);
-    for (let i = 0; i < this.#capacity; i++) {
-      const o = i * 3;
-      this.#writeScale(i, scales[o], scales[o + 1], scales[o + 2]);
+    const { duration = 0, easing = 'linear' } = options;
+    this.#assertBulkTransitionDuration('setAllScales', duration);
+    this.#cancelBulkTransition('scale');
+
+    if (duration === 0) {
+      for (let i = 0; i < this.#capacity; i++) {
+        const o = i * 3;
+        this.#writeScale(i, scales[o], scales[o + 1], scales[o + 2]);
+      }
+      return this;
     }
+
+    const from = this.#snapshotScales();
+    const easingFn = resolveEasing(easing);
+    const count = scales.length / 3;
+    this.#runBulkTransition('scale', duration, easingFn, (t) => {
+      for (let i = 0; i < count; i++) {
+        const o = i * 3;
+        this.#writeScale(
+          i,
+          from[o] + (scales[o] - from[o]) * t,
+          from[o + 1] + (scales[o + 1] - from[o + 1]) * t,
+          from[o + 2] + (scales[o + 2] - from[o + 2]) * t,
+        );
+      }
+      this.commitMatrix();
+    });
     return this;
   }
 
@@ -503,25 +589,83 @@ export class GraphInstancedObject extends GraphObject {
   }
 
   /**
+   * Read one instance's current color — a fresh `THREE.Color` (mutating it
+   * has no effect on the instance). Before any `setInstanceColor`/
+   * `setAllColors` call, no `instanceColor` buffer exists yet, so every
+   * instance renders at the shared material's color unmultiplied; this
+   * returns that material color in that case, matching what's actually
+   * on screen. Exists for read-modify-write callers (e.g.
+   * `SelectionTransition.attr('color', ...)`, Prompt 91) that need the
+   * current value before writing an interpolated one.
+   * @param {number} i
+   * @returns {THREE.Color}
+   * @throws {RangeError} If `i` is out of bounds.
+   * @throws {Error} If called after `dispose()`.
+   * @example const c = bars.getInstanceColor(0);
+   */
+  getInstanceColor(i) {
+    this.#assertNotDisposed('getInstanceColor');
+    this.#assertIndex('getInstanceColor', i);
+    if (this.#mesh.instanceColor === null) {
+      const materials = Array.isArray(this.#mesh.material) ? this.#mesh.material : [this.#mesh.material];
+      const colorCapable = materials.find((m) => m.color);
+      return colorCapable ? colorCapable.color.clone() : new THREE.Color(0xffffff);
+    }
+    return new THREE.Color().fromArray(this.#mesh.instanceColor.array, i * 3);
+  }
+
+  /**
    * Overwrite every instance's color in one pass via a direct typed-array
    * copy into the underlying `InstancedBufferAttribute` — no per-instance
    * `THREE.Color` allocation, unlike looping `setInstanceColor`. Values are
    * written as-is (same raw RGB floats `THREE.Color.toArray()` produces),
    * so build `colors` with `THREE.Color` up front if conversion from
    * hex/CSS strings is needed.
+   *
+   * With `options.duration` set (Prompt 92), animates the whole array toward
+   * `colors` over time instead of writing it immediately — see
+   * `setAllPositions`'s doc for the exact behavior; same conventions apply here.
    * @param {Float32Array} colors - Flat `[r0, g0, b0, r1, g1, b1, ...]`, length `capacity * 3`.
+   * @param {{duration?: number, easing?: (string|((t:number)=>number))}} [options]
+   *   `duration` in milliseconds (`0`, the default, writes immediately).
    * @returns {this}
    * @throws {TypeError} If `colors` is not a `Float32Array` of length `capacity * 3`.
+   * @throws {TypeError} If `duration` is not a non-negative number, or `easing` doesn't resolve.
    * @throws {Error} If called after `dispose()`.
    * @example bars.setAllColors(new Float32Array([1, 0, 0, 0, 1, 0])); // capacity === 2
+   * @example bars.setAllColors(nextColors, { duration: 600 });
    */
-  setAllColors(colors) {
+  setAllColors(colors, options = {}) {
     this.#assertNotDisposed('setAllColors');
     this.#assertTypedArray('setAllColors', colors, this.#capacity * 3);
+    const { duration = 0, easing = 'linear' } = options;
+    this.#assertBulkTransitionDuration('setAllColors', duration);
+    this.#cancelBulkTransition('color');
+
+    if (duration === 0) {
+      if (this.#mesh.instanceColor === null) {
+        this.#mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(this.#capacity * 3), 3);
+      }
+      this.#mesh.instanceColor.array.set(colors);
+      return this;
+    }
+
+    // Snapshot before allocating instanceColor — a freshly allocated buffer
+    // starts zero-filled, which would silently become the "from" state
+    // instead of the shared material color it actually defaults to.
+    const from = this.#snapshotColors();
     if (this.#mesh.instanceColor === null) {
       this.#mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(this.#capacity * 3), 3);
     }
-    this.#mesh.instanceColor.array.set(colors);
+    const easingFn = resolveEasing(easing);
+    const count = colors.length;
+    this.#runBulkTransition('color', duration, easingFn, (t) => {
+      const array = this.#mesh.instanceColor.array;
+      for (let i = 0; i < count; i++) {
+        array[i] = from[i] + (colors[i] - from[i]) * t;
+      }
+      this.commitColor();
+    });
     return this;
   }
 
@@ -618,6 +762,34 @@ export class GraphInstancedObject extends GraphObject {
       attribute.set(value, i * attribute.itemSize);
     }
     return this;
+  }
+
+  /**
+   * Read one instance's current value from a custom attribute defined via
+   * `defineAttribute`. Exists for read-modify-write callers (e.g.
+   * `SelectionTransition.attr(name, ...)`, Prompt 91) that need the current
+   * value before writing an interpolated one.
+   * @param {number} i
+   * @param {string} name
+   * @returns {number|number[]} A single number when the attribute's
+   *   `itemSize` is 1, otherwise a plain array of `itemSize` numbers.
+   * @throws {RangeError} If `i` is out of bounds.
+   * @throws {Error} If no attribute named `name` was defined, or called after `dispose()`.
+   * @example bars.getInstanceAttribute(0, 'pulsePhase');
+   */
+  getInstanceAttribute(i, name) {
+    this.#assertNotDisposed('getInstanceAttribute');
+    this.#assertIndex('getInstanceAttribute', i);
+    const attribute = this.#mesh.geometry.getAttribute(name);
+    if (!(attribute instanceof THREE.InstancedBufferAttribute)) {
+      throw new Error(
+        `GraphInstancedObject.getInstanceAttribute: no attribute named '${name}' — call defineAttribute() first.`,
+      );
+    }
+    if (attribute.itemSize === 1) return attribute.getX(i);
+    const out = new Array(attribute.itemSize);
+    for (let c = 0; c < attribute.itemSize; c++) out[c] = attribute.array[i * attribute.itemSize + c];
+    return out;
   }
 
   // ── Picking ────────────────────────────────────────────────────────────────
@@ -856,6 +1028,9 @@ export class GraphInstancedObject extends GraphObject {
     // Unregister from the shared RAF loop first — otherwise the next frame
     // would invoke a callback closing over a now-disposed mesh.
     if (this.#cullingLoopCallback) loop.remove(this.#cullingLoopCallback);
+    this.#cancelBulkTransition('position');
+    this.#cancelBulkTransition('scale');
+    this.#cancelBulkTransition('color');
     // WebGLRenderer frees instanceMatrix/instanceColor GPU buffers in response
     // to this event — they live directly on the mesh, not in geometry.attributes,
     // so geometry.dispose() alone would leak them.
@@ -960,6 +1135,97 @@ export class GraphInstancedObject extends GraphObject {
     this.#matrixScratch.compose(this.#positionScratch, this.#quaternionScratch, this.#scaleScratch);
     this.#mesh.setMatrixAt(i, this.#matrixScratch);
     this.#syncOctree(i, this.#positionScratch, Math.max(sx, sy, sz));
+  }
+
+  /**
+   * Starts a per-frame bulk transition for one whole-array bulk setter,
+   * driven by the shared RAF `loop` (never a second `requestAnimationFrame`).
+   * Callers must call `#cancelBulkTransition(key)` first — this doesn't
+   * self-cancel, since the immediate (`duration === 0`) path needs the same
+   * cancellation without registering a new callback.
+   * @param {'position'|'scale'|'color'} key
+   * @param {number} durationMs
+   * @param {(t: number) => number} easingFn
+   * @param {(t: number) => void} applyFrame Writes the interpolated state for eased progress `t` and commits it.
+   */
+  #runBulkTransition(key, durationMs, easingFn, applyFrame) {
+    let elapsedMs = 0;
+    const tick = (deltaSeconds) => {
+      elapsedMs += deltaSeconds * 1000;
+      const t = Math.min(1, elapsedMs / durationMs);
+      applyFrame(easingFn(t));
+      if (t >= 1) this.#cancelBulkTransition(key);
+    };
+    this.#bulkTransitionCallbacks[key] = tick;
+    loop.add(tick);
+  }
+
+  /** @param {'position'|'scale'|'color'} key No-op if no transition is in flight for `key`. */
+  #cancelBulkTransition(key) {
+    const tick = this.#bulkTransitionCallbacks[key];
+    if (tick === null) return;
+    loop.remove(tick);
+    this.#bulkTransitionCallbacks[key] = null;
+  }
+
+  /** @param {string} method @param {*} duration @throws {TypeError} */
+  #assertBulkTransitionDuration(method, duration) {
+    if (typeof duration !== 'number' || !Number.isFinite(duration) || duration < 0) {
+      throw new TypeError(
+        `GraphInstancedObject.${method}: options.duration must be a non-negative number, received ${JSON.stringify(duration)}.`,
+      );
+    }
+  }
+
+  /** @returns {Float32Array} Every instance's current position, flattened `[x0,y0,z0,x1,y1,z1,...]`. */
+  #snapshotPositions() {
+    const out = new Float32Array(this.#capacity * 3);
+    for (let i = 0; i < this.#capacity; i++) {
+      this.#mesh.getMatrixAt(i, this.#matrixScratch);
+      this.#matrixScratch.decompose(this.#positionScratch, this.#quaternionScratch, this.#scaleScratch);
+      const o = i * 3;
+      out[o] = this.#positionScratch.x;
+      out[o + 1] = this.#positionScratch.y;
+      out[o + 2] = this.#positionScratch.z;
+    }
+    return out;
+  }
+
+  /** @returns {Float32Array} Every instance's current scale, flattened `[sx0,sy0,sz0,sx1,sy1,sz1,...]`. */
+  #snapshotScales() {
+    const out = new Float32Array(this.#capacity * 3);
+    for (let i = 0; i < this.#capacity; i++) {
+      this.#mesh.getMatrixAt(i, this.#matrixScratch);
+      this.#matrixScratch.decompose(this.#positionScratch, this.#quaternionScratch, this.#scaleScratch);
+      const o = i * 3;
+      out[o] = this.#scaleScratch.x;
+      out[o + 1] = this.#scaleScratch.y;
+      out[o + 2] = this.#scaleScratch.z;
+    }
+    return out;
+  }
+
+  /**
+   * @returns {Float32Array} Every instance's current color, flattened
+   *   `[r0,g0,b0,r1,g1,b1,...]` — the shared material's color repeated for
+   *   every instance if `instanceColor` was never written (mirrors
+   *   `getInstanceColor`'s same default).
+   */
+  #snapshotColors() {
+    const out = new Float32Array(this.#capacity * 3);
+    if (this.#mesh.instanceColor === null) {
+      const materials = Array.isArray(this.#mesh.material) ? this.#mesh.material : [this.#mesh.material];
+      const base = materials.find((m) => m.color)?.color ?? new THREE.Color(0xffffff);
+      for (let i = 0; i < this.#capacity; i++) {
+        const o = i * 3;
+        out[o] = base.r;
+        out[o + 1] = base.g;
+        out[o + 2] = base.b;
+      }
+    } else {
+      out.set(this.#mesh.instanceColor.array);
+    }
+    return out;
   }
 
   /** @param {string} method @param {*} array @param {number} expectedLength @throws {TypeError} */

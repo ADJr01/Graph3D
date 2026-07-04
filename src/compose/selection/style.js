@@ -1,5 +1,5 @@
 import { accessor } from '../generator/index.js';
-import { applyAttr, writeInstanceScalarAttribute } from './attr.js';
+import { applyAttr, writeInstanceScalarAttribute, materialsOf } from './attr.js';
 
 // The only material properties a per-instance attribute can drive today
 // (color via instanceColor, opacity/emissiveIntensity via a scalar
@@ -8,11 +8,6 @@ import { applyAttr, writeInstanceScalarAttribute } from './attr.js';
 // the Phase 6 dataDriven material reading a custom attribute per property,
 // which doesn't exist yet.
 const INSTANCE_CAPABLE_PROPS = new Set(['color', 'opacity', 'emissiveIntensity']);
-
-/** @param {THREE.Material|THREE.Material[]} material @returns {THREE.Material[]} */
-function materialsOf(material) {
-  return Array.isArray(material) ? material : [material];
-}
 
 /**
  * Assign `value` to `prop` on every material in `materials` that has it.
