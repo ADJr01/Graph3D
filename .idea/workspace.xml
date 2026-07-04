@@ -1,24 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="33557d05-3974-4e5d-9972-8791b8163414" name="Changes" comment="graph3D phase4">
-      <change beforePath="$PROJECT_DIR$/.claude/TODO.md" beforeDir="false" afterPath="$PROJECT_DIR$/.claude/TODO.md" afterDir="false" />
+    <list default="true" id="33557d05-3974-4e5d-9972-8791b8163414" name="Changes" comment="Phase 5 — anim/:                                                                            &#10;  - GraphAnimCurve easings, GraphAnimTimeline (groups, loop modes, interrupt                  &#10;    registry), Transition (D3-style ms API), CameraTour, reduced-motion support               &#10;  - compose/selection/SelectionTransition wires .transition() into data-bound                 &#10;    selections on both meshes and instanced backends                                          &#10;  - GraphInstancedObject bulk setters (setAllPositions/Scales/Colors) animate                 &#10;    via Transition instead of snapping                                                        &#10;  - examples/05-transitions hero example, docs/concepts/anim.md                               &#10;                                                                                              &#10;  Phase 6 — material/:                                                                        &#10;  - Preset namespace: PBR passthroughs (standard/physical/basic/lambert/                      &#10;    phong/toon/matcap) plus custom-shader looks (holographic, crystal, glass,                 &#10;    neon, glow, velvet, metals, dataDriven)                                                   &#10;  - texture namespace: gradient/noise/voronoi/checkerboard/dots/lines/                        &#10;    cellular/paletteTexture procedural generators                                             &#10;  - SDFText MSDF text engine (atlas loading, glyph layout, shader)                            &#10;  - addPlanarReflection, GraphObjectMaterial texture ref-counting disposal,                   &#10;    setPaletteForAttribute convenience, applyShader dev-mode hot-reload                       &#10;  - examples/06-materials hero gallery, docs/concepts/material.md">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/BUILD_PLAN.md" beforeDir="false" afterPath="$PROJECT_DIR$/BUILD_PLAN.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/CLAUDE.md" beforeDir="false" afterPath="$PROJECT_DIR$/CLAUDE.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/concepts/compose.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/concepts/compose.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/concepts/object.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/concepts/object.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/concepts/material.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/concepts/material.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/skipping_list.md" beforeDir="false" afterPath="$PROJECT_DIR$/skipping_list.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/compose/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/index.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/compose/selection/Selection.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/selection/Selection.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/compose/selection/attr.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/selection/attr.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/compose/selection/SelectionTransition.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/selection/SelectionTransition.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/compose/selection/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/selection/index.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/compose/selection/style.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/selection/style.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/core/GraphDisposal.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/GraphDisposal.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/core/Graph3D.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/Graph3D.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/index.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/object/GraphInstancedObject.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/object/GraphInstancedObject.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/material/planarReflection.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/material/planarReflection.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/scene/GraphSceneEnvironment.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/scene/GraphSceneEnvironment.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/tests/compose/selection/Selection.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/compose/selection/Selection.test.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/object/GraphInstancedObject.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/object/GraphInstancedObject.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/core/Graph3D.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/core/Graph3D.test.js" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -79,7 +77,8 @@
       <workItem from="1782981633359" duration="4102000" />
       <workItem from="1782986967441" duration="2552000" />
       <workItem from="1782997533672" duration="16176000" />
-      <workItem from="1783055593824" duration="24833000" />
+      <workItem from="1783055593824" duration="32058000" />
+      <workItem from="1783176135511" duration="9832000" />
     </task>
     <task id="LOCAL-00001" summary="graph3D created">
       <option name="closed" value="true" />
@@ -105,7 +104,23 @@
       <option name="project" value="LOCAL" />
       <updated>1782987002623</updated>
     </task>
-    <option name="localTasksCounter" value="4" />
+    <task id="LOCAL-00004" summary="Phase 5 — anim/:                                                                            &#10;  - GraphAnimCurve easings, GraphAnimTimeline (groups, loop modes, interrupt                  &#10;    registry), Transition (D3-style ms API), CameraTour, reduced-motion support               &#10;  - compose/selection/SelectionTransition wires .transition() into data-bound                 &#10;    selections on both meshes and instanced backends                                          &#10;  - GraphInstancedObject bulk setters (setAllPositions/Scales/Colors) animate                 &#10;    via Transition instead of snapping                                                        &#10;  - examples/05-transitions hero example, docs/concepts/anim.md                               &#10;                                                                                              &#10;  Phase 6 — material/:                                                                        &#10;  - Preset namespace: PBR passthroughs (standard/physical/basic/lambert/                      &#10;    phong/toon/matcap) plus custom-shader looks (holographic, crystal, glass,                 &#10;    neon, glow, velvet, metals, dataDriven)                                                   &#10;  - texture namespace: gradient/noise/voronoi/checkerboard/dots/lines/                        &#10;    cellular/paletteTexture procedural generators                                             &#10;  - SDFText MSDF text engine (atlas loading, glyph layout, shader)                            &#10;  - addPlanarReflection, GraphObjectMaterial texture ref-counting disposal,                   &#10;    setPaletteForAttribute convenience, applyShader dev-mode hot-reload                       &#10;  - examples/06-materials hero gallery, docs/concepts/material.md">
+      <option name="closed" value="true" />
+      <created>1783148726923</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1783148726923</updated>
+    </task>
+    <task id="LOCAL-00005" summary="Phase 5 — anim/:                                                                            &#10;  - GraphAnimCurve easings, GraphAnimTimeline (groups, loop modes, interrupt                  &#10;    registry), Transition (D3-style ms API), CameraTour, reduced-motion support               &#10;  - compose/selection/SelectionTransition wires .transition() into data-bound                 &#10;    selections on both meshes and instanced backends                                          &#10;  - GraphInstancedObject bulk setters (setAllPositions/Scales/Colors) animate                 &#10;    via Transition instead of snapping                                                        &#10;  - examples/05-transitions hero example, docs/concepts/anim.md                               &#10;                                                                                              &#10;  Phase 6 — material/:                                                                        &#10;  - Preset namespace: PBR passthroughs (standard/physical/basic/lambert/                      &#10;    phong/toon/matcap) plus custom-shader looks (holographic, crystal, glass,                 &#10;    neon, glow, velvet, metals, dataDriven)                                                   &#10;  - texture namespace: gradient/noise/voronoi/checkerboard/dots/lines/                        &#10;    cellular/paletteTexture procedural generators                                             &#10;  - SDFText MSDF text engine (atlas loading, glyph layout, shader)                            &#10;  - addPlanarReflection, GraphObjectMaterial texture ref-counting disposal,                   &#10;    setPaletteForAttribute convenience, applyShader dev-mode hot-reload                       &#10;  - examples/06-materials hero gallery, docs/concepts/material.md">
+      <option name="closed" value="true" />
+      <created>1783148737466</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1783148737466</updated>
+    </task>
+    <option name="localTasksCounter" value="6" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -115,6 +130,7 @@
     <MESSAGE value="graph3D created" />
     <MESSAGE value="graph3D phase3 completed" />
     <MESSAGE value="graph3D phase4" />
-    <option name="LAST_COMMIT_MESSAGE" value="graph3D phase4" />
+    <MESSAGE value="Phase 5 — anim/:                                                                            &#10;  - GraphAnimCurve easings, GraphAnimTimeline (groups, loop modes, interrupt                  &#10;    registry), Transition (D3-style ms API), CameraTour, reduced-motion support               &#10;  - compose/selection/SelectionTransition wires .transition() into data-bound                 &#10;    selections on both meshes and instanced backends                                          &#10;  - GraphInstancedObject bulk setters (setAllPositions/Scales/Colors) animate                 &#10;    via Transition instead of snapping                                                        &#10;  - examples/05-transitions hero example, docs/concepts/anim.md                               &#10;                                                                                              &#10;  Phase 6 — material/:                                                                        &#10;  - Preset namespace: PBR passthroughs (standard/physical/basic/lambert/                      &#10;    phong/toon/matcap) plus custom-shader looks (holographic, crystal, glass,                 &#10;    neon, glow, velvet, metals, dataDriven)                                                   &#10;  - texture namespace: gradient/noise/voronoi/checkerboard/dots/lines/                        &#10;    cellular/paletteTexture procedural generators                                             &#10;  - SDFText MSDF text engine (atlas loading, glyph layout, shader)                            &#10;  - addPlanarReflection, GraphObjectMaterial texture ref-counting disposal,                   &#10;    setPaletteForAttribute convenience, applyShader dev-mode hot-reload                       &#10;  - examples/06-materials hero gallery, docs/concepts/material.md" />
+    <option name="LAST_COMMIT_MESSAGE" value="Phase 5 — anim/:                                                                            &#10;  - GraphAnimCurve easings, GraphAnimTimeline (groups, loop modes, interrupt                  &#10;    registry), Transition (D3-style ms API), CameraTour, reduced-motion support               &#10;  - compose/selection/SelectionTransition wires .transition() into data-bound                 &#10;    selections on both meshes and instanced backends                                          &#10;  - GraphInstancedObject bulk setters (setAllPositions/Scales/Colors) animate                 &#10;    via Transition instead of snapping                                                        &#10;  - examples/05-transitions hero example, docs/concepts/anim.md                               &#10;                                                                                              &#10;  Phase 6 — material/:                                                                        &#10;  - Preset namespace: PBR passthroughs (standard/physical/basic/lambert/                      &#10;    phong/toon/matcap) plus custom-shader looks (holographic, crystal, glass,                 &#10;    neon, glow, velvet, metals, dataDriven)                                                   &#10;  - texture namespace: gradient/noise/voronoi/checkerboard/dots/lines/                        &#10;    cellular/paletteTexture procedural generators                                             &#10;  - SDFText MSDF text engine (atlas loading, glyph layout, shader)                            &#10;  - addPlanarReflection, GraphObjectMaterial texture ref-counting disposal,                   &#10;    setPaletteForAttribute convenience, applyShader dev-mode hot-reload                       &#10;  - examples/06-materials hero gallery, docs/concepts/material.md" />
   </component>
 </project>

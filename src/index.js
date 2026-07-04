@@ -45,3 +45,5 @@ export {
   CameraTour,
 } from './anim/index.js';
 export { GraphObjectMaterial, material, SDFText, texture } from './material/index.js';
+export { PostFX, ParticleSystem } from './postfx/index.js';
+export { GraphChart } from './chart/index.js';

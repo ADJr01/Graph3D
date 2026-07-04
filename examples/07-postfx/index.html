@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Graph3D — Phase 7 PostFX & Particles</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { overflow: hidden; background: #050507; font-family: system-ui, sans-serif; }
+      canvas { display: block; }
+
+      #panel {
+        position: fixed;
+        top: 12px;
+        left: 12px;
+        background: rgba(20, 20, 24, 0.75);
+        color: #eee;
+        padding: 12px 14px;
+        border-radius: 8px;
+        font-size: 12px;
+        backdrop-filter: blur(6px);
+        max-width: 340px;
+      }
+      #panel h1 { font-size: 14px; margin-bottom: 8px; }
+      #panel .row { display: flex; gap: 8px; margin-bottom: 4px; }
+      #panel .label { opacity: 0.6; width: 100px; }
+      #panel p { opacity: 0.7; font-size: 11px; margin-top: 8px; line-height: 1.4; }
+
+      #presetBar { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+      #presetBar button {
+        background: rgba(255, 255, 255, 0.08);
+        color: #eee;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 6px;
+        padding: 4px 8px;
+        font-size: 11px;
+        cursor: pointer;
+      }
+      #presetBar button:hover { background: rgba(255, 255, 255, 0.16); }
+      #presetBar button.active { background: #3b82f6; border-color: #3b82f6; }
+
+      #rainButton {
+        display: block;
+        width: 100%;
+        margin-top: 10px;
+        background: #1d4ed8;
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        padding: 8px 10px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      #rainButton:hover { background: #2563eb; }
+
+      #status { opacity: 0.6; font-size: 11px; margin-top: 8px; word-break: break-word; }
+    </style>
+  </head>
+  <body>
+    <div id="panel">
+      <h1>Phase 7 — PostFX presets & particle rain</h1>
+      <div class="row"><span class="label">FPS</span><span id="fps">—</span></div>
+      <div class="row"><span class="label">Rain capacity</span><span id="particleCount">—</span></div>
+      <div id="presetBar"></div>
+      <button id="rainButton">🌧 100K-particle rain</button>
+      <p>
+        Toggle one of Prompt 119's 7 named <code>PostFX</code> presets — each swaps in a
+        tuned bundle of passes over the glowing/matte gallery objects. The rain button
+        lazily builds one <code>ParticleSystem</code> and bursts 100,000 falling particles
+        on each click.
+      </p>
+      <div id="status"></div>
+    </div>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

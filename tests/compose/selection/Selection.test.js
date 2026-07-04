@@ -160,6 +160,70 @@ describe('Selection.remove', () => {
   });
 });
 
+// ── remove(animationName, options) — Prompt 122 ─────────────────────────────
+
+describe('Selection.remove(animationName, options)', () => {
+  it('throws TypeError when animationName is given without options.system', () => {
+    const selection = new Selection({ type: 'meshes', meshes: [] });
+    expect(() => selection.remove('dissolve')).toThrow(/options\.system/);
+  });
+
+  it('throws TypeError when options.system has no .preset method', () => {
+    const selection = new Selection({ type: 'meshes', meshes: [] });
+    expect(() => selection.remove('dissolve', { system: {} })).toThrow(/options\.system/);
+  });
+
+  it('throws TypeError for a non-string animationName', () => {
+    const selection = new Selection({ type: 'meshes', meshes: [] });
+    expect(() => selection.remove(42, { system: { preset: () => {} } })).toThrow(TypeError);
+  });
+
+  it('meshes backend: calls system.preset(name, { mesh, ...opts }) once per node, then disposes them', () => {
+    const scene = new THREE.Scene();
+    const meshA = makeMesh(scene, 'a');
+    const meshB = makeMesh(scene, 'b');
+    const selection = new Selection({ type: 'meshes', meshes: [meshA, meshB] });
+    const calls = [];
+    const system = { preset: (name, opts) => calls.push({ name, opts }) };
+
+    selection.remove('dissolve', { system, speed: 2 });
+
+    expect(calls).toHaveLength(2);
+    expect(calls[0]).toEqual({ name: 'dissolve', opts: { speed: 2, mesh: meshA.three } });
+    expect(calls[1]).toEqual({ name: 'dissolve', opts: { speed: 2, mesh: meshB.three } });
+    expect(() => meshA.getPosition()).toThrow(/disposed/);
+  });
+
+  it('instanced backend: calls system.preset(name, { position, ...opts }) once per node using local instance position', () => {
+    const object = makeInstanced(new THREE.Scene(), 'a', 4);
+    object.setInstancePosition(2, 1, 2, 3);
+    const selection = new Selection({ type: 'instanced', object, indices: Uint32Array.from([2]) });
+    const calls = [];
+    const system = { preset: (name, opts) => calls.push({ name, opts }) };
+
+    selection.remove('dissolve', { system });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].name).toBe('dissolve');
+    expect(calls[0].opts.position.x).toBeCloseTo(1);
+    expect(calls[0].opts.position.y).toBeCloseTo(2);
+    expect(calls[0].opts.position.z).toBeCloseTo(3);
+  });
+
+  it('still removes the backend even when animated', () => {
+    const object = makeInstanced(new THREE.Scene(), 'a', 4);
+    const selection = new Selection({ type: 'instanced', object, indices: Uint32Array.from([0]) });
+    const system = { preset: () => {} };
+    expect(() => selection.remove('dissolve', { system })).not.toThrow();
+  });
+
+  it('returns this for chaining', () => {
+    const selection = new Selection({ type: 'meshes', meshes: [] });
+    const system = { preset: () => {} };
+    expect(selection.remove('dissolve', { system })).toBe(selection);
+  });
+});
+
 // ── transition() (Prompt 91) ────────────────────────────────────────────────
 // Full SelectionTransition behavior is covered in SelectionTransition.test.js;
 // this just confirms Selection wires the two together correctly.

@@ -18,10 +18,10 @@ function assertPositiveInteger(name, value) {
  * this codebase's established pattern for `three/examples/jsm/*` utilities —
  * `GraphSceneCamera`'s `OrbitControls`, `GraphSceneEnvironment`'s
  * `RGBELoader`, `GraphObjectLoader`'s loaders). Pass `ssrPass` (a truthy
- * value — its shape isn't validated, since `postfx/`'s SSR pass doesn't
- * exist yet to define one) to use `ReflectorForSSRPass` instead, for
- * cooperating with a real screen-space-reflections pass once Phase 7 builds
- * one; otherwise this always uses the standalone `Reflector` fallback today.
+ * value — its shape still isn't validated, since any truthy value only
+ * selects the constructor here) to use `ReflectorForSSRPass` instead of the
+ * standalone `Reflector`. Pair it with `postfx/`'s `ssr` pass (Prompt 119):
+ * create the mirror first, then `graph3d.postfx.enable('ssr', { groundReflector: mirror })`.
  *
  * `plane` is disposed and replaced in its scene by the new reflector
  * (constructed from a clone of `plane`'s geometry, at `plane`'s exact

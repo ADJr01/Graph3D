@@ -32,6 +32,24 @@ vi.mock('../../src/core/CapabilityProbe.js', () => ({
   },
 }));
 
+vi.mock('../../src/postfx/index.js', () => ({
+  PostFX: class {
+    enabledPasses = [];
+    setSize = vi.fn();
+    setSceneCamera = vi.fn();
+    render = vi.fn();
+    dispose = vi.fn();
+    enabled = vi.fn(function () {
+      return this.enabledPasses;
+    });
+    constructor({ renderer, scene, camera } = {}) {
+      this.renderer = renderer;
+      this.scene = scene;
+      this.camera = camera;
+    }
+  },
+}));
+
 // Imports must follow vi.mock declarations.
 import { Graph3D } from '../../src/core/Graph3D.js';
 import { registry } from '../../src/core/Graph3DRegistry.js';
@@ -156,6 +174,118 @@ describe('Graph3D.workers (lazy pool)', () => {
     const g = new Graph3D({ canvas: makeCanvas() });
     g.dispose();
     expect(() => g.workers).toThrow(/disposed/);
+  });
+});
+
+// ── Lazy PostFX ───────────────────────────────────────────────────────────────
+
+describe('Graph3D.postfx (lazy)', () => {
+  it('throws when no active scene exists yet', () => {
+    const g = new Graph3D({ canvas: makeCanvas() });
+    expect(() => g.postfx).toThrow(/no active scene/);
+  });
+
+  it('creates a PostFX bound to the active scene on first access', () => {
+    const g = new Graph3D({ canvas: makeCanvas() });
+    const scene = g.createScene('main');
+    g.setActiveScene('main');
+    expect(g.postfx.renderer).toBe(g.renderer.three);
+    expect(g.postfx.scene).toBe(scene.three);
+    expect(g.postfx.camera).toBe(scene.camera.three);
+  });
+
+  it('returns the same PostFX instance on repeated access', () => {
+    const g = new Graph3D({ canvas: makeCanvas() });
+    g.createScene('main');
+    g.setActiveScene('main');
+    expect(g.postfx).toBe(g.postfx);
+  });
+
+  it('throws after dispose()', () => {
+    const g = new Graph3D({ canvas: makeCanvas() });
+    g.createScene('main');
+    g.setActiveScene('main');
+    g.dispose();
+    expect(() => g.postfx).toThrow(/disposed/);
+  });
+
+  it('dispose() disposes the PostFX when it was previously accessed', () => {
+    const g = new Graph3D({ canvas: makeCanvas() });
+    g.createScene('main');
+    g.setActiveScene('main');
+    const fx = g.postfx;
+    g.dispose();
+    expect(fx.dispose).toHaveBeenCalledOnce();
+  });
+
+  it('does not throw when .postfx was never accessed before dispose()', () => {
+    const g = new Graph3D({ canvas: makeCanvas() });
+    expect(() => g.dispose()).not.toThrow();
+  });
+
+  it('setSize() forwards to postfx when it was previously accessed', () => {
+    const g = new Graph3D({ canvas: makeCanvas() });
+    g.createScene('main');
+    g.setActiveScene('main');
+    const fx = g.postfx;
+    g.setSize(800, 600);
+    expect(fx.setSize).toHaveBeenCalledWith(800, 600);
+  });
+});
+
+// ── Tick + PostFX ─────────────────────────────────────────────────────────────
+
+describe('Graph3D tick rendering with PostFX', () => {
+  it('renders directly (bypassing postfx) when no passes are enabled', () => {
+    const addSpy = vi.spyOn(loop, 'add');
+    const g = new Graph3D({ canvas: makeCanvas() });
+    const tick = addSpy.mock.calls[0][0];
+    g.createScene('main');
+    g.setActiveScene('main');
+    const fx = g.postfx; // accessed, but no passes enabled
+
+    tick(0.016);
+
+    expect(fx.render).not.toHaveBeenCalled();
+    expect(g.renderer.three.render).toHaveBeenCalledOnce();
+    addSpy.mockRestore();
+  });
+
+  it('renders through postfx when passes are enabled on the single default viewport', () => {
+    const addSpy = vi.spyOn(loop, 'add');
+    const g = new Graph3D({ canvas: makeCanvas() });
+    const tick = addSpy.mock.calls[0][0];
+    const scene = g.createScene('main');
+    g.setActiveScene('main');
+    const fx = g.postfx;
+    fx.enabledPasses = ['bloom'];
+
+    tick(0.016);
+
+    expect(fx.setSceneCamera).toHaveBeenCalledWith(scene.three, scene.camera.three);
+    expect(fx.render).toHaveBeenCalledWith(0.016);
+    expect(g.renderer.three.render).not.toHaveBeenCalled();
+    addSpy.mockRestore();
+  });
+
+  it('falls back to direct per-viewport rendering when multiViewport is configured, even with passes enabled', () => {
+    const addSpy = vi.spyOn(loop, 'add');
+    const g = new Graph3D({ canvas: makeCanvas() });
+    const tick = addSpy.mock.calls[0][0];
+    const scene = g.createScene('main');
+    scene.setViewports([
+      { x: 0, y: 0, width: 0.5, height: 1 },
+      { x: 0.5, y: 0, width: 0.5, height: 1 },
+    ]);
+    g.setActiveScene('main');
+    const fx = g.postfx;
+    fx.enabledPasses = ['bloom'];
+
+    tick(0.016);
+
+    expect(fx.render).not.toHaveBeenCalled();
+    expect(g.renderer.three.render).toHaveBeenCalledTimes(2);
+    addSpy.mockRestore();
   });
 });
 

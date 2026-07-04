@@ -13,8 +13,14 @@ const BUILTIN_HDRS = {
 
 /**
  * Named fog presets with cinematically tuned default values.
- * Volumetric presets flag the scene for a god-rays postfx pass (Phase 7)
- * and fall back to exponential fog in the meantime.
+ * Volumetric presets flag the scene (via `scene.userData.graph3d_fogPreset`)
+ * so `postfx/`'s `godRays` pass can react to it, but the fog itself always
+ * renders as exponential — a true raymarched volumetric fog volume is a
+ * separate, much larger feature this project doesn't implement (Prompt 118
+ * only wires the light-shaft look, not in-scattering fog density).
+ * `'volumetric-cinematic'` is auto-activated by `PostFX` (Prompt 118) once
+ * `graph3d.postfx` has been accessed; `'volumetric-low'` currently isn't
+ * wired to anything — see `skipping_list.md`.
  * @type {Record<string, { color: number, near?: number, far?: number, density?: number }>}
  */
 const FOG_PRESETS = {
@@ -278,16 +284,17 @@ export class GraphSceneEnvironment {
    * **String presets** (recommended — good defaults included):
    * - `'linear'` — cool grey-blue linear fog
    * - `'exponential'` — muted blue-grey exponential haze
-   * - `'volumetric-low'` — warm atmospheric volumetric haze (requires Phase 7 postfx; falls back to exponential)
-   * - `'volumetric-cinematic'` — deep-blue night volumetric (requires Phase 7 postfx; falls back to exponential)
+   * - `'volumetric-low'` — warm atmospheric volumetric haze (renders as exponential fog; not yet wired to a postfx pass)
+   * - `'volumetric-cinematic'` — deep-blue night volumetric (renders as exponential fog; auto-activates `postfx`'s `godRays` pass once `graph3d.postfx` is accessed)
    *
    * **Object form** (custom values, existing behavior):
    * - `{ type: 'linear', color?, near?, far? }`
    * - `{ type: 'exponential', color?, density? }`
    *
-   * Volumetric presets emit a `console.warn` until Phase 7 postfx is wired in,
-   * and store the preset name in `scene.userData.graph3d_fogPreset` so the future
-   * god-rays pass can detect them.
+   * Volumetric presets always render as exponential fog (there is no
+   * raymarched fog-volume renderer) and emit a `console.warn` saying so, and
+   * store the preset name in `scene.userData.graph3d_fogPreset` so `postfx`'s
+   * `godRays` pass can detect it.
    *
    * @param {string|{ type: 'linear'|'exponential', color?: number, near?: number, far?: number, density?: number }} input
    * @returns {this}
@@ -445,10 +452,11 @@ export class GraphSceneEnvironment {
     this.#fogPreset = name;
     if (VOLUMETRIC_PRESETS.has(name)) {
       this.#scene.userData.graph3d_fogPreset = name;
-      // ponytail: full volumetric god-rays land in Phase 7; exponential fog is the fallback.
+      // ponytail: no raymarched fog-volume renderer exists; exponential fog is the permanent stand-in.
       console.warn(
-        `GraphSceneEnvironment.setFog: '${name}' requires the god-rays postfx pass ` +
-          `(Phase 7). Applying exponential fog as a fallback.`,
+        `GraphSceneEnvironment.setFog: '${name}' renders as exponential fog — ` +
+          `there is no true volumetric fog-volume renderer. ` +
+          `${name === 'volumetric-cinematic' ? "The light-shaft look comes from postfx's 'godRays' pass, auto-activated once graph3d.postfx is accessed." : "It is not yet wired to a postfx pass."}`,
       );
       this.#scene.fog = new THREE.FogExp2(preset.color, preset.density);
     } else {

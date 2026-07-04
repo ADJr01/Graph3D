@@ -322,12 +322,79 @@ export class Selection {
    * back to the join system's free-list for a future `enter()` to recycle
    * (instanced backend). Typically called on an `.exit()` result, but works
    * on any selection.
+   *
+   * Passing `animationName` (Prompt 122, e.g. `'dissolve'`) plays a particle
+   * exit effect at each departing node's location first — the node is still
+   * freed immediately after, since the burst is a short-lived visual, not a
+   * removal delay (there's no chart-level animated-exit lifecycle yet; that
+   * lands with `GraphChart.exitAnimation` in Phase 8). `options.system` must
+   * be a particle system exposing `.preset(name, opts)` — i.e. a
+   * `postfx/particles` `ParticleSystem`, duck-typed rather than imported,
+   * since `Selection` (compose/) has no scene/camera/renderer of its own to
+   * build one and must not import `postfx/` per CLAUDE.md §1.4. Meshes
+   * backend passes each node's raw mesh (`options.system.preset(name, {
+   * mesh })`, e.g. `ParticleSystem`'s `'dissolve'` preset surface-samples
+   * it); instanced backend passes its local-space position instead.
+   * @param {string} [animationName] - A preset name registered on `options.system`.
+   * @param {Object} [options={}]
+   * @param {{preset: function(string, Object): void}} [options.system] - Required when `animationName` is given.
    * @returns {this}
+   * @throws {TypeError} If `animationName` is given without a valid `options.system`.
    * @example joined.exit().remove();
+   * @example joined.exit().remove('dissolve', { system: rain });
    */
-  remove() {
+  remove(animationName, options = {}) {
+    if (animationName !== undefined) {
+      if (typeof animationName !== 'string' || animationName.length === 0) {
+        throw new TypeError(`Selection.remove: animationName must be a non-empty string, received ${JSON.stringify(animationName)}.`);
+      }
+      const { system, ...presetOpts } = options;
+      if (!system || typeof system.preset !== 'function') {
+        throw new TypeError(
+          `Selection.remove('${animationName}'): options.system must be a particle system exposing .preset(name, opts) (e.g. a postfx ParticleSystem).`,
+        );
+      }
+      this.#playExitAnimation(animationName, system, presetOpts);
+    }
     removeBackend(this.#backend);
     return this;
+  }
+
+  /**
+   * Permanently disposes the underlying rendering resource(s) this
+   * selection's backend owns: every `GraphMesh` (meshes backend), or the
+   * shared `GraphInstancedObject` itself, once, regardless of how many
+   * indices this particular selection covers — the instanced object is a
+   * single chart-owned resource, not a per-index one. Unlike `remove()`
+   * (which only frees this selection's own members for potential reuse),
+   * `dispose()` releases the resource for good — meant for tearing down a
+   * chart's entire backend (`GraphChart.destroy()`, Prompt 131), not for
+   * narrowed/filtered selections a caller still wants to use.
+   * @returns {void}
+   * @example chart.selection().dispose();
+   */
+  dispose() {
+    if (this.#backend.type === 'meshes') {
+      for (const mesh of this.#backend.meshes) mesh.dispose();
+    } else {
+      this.#backend.object.dispose();
+    }
+  }
+
+  /**
+   * @param {string} animationName
+   * @param {{preset: function(string, Object): void}} system
+   * @param {Object} presetOpts
+   */
+  #playExitAnimation(animationName, system, presetOpts) {
+    for (let i = 0; i < this.size(); i++) {
+      if (this.#backend.type === 'meshes') {
+        system.preset(animationName, { ...presetOpts, mesh: this.#backend.meshes[i].three });
+      } else {
+        const rawIndex = this.#backend.indices[i];
+        system.preset(animationName, { ...presetOpts, position: this.#backend.object.getInstancePosition(rawIndex) });
+      }
+    }
   }
 
   /**

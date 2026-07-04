@@ -7,6 +7,8 @@ import { WorkerPool } from './WorkerPool.js';
 import { createWorkerFactory } from './worker/workerBlob.js';
 // Cross-layer import: Graph3D is the composition root and owns scene lifecycle.
 import { GraphScene } from '../scene/index.js';
+// Cross-layer import: same composition-root exception as GraphScene above (CLAUDE.md §1.4).
+import { PostFX } from '../postfx/index.js';
 
 /**
  * @typedef {Object} Graph3DOptions
@@ -45,6 +47,9 @@ export class Graph3D {
 
   /** @type {WorkerPool|null} */
   #workerPool = null;
+
+  /** @type {PostFX|null} */
+  #postfx = null;
 
   /** @type {Map<string, *>} */
   #scenes = new Map();
@@ -129,8 +134,20 @@ export class Graph3D {
       const H = el.height;
       const threeScene = this.#activeScene.three;
       const threeCamera = this.#activeScene.camera.three;
+      const viewports = this.#activeScene.viewports;
 
-      for (const vp of this.#activeScene.viewports) {
+      // PostFX composites the whole canvas through a single EffectComposer
+      // pass chain, which doesn't reconcile with scissored multi-viewport
+      // rendering — it only applies to the common single-viewport case.
+      if (this.#postfx && viewports.length === 1 && this.#postfx.enabled().length > 0) {
+        this.#postfx.setSceneCamera(threeScene, threeCamera);
+        threeRenderer.setViewport(0, 0, W, H);
+        threeRenderer.setScissorTest(false);
+        this.#postfx.render(deltaSec);
+        return;
+      }
+
+      for (const vp of viewports) {
         threeRenderer.setViewport(
           Math.round(vp.x * W),
           Math.round(vp.y * H),
@@ -206,6 +223,36 @@ export class Graph3D {
   }
 
   /**
+   * The `PostFX` pipeline bound to this instance's active scene, created
+   * lazily on first access. Requires an active scene (`setActiveScene()`)
+   * to exist first — the underlying `EffectComposer` needs a concrete scene
+   * and camera to render.
+   *
+   * @returns {PostFX}
+   * @throws {Error} If called after `dispose()`, or before any scene is active.
+   * @example
+   * g.setActiveScene('main');
+   * g.postfx.enable('bloom', { strength: 1.2 });
+   */
+  get postfx() {
+    this.#assertNotDisposed('postfx');
+    if (!this.#postfx) {
+      if (!this.#activeScene) {
+        throw new Error(
+          'Graph3D.postfx: no active scene. Call setActiveScene() before accessing postfx.',
+        );
+      }
+      this.#postfx = new PostFX({
+        renderer: this.#renderer.three,
+        scene: this.#activeScene.three,
+        camera: this.#activeScene.camera.three,
+        capabilities: this.capabilities,
+      });
+    }
+    return this.#postfx;
+  }
+
+  /**
    * Map of all scenes keyed by name. Populated by `createScene()` (Prompt 22).
    * @returns {Map<string, *>}
    */
@@ -235,6 +282,7 @@ export class Graph3D {
   setSize(width, height) {
     this.#assertNotDisposed('setSize');
     this.#renderer.setSize(width, height);
+    this.#postfx?.setSize(width, height);
   }
 
   /**
@@ -394,6 +442,7 @@ export class Graph3D {
     loop.remove(this.#tick);
     this.#frameBudget.dispose();
     this.#workerPool?.dispose();
+    this.#postfx?.dispose();
 
     // Dispose scenes before the renderer — scene disposal releases GPU resources first.
     for (const scene of this.#scenes.values()) {

@@ -2,9 +2,64 @@
 
 **Read this file at the start of every session. Re-read before touching any code you haven't touched today. These rules are not suggestions.**
 
+**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
+
+## 1. Think Before Coding
+
+**Don't assume. Don't hide confusion. Surface tradeoffs.**
+
+Before implementing:
+- State your assumptions explicitly. If uncertain, ask.
+- If multiple interpretations exist, present them - don't pick silently.
+- If a simpler approach exists, say so. Push back when warranted.
+- If something is unclear, stop. Name what's confusing. Ask.
+
+## 2. Simplicity First
+
+**Minimum code that solves the problem. Nothing speculative.**
+
+- No features beyond what was asked.
+- No abstractions for single-use code.
+- No "flexibility" or "configurability" that wasn't requested.
+- No error handling for impossible scenarios.
+- If you write 200 lines and it could be 50, rewrite it.
+
+Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+
+## 3. Surgical Changes
+
+**Touch only what you must. Clean up only your own mess.**
+
+When editing existing code:
+- Don't "improve" adjacent code, comments, or formatting.
+- Don't refactor things that aren't broken.
+- Match existing style, even if you'd do it differently.
+- If you notice unrelated dead code, mention it - don't delete it.
+
+When your changes create orphans:
+- Remove imports/variables/functions that YOUR changes made unused.
+- Don't remove pre-existing dead code unless asked.
+
+The test: Every changed line should trace directly to the user's request.
+
+## 4. Goal-Driven Execution
+
+**Define success criteria. Loop until verified.**
+
+Transform tasks into verifiable goals:
+- "Add validation" → "Write tests for invalid inputs, then make them pass"
+- "Fix the bug" → "Write a test that reproduces it, then make it pass"
+- "Refactor X" → "Ensure tests pass before and after"
+
+For multi-step tasks, state a brief plan:
+```
+1. [Step] → verify: [check]
+2. [Step] → verify: [check]
+3. [Step] → verify: [check]
+```
 ---
 
-## 0. Project North Star
+## Project North Star
 
 Graph3D.js is a **D3-flavored, GPU-instanced, cinematically rendered 3D data visualization library**. It targets millions of data points, exposes the full Three.js scene at every layer, and provides a fluent chainable API as the primary surface.
 
@@ -68,7 +123,7 @@ Every module owns one concern. Modules communicate through explicit, narrow inte
 
 | Layer | Owns | Must NOT touch |
 |---|---|---|
-| `core/` | Renderer, loop, registry, capabilities, workers, frame budget | Scene contents, chart logic, materials |
+| `core/` | Renderer, loop, registry, capabilities, workers, frame budget | Scene contents, chart logic, materials — **except `Graph3D`'s own `postfx` getter**, a second sanctioned composition-root exception alongside `GraphScene` below: `Graph3D` lazily builds a `PostFX` (`postfx/`, Prompt 116) bound to the active scene's `.three`/`.camera.three`, exactly mirroring why `Graph3D` is already allowed to import `GraphScene` — it is the one place that legitimately wires every layer together, not `core/`'s other files. |
 | `scene/` | Scene composition: cameras, lights, environment, shadows, clip planes | Chart data, instancing decisions, materials beyond environment — **except `GraphScene.selectAll`**, a second sanctioned exception mirroring `compose/selection`'s: it imports `Selection` from `compose/selection` purely to wrap `selectByName`'s existing matches into a join-ready handle (auto-choosing backend), so the fluent `scene.selectAll(name).attr(...)` entry point (Prompts 74+, 81) doesn't require every caller to construct a `Selection` by hand. `GraphScene` still never imports concrete chart/data-binding logic — only the one `compose/selection` re-export. |
 | `object/` | Object/mesh wrappers, instancing, octree, loaders | Chart-type-specific logic, data binding, scales — **except `GraphInstancedObject`'s `setAllPositions`/`setAllScales`/`setAllColors`**, a fourth sanctioned exception in the same family as `compose/selection`'s: their `options.easing` (Prompt 92, "wire `Transition` into the bulk setters") resolves through `anim/GraphAnimCurve.resolve` rather than a second easing table living in `object/` (CLAUDE.md §1.1 DRY). `resolve` is a pure, stateless `(name) => (t) => number` function with zero knowledge of THREE.js or `object/`'s types — `object/` still never imports anything else from `anim/`, and `anim/` never imports `object/` back (no cycle; `madge --circular` stays clean). |
 | `compose/` | Scales, generators, layouts, palettes, axes, annotations, **and `compose/selection` (`Selection`, data-join — v3 addition, Prompts 74+)** | Direct Three.js API calls (works on plain arrays/numbers) — **except `compose/selection`, which is deliberately exempt**: `Selection` reads/writes through `object/`-layer wrapper instances (`GraphMesh`, `GraphInstancedObject`) so per-datum micro-control works uniformly across both rendering paths. It still never touches raw `THREE.*` classes directly — only the `object/` wrappers, which is the one sanctioned import-from-below inside `compose/`. **`compose/axis` and `compose/annotation` (Prompts 83–84) share the same exemption**: `Axis` renders a real spine/tick scene object and `annotation`'s `callout`/`referenceLine`/`referencePlane`/`region` render real callout/plane/region scene objects — no data-only chart layer exists yet to do this on their behalf, so both import `GraphMesh` from `object/` (mirroring `compose/selection`'s import) and construct `THREE.BufferGeometry`/`THREE.Material` instances directly (the minimum needed to hand `GraphMesh` a concrete geometry+material) — no other Three.js API surface is touched. `annotation.label` and `Axis`'s per-tick labels remain plain metadata (`{text, position}`, no Three.js object at all) until Phase 6's SDF text material exists. **`compose/selection`'s `SelectionTransition` (Prompt 91) is a third, narrower exemption**: `Selection.transition()` needs a timeline/easing engine to drive animated `.attr()`/`.style()` writes, and `anim/` is that engine — rather than build a second one inside `compose/`, `SelectionTransition` imports `GraphAnimTimeline`/`GraphAnim`/`GraphAnimCurve.resolve` from `anim/` directly (an import from a layer listed *after* `compose/` in this table). This doesn't close a cycle (`madge --circular src/` stays clean): `anim/` itself only reaches back into `compose/interpolate` (Prompt 87, a leaf with no further upward imports), never into `compose/selection`, so the two crossings don't meet. Treat this the same as the other two: importing `anim/`'s public exports only, never its internals, and never for anything `anim/` itself needs to know about `Selection`/`object/` types (it still only sees opaque per-frame numbers via `SelectionTransition`'s own dummy timeline target). |

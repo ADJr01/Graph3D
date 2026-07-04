@@ -102,7 +102,12 @@ One call instead of hand-assembling `GraphObjectMaterial` + `dataDriven`. Note t
 const mirror = await material.addPlanarReflection(floorPlane, { textureWidth: 1024 });
 ```
 
-Turns an existing flat `GraphMesh` into a live mirror using `three/examples/jsm/objects/Reflector.js` (dynamically imported, matching this codebase's established pattern for `three/examples/jsm/*` utilities). Reflects the current camera view every frame automatically via THREE's own `onBeforeRender` hook — no `loop`/RAF wiring needed on this library's side. `plane` is disposed and replaced in its scene by the reflector (a whole `THREE.Mesh` subclass, not a swappable material). Pass `ssrPass` (any truthy value) to use `ReflectorForSSRPass` instead, for cooperating with a real screen-space-reflections pass once Phase 7 builds one — every call today, with no `ssrPass`, uses the standalone `Reflector` fallback, since Phase 7 doesn't exist yet.
+Turns an existing flat `GraphMesh` into a live mirror using `three/examples/jsm/objects/Reflector.js` (dynamically imported, matching this codebase's established pattern for `three/examples/jsm/*` utilities). Reflects the current camera view every frame automatically via THREE's own `onBeforeRender` hook — no `loop`/RAF wiring needed on this library's side. `plane` is disposed and replaced in its scene by the reflector (a whole `THREE.Mesh` subclass, not a swappable material). Pass `ssrPass` (any truthy value) to use `ReflectorForSSRPass` instead of the standalone `Reflector` fallback, then pair the result with postfx's `ssr` pass (Prompt 119):
+
+```js
+const mirror = await material.addPlanarReflection(floorPlane, { ssrPass: true });
+graph3d.postfx.enable('ssr', { groundReflector: mirror });
+```
 
 ---
 

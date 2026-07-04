@@ -284,6 +284,23 @@ export class SelectionTransition {
     return this;
   }
 
+  /**
+   * Immediately unregisters this transition's internal timeline from the
+   * shared `anim` engine, abandoning every pending write — no further ticks
+   * fire, and any `.remove()` scheduled on this transition never runs.
+   * Idempotent (safe on an already-finished, never-started, or
+   * already-stopped transition). For tearing down a chart mid-animation
+   * (`GraphChart.destroy()`, Prompt 131), where letting the tween finish (and
+   * firing `'end'` handlers) no longer matters — not a graceful finish.
+   * @returns {void}
+   * @example transition.stop();
+   */
+  stop() {
+    if (!this.#timeline) return;
+    anim.remove(this.#timeline);
+    this.#timeline = null;
+  }
+
   // ── per-path job builders ───────────────────────────────────────────────
 
   #scheduleTransformComponent(path, base, component, resolveValue) {
