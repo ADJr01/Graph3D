@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Graph3D — Phase 5 Animation & Transitions</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { overflow: hidden; background: #000; font-family: system-ui, sans-serif; }
+      canvas { display: block; }
+
+      #panel {
+        position: fixed;
+        top: 12px;
+        left: 12px;
+        background: rgba(20, 20, 24, 0.75);
+        color: #eee;
+        padding: 12px 14px;
+        border-radius: 8px;
+        font-size: 13px;
+        backdrop-filter: blur(6px);
+        max-width: 340px;
+      }
+      #panel .row { display: flex; gap: 8px; margin-bottom: 4px; }
+      #panel .label { opacity: 0.6; width: 90px; }
+      #panel p { opacity: 0.7; font-size: 11px; margin-top: 6px; line-height: 1.4; }
+    </style>
+  </head>
+  <body>
+    <div id="panel">
+      <div class="row"><span class="label">Bars (live)</span><span id="count"></span></div>
+      <div class="row"><span class="label">Tallest</span><span id="max"></span></div>
+      <p>
+        The Phase 4 capstone's bar layout, animated with <code>Selection.transition()</code>
+        (<code>SelectionTransition</code>) instead of snapping: entering bars grow in staggered,
+        updated bars morph height/color, exiting bars dissolve before their slot frees. A
+        <code>CameraTour.flyTo()</code> reframes on the new tallest bar every cycle.
+      </p>
+    </div>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
