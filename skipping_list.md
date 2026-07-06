@@ -77,10 +77,10 @@ resolving prompt/commit noted, don't delete — the history is useful).
 - **Why skipped:** `prompts.md` Prompt 165 ("Wire `layout.force` to GPGPU above 5000 nodes") explicitly plans this as separate, later work — Prompt 72's scope is the CPU/plain-object version.
 - **Revisit when:** Prompt 165 is reached.
 
-### ☐ No `.linkDistance()`/`.cluster()` convenience helpers on `layout.force`
+### ☑ No `.linkDistance()`/`.cluster()` convenience helpers on `layout.force`
 - **Where:** `src/compose/layout/force/index.js`
 - **Why skipped:** These belong to the future `NetworkChart` (Prompt 137), which will consume `layout.force` directly — no current consumer for standalone convenience sugar (CLAUDE.md §1.3 YAGNI).
-- **Revisit when:** Prompt 137 (`NetworkChart`) is implemented.
+- **Resolved:** Prompt 137 — `NetworkChart.linkDistance(value)`/`.cluster(keyFn, strength)` pass straight through to `layout.force.link`'s `distance` option / a new `layout.force.cluster` factory. This checkbox should have flipped when Prompt 137 landed; caught late during the Prompt 138 skipping_list.md audit.
 
 ### ☐ `layout.pack`'s sphere placement is a force-relaxation heuristic, not an exact minimal-enclosing-sphere solver
 - **Where:** `src/compose/layout/pack.js:4` (`packChildren`)
@@ -92,10 +92,10 @@ resolving prompt/commit noted, don't delete — the history is useful).
 - **Why skipped:** A "conical tree" / sunburst-style heuristic (wedge width ∝ leaf count) guarantees siblings never collide by construction, without full Reingold-Tilford contour tracking.
 - **Revisit when:** A wide leaf node visibly crowds a narrow sibling in a real hierarchy chart.
 
-### ☐ No `.radius()`/`.size()` chainable convenience on `layout.pack`/`layout.tree` beyond `padding`/`levelHeight`/`levelRadius`
+### ☑ No `.radius()`/`.size()` chainable convenience on `layout.pack`/`layout.tree` beyond `padding`/`levelHeight`/`levelRadius`
 - **Where:** `src/compose/layout/pack.js`, `src/compose/layout/tree.js`
 - **Why skipped:** No current consumer (Prompt 73 only requires the config-object form); a consuming chart (Prompt 137+) may want a different chaining surface.
-- **Revisit when:** A hierarchy-consuming chart is built and asks for it.
+- **Resolved:** Prompt 138 — `TreeChart`/`PackChart` expose `.children(fn)`/`.value(fn)`/`.sortChildren(fn)` (chart-level passthroughs to the layout's own `children`/`value`/`sort` options) plus `.levelHeight()`/`.levelRadius()` (`TreeChart`) and `.padding()` (`PackChart`) — the chaining surface lives on the consuming chart, not on `layout.pack`/`layout.tree` themselves, which is the shape this entry anticipated ("a consuming chart may want a different chaining surface").
 
 ---
 
@@ -505,6 +505,88 @@ resolving prompt/commit noted, don't delete — the history is useful).
 - **Where:** N/A — no `src/chart/` yet.
 - **Why skipped:** Prompt 122 asks for two things: `Selection.exit().remove('dissolve')` (implemented — see `Selection.remove(animationName, options)`, `src/compose/selection/Selection.js`) and `chart.exitAnimation('dissolve')`. The latter requires `GraphChart`, which is Prompt 127+ (Phase 8), five prompts after this one in the sequence — there is nothing to wire it to yet. `Selection.remove(animationName, options)` takes `options.system` (a particle system exposing `.preset(name, opts)`, duck-typed — `compose/` must not import `postfx/` per CLAUDE.md §1.4, and `Selection` has no scene/camera/renderer of its own to construct one itself) rather than resolving a system implicitly, precisely because that implicit "the chart already knows its own scene/camera/renderer/postfx" resolution is what `GraphChart.exitAnimation` will provide once it exists — building that resolution mechanism now, ahead of `GraphChart`, would mean inventing scaffolding for a consumer that isn't there yet (YAGNI).
 - **Revisit when:** Prompt 127+ builds `GraphChart` — add `chart.exitAnimation(name)` storing a default animation name, consumed by the chart's own `update()`/exit-join path (Prompt 130) which already has direct access to its `postfx`-obtained `ParticleSystem`; it should call the same `Selection.remove(animationName, { system, ...opts })` path added here, not a second implementation.
+- **Note (Prompt 137):** the stated revisit trigger already fired — `GraphChart` (Prompt 127) and every chart type through `NetworkChart` (Prompt 137) now exist, and this still isn't wired. Genuinely overdue, not re-deferred; flagging here since it was found late (this whole Phase 8 section was added retroactively after Prompt 137, see the section note below) rather than silently left stale.
+
+---
+
+## Phase 8 — Chart Types (Prompts 127–139)
+
+**Process note:** this section was written retroactively after Prompt 137 — none of Prompts 132–137's deliberate scope-narrowing was logged here (or marked `ponytail:` in-code) as each chart landed, breaking this file's own stated process. The entries below were reconstructed from the actual code; going forward each new chart/prompt in this phase must get its entry here at the time it's built, not batched at the end.
+
+### ☐ `chart/colorField.js`'s `applyColorField` always writes color immediately, never through the chart's configured `.transition()`
+- **Where:** `src/chart/colorField.js:28` (`applyColorField`) — consumed by `BarChart`, `ScatterChart`, `HeatmapChart`, `NetworkChart`
+- **Why skipped:** `GraphChart`'s position/scale writes (`#writeComputedTransform`) already animate through a `SelectionTransition` when `.transition()` is configured; `applyColorField` was extracted from `BarChart`'s original immediate `Selection.attr('color', ...)` write (Prompt 132) and never revisited for transition-awareness as more charts adopted it (Prompt 134 Scatter, Prompt 136 Heatmap, Prompt 137 Network) — every later consumer inherited the same gap rather than any of them independently deciding it was fine.
+- **Revisit when:** A chart/example wants an animated color change (e.g. a heatmap "flash" on update) — `applyColorField` would need an optional transition target, mirroring `#writeComputedTransform`'s own branch.
+
+### ☐ `AreaChart`/`SurfaceChart` dispose and rebuild their whole mesh on every `update()`, never mutate in place
+- **Where:** `src/chart/AreaChart.js:164-170` (`#sync`), `src/chart/SurfaceChart.js:190-197` (`#sync`)
+- **Why skipped:** `LineChart`'s `GraphLine.setPositions()` mutates its existing buffer in place when the point count is unchanged; `AreaChart`/`SurfaceChart` never got the equivalent optimization for their triangulated mesh — each `update()` is a full dispose+recreate. Documented in both files' own class doc as a deliberate YAGNI call (no current requirement calls for it), but never logged here at the time.
+- **Revisit when:** A frequently-updated (e.g. streaming/animated) area or surface chart shows visible GC/allocation pressure from rebuilding the whole `BufferGeometry` every frame.
+
+### ☐ `SurfaceChart`'s contour tracer resolves the ambiguous 4-edge "saddle" cell with one fixed rule, not a real disambiguator
+- **Where:** `src/compose/generator/contour.js:43` area (saddle handling)
+- **Why skipped:** A full marching-squares implementation disambiguates a saddle by sampling the cell's center value; this tracer picks one deterministic connection instead — correct most of the time, but can occasionally connect the wrong diagonal pair on a genuinely ambiguous cell. Never logged when Prompt 135 landed.
+- **Revisit when:** A real dataset's contour overlay visibly "swaps" a saddle connection in a way that looks wrong.
+
+### ☐ `LineChart`/`AreaChart`/`SurfaceChart`'s `selection()`/`on('enter'|'update'|'exit', ...)` are inert
+- **Where:** `src/chart/LineChart.js:23-27` (class doc), `src/chart/AreaChart.js` (mirrors it), `src/chart/SurfaceChart.js` (mirrors it)
+- **Why skipped:** All three render one continuous object (a `GraphLine`/triangulated mesh), not N per-datum members — there's no per-vertex/per-segment `Selection` for enter/exit micro-control to operate on. This is closer to an architectural consequence than a lazy shortcut, but it's a real capability gap relative to `BarChart`/`ScatterChart`/`HeatmapChart`/`NetworkChart`, and was never logged.
+- **Revisit when:** A concrete use case wants per-point/per-segment control on a line/area/surface (e.g. highlighting one vertex) — would need a genuinely different backend shape for these charts, not a small patch.
+
+### ☐ `ScatterChart.pick()` uses a plain `THREE.Raycaster` on the meshes backend, no octree below `INSTANCING_THRESHOLD`
+- **Where:** `src/chart/ScatterChart.js:94-105` (`pick`)
+- **Why skipped:** Documented in-code as intentional (an octree isn't worth the overhead at ≤50 individual meshes), but never cross-referenced here.
+- **Revisit when:** `instancingThreshold` is raised well past its current default and mesh-backend picking becomes a real bottleneck.
+
+### ☐ `NetworkChart`/`TreeChart`'s edges are one `Line2` per link — not instanced, so edge count doesn't scale the way node count does
+- **Where:** `src/chart/NetworkChart.js` (`#buildBackend`, `#edgeLines`), `src/chart/TreeChart.js` (`#buildBackend`, `#edgeLines`)
+- **Why skipped:** Matches Prompt 137's literal ask ("Line2 edges") and reuses `object/GraphLine.js` as-is (CLAUDE.md §1.1 DRY — no new instanced-line primitive exists yet); `TreeChart` (Prompt 138) reused the identical primitive for its parent-child edges rather than building a second one. Nodes render as one `GraphInstancedObject` above `INSTANCING_THRESHOLD` and genuinely scale to the library's "millions" target; edges are one draw call each and do not — a graph/tree with thousands of edges means thousands of `Line2` objects. This is the biggest scale gap in these charts relative to the project's north star.
+- **Revisit when:** An example/use case needs a graph or tree with more than a few thousand visible edges — would need an instanced/batched line-segment primitive (`GraphObjectFactory.createLineSegments` already exists, unused — see below — but it's box-mesh-based, not a real constant-pixel-width line).
+
+### ☐ `NetworkChart`/`TreeChart`/`PackChart.update()` fully tears down and rebuilds the entire node (and, for `NetworkChart`/`TreeChart`, edge) backend every call, not incrementally
+- **Where:** `src/chart/NetworkChart.js:#buildBackend`, `src/chart/TreeChart.js:#buildBackend`, `src/chart/PackChart.js:#buildBackend`
+- **Why skipped:** Mirrors `SurfaceChart`'s established "no in-place mutation" precedent (a fixed-capacity `GraphInstancedObject` can't grow/shrink, and diffing per-node/per-edge adds/removes wasn't required by any of these prompts) — but a network/tree/pack chart is a more likely candidate for frequent, small updates (e.g. a streaming graph, a live org chart) than a surface plot, making this a more consequential simplification here than for `SurfaceChart`.
+- **Revisit when:** A streaming/frequently-updated network, tree, or pack chart shows visible hitching on each `update()` call.
+
+### ☐ `NetworkChart.pin()`/`.unpin()` have no drag-interaction wiring — nothing calls them yet
+- **Where:** `src/chart/NetworkChart.js` (`pin`/`unpin`)
+- **Why skipped:** `interact/` (picking, drag, state machine) doesn't exist yet — same reasoning as the still-open `chart.exitAnimation` entry above: the mechanism is built and ready, but there's no consumer layer yet to call it from a real drag gesture. Deferred, not silently skipped.
+- **Revisit when:** `interact/`'s drag/picking layer is built — wire a drag-start/drag-end handler to call `chart.pin(datum, worldPosition)`/`chart.unpin(datum)`, not a second pinning mechanism.
+
+### ☐ `NetworkChart`/`TreeChart`/`PackChart`'s `.size()`/`.shape()`/`.opacity()`/`.filter()`/`.sort()` are inert
+- **Where:** `src/chart/NetworkChart.js` (class doc), `src/chart/TreeChart.js` (class doc), `src/chart/PackChart.js` (class doc)
+- **Why skipped:** Only `.color()`/`.material()` were wired in (cheap reuse of existing `chart/colorField.js`/`chart/materialField.js` since a real node `Selection` was already being built for that purpose in each) — per-node size/shape/opacity/filtering wasn't asked for by Prompts 137/138 and had no consumer to justify the extra wiring (YAGNI). `TreeChart`/`PackChart` additionally leave `GraphChart.sort()` inert by design (see `.sortChildren()` in each's own doc), since it would collide in name but not meaning with the inherited flat-array sort.
+- **Revisit when:** A use case wants node radius to encode a *second* value independent of the hierarchy's own `.value()`-driven sizing (e.g. color for depth, size for a different metric), or wants to filter which nodes render.
+
+### ☐ `PackChart`'s default material is opaque, which fully hides nested children from any outside viewing angle
+- **Where:** `src/chart/PackChart.js` (`.material()`, inherited from `GraphChart`, defaults to `material.standard()` same as every other chart)
+- **Why skipped:** Consistency with every other chart type's default (CLAUDE.md §1.1 DRY — `resolveChartMaterial`/`material.standard()` is the one shared fallback, not a chart-specific override) was prioritized over a chart-specific default; Prompt 138 only asked to render "every node as a sphere," not to solve 3D-nesting visibility. Discovered hands-on while building `examples/16-pack-chart/`: an opaque root sphere makes every descendant invisible until the caller manually sets `.material('standard', { transparent: true, opacity: <0.5ish> })` — the 2D d3.pack analogue has this problem for free since flat circles never occlude each other.
+- **Revisit when:** A user reports "PackChart renders one solid ball" — consider defaulting to a low opacity, or adding a dedicated leaves-only/cutaway render mode, rather than requiring every caller to discover and set `transparent`+`opacity` by hand.
+
+### ☐ `TreeChart` sizes every node sphere by `radiusFromValue(subtree value)` (same convention as `PackChart`), not a uniform marker size
+- **Where:** `src/chart/TreeChart.js` (`#buildBackend`, via `chart/hierarchyField.js`'s `nodeScaleForRadius`)
+- **Why skipped:** Reuses the exact same `.r` field/sizing convention `layout.tree()` (Prompt 73) already computes and `PackChart` already needs verbatim (CLAUDE.md §1.1 DRY — one sizing rule, not a per-chart-type one), rather than adding a second "uniform node marker" sizing path that only `TreeChart` would use. For a node-*link* diagram (unlike a nested-sphere pack), this means a shallow/root node — whose subtree value is a bottom-up sum — visually dominates its many small leaves, which is unusual for a typical tree/org-chart visualization (most render every node the same size, or size only by an explicit per-node metric).
+- **Revisit when:** A real tree dataset's root/near-root spheres visually overwhelm leaf nodes badly enough that a uniform-size (or `.value(() => 1)`-friendly, own-value-only) mode is worth adding — see `examples/15-tree-chart/`'s own workaround (assigning leaves-only `value`) for the same problem.
+
+### ☐ `PieChart`'s wedges are one `GraphMesh` per slice — not instanced, so slice count doesn't scale the way node/bar count does
+- **Where:** `src/chart/PieChart.js` (`#sync`, `#meshes`)
+- **Why skipped:** Every slice's wedge geometry genuinely differs (a different angular span from the same `generator.arc()` config), unlike `BarChart`/`ScatterChart` where every datum shares one base geometry an `InstancedMesh` can batch — `GraphObjectFactory`'s instancing dispatch (`createBars`/`createNodes`) fundamentally requires one shared geometry across instances, which doesn't fit N differently-shaped wedges. Pie charts realistically have a handful to a few dozen slices, so this is an accepted, documented-in-class-doc tradeoff, not an oversight — logged here for cross-reference per this file's own process.
+- **Revisit when:** A use case wants a pie/donut with hundreds+ of slices (unusual for the chart type, but not impossible — e.g. a fine-grained categorical breakdown).
+
+### ☐ `PieChart`/`VolumeChart`'s inherited `GraphChart` per-datum fields are inert
+- **Where:** `src/chart/PieChart.js` (class doc: `x()`/`y()`/`z()`/`size()`/`shape()`/`opacity()`/`filter()`/`sort()`/`on()`), `src/chart/VolumeChart.js` (class doc: all of those plus `data()`/`color()`/`material()`/`selection()`)
+- **Why skipped:** Same reasoning as `NetworkChart`/`TreeChart`/`PackChart`'s identical gap (see above) — no per-datum concept applies to a proportional-sweep layout or a continuous scalar field. `VolumeChart` goes further than the others (even `.material()` is inert, since its rendering *is* `material.volumeRaymarch(...)`, always) and overrides `.opacity()` with different, non-per-datum semantics (a plain global alpha number) rather than leaving the name unused — documented explicitly in its own class doc as a deliberate name reuse with a semantic break, mirroring `TreeChart`/`PackChart`/`PieChart`'s `.sortChildren()`/`.sortSlices()` precedent of picking a new name instead when semantics differ enough.
+- **Revisit when:** Not expected to change — these are architectural consequences of what these two chart types actually render, not scope cuts with a natural "done" state to grow into.
+
+### ☐ `material.volumeRaymarch`'s shader GLSL is untested by real WebGL compilation — and this prompt hit two real compile errors that only manual browser testing caught
+- **Where:** `tests/material/presets/volumeRaymarch.test.js`, `src/material/presets/volumeRaymarch.js`
+- **Why skipped:** Same pre-existing gap as `holographic`/`crystal`/`glow`/`dataDriven` (jsdom's `HTMLCanvasElement.getContext()` isn't implemented here). Concretely realized this time, not just theoretical: the first shipped version of this shader had `gl_FragColor` (removed in GLSL ES 300, which `glslVersion: THREE.GLSL3`/`sampler3D` requires) and referenced `modelMatrix` without declaring it (Three.js auto-injects `cameraPosition`/`modelViewMatrix`/`projectionMatrix` into a bare `ShaderMaterial` but not `modelMatrix` on its own) — 17 structural unit tests (uniforms, validation, disposal) all passed throughout, because none of them render a frame. Both were only found by loading `examples/18-volume-chart/` in an actual browser and reading `THREE.WebGLProgram`'s shader-compile error log. A separate raymarch-specific bug was also found the same way: the ray's starting position sits exactly on the cube's boundary, and GPU perspective-correct varying interpolation isn't bit-exact, so the very first bounds check could fail before a single density sample was taken, rendering nothing (fixed with a small `BOX_BOUNDARY_EPSILON` tolerance).
+- **Revisit when:** A headless-GL or real-browser test harness is added — add a "compiles and renders one frame without a GL error" smoke test for every shader-based preset (this entry included). Until then: **always load a new/changed shader-based example in a real browser before calling it done** — structural unit tests here provably do not catch GLSL compile errors.
+
+### ☐ `material.volumeRaymarch` only renders front faces — a camera positioned inside the volume sees nothing
+- **Where:** `src/material/presets/volumeRaymarch.js` (`side: THREE.FrontSide`)
+- **Why skipped:** The simplest correct raymarch entry point is "the front face the camera is looking at from outside" — supporting a camera inside the volume needs a second code path (e.g. rendering back faces when no front face is hit, or a full near-plane-based ray origin instead of the geometry surface). Not required by Prompt 139, and orbit-style camera controls (every example in this project) keep the camera outside a chart's own bounding volume by convention anyway.
+- **Revisit when:** A use case wants to fly the camera through/inside a volume (e.g. a first-person "walk through the data" mode).
 
 ---
 

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Graph3D — Phase 8 LineChart</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { overflow: hidden; background: #000; font-family: system-ui, sans-serif; }
+      canvas { display: block; }
+
+      #panel {
+        position: fixed;
+        top: 12px;
+        left: 12px;
+        background: rgba(20, 20, 24, 0.75);
+        color: #eee;
+        padding: 12px 14px;
+        border-radius: 8px;
+        font-size: 13px;
+        backdrop-filter: blur(6px);
+        max-width: 340px;
+      }
+      #panel .row { display: flex; gap: 8px; margin-bottom: 4px; }
+      #panel .label { opacity: 0.6; width: 90px; }
+      #panel button {
+        margin-top: 8px;
+        padding: 6px 10px;
+        font-size: 12px;
+        border-radius: 6px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.08);
+        color: #eee;
+        cursor: pointer;
+      }
+      #panel p { opacity: 0.7; font-size: 11px; margin-top: 6px; line-height: 1.4; }
+    </style>
+  </head>
+  <body>
+    <div id="panel">
+      <div class="row"><span class="label">Curve</span><span id="curveName"></span></div>
+      <div class="row"><span class="label">Series</span><span id="count"></span></div>
+      <button id="toggle">Toggle curve (linear/catmullRom)</button>
+      <p>
+        <code>LineChart</code> (Prompt 133): 3 series, one <code>Line2</code> each via
+        <code>.series(keyFn)</code>, colored by <code>palette.category10</code>. Data re-joins on
+        an interval — same point count each time, so <code>update()</code> mutates each line's
+        vertex buffer in place instead of rebuilding it.
+      </p>
+    </div>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

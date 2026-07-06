@@ -143,11 +143,12 @@ describe('force().tick()', () => {
 });
 
 describe('force static factories', () => {
-  it('exposes .link/.charge/.center/.collide/.radial', () => {
+  it('exposes .link/.charge/.center/.collide/.radial/.cluster', () => {
     expect(typeof force.link).toBe('function');
     expect(typeof force.charge).toBe('function');
     expect(typeof force.center).toBe('function');
     expect(typeof force.collide).toBe('function');
     expect(typeof force.radial).toBe('function');
+    expect(typeof force.cluster).toBe('function');
   });
 });

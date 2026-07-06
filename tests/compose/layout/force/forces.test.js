@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { forceCharge, forceLink, forceCenter, forceCollide, forceRadial } from '../../../../src/compose/layout/force/forces.js';
+import { forceCharge, forceLink, forceCenter, forceCollide, forceRadial, forceCluster } from '../../../../src/compose/layout/force/forces.js';
 
 function applyAccel(force, nodes, alpha = 1) {
   for (const node of nodes) {
@@ -168,6 +168,29 @@ describe('forceRadial', () => {
     const nodes = [{ x: 15, y: 0, z: 0 }];
     applyAccel(forceRadial(1, 10, 0, 0), nodes);
     expect(nodes[0].__ax).toBeLessThan(0); // farther than radius 1 from (10,0,0), pulled back in
+  });
+});
+
+describe('forceCluster', () => {
+  it('pulls a node toward its own group centroid, away from other groups', () => {
+    const nodes = [
+      { x: 0, y: 0, z: 0, group: 'a' },
+      { x: 10, y: 0, z: 0, group: 'a' },
+      { x: -100, y: 0, z: 0, group: 'b' },
+    ];
+    applyAccel(forceCluster((d) => d.group), nodes);
+    // group 'a' centroid is (5,0,0) — node 0 is pulled toward +x.
+    expect(nodes[0].__ax).toBeGreaterThan(0);
+    // node 2 is alone in its group — already at its own centroid, no pull.
+    expect(nodes[2].__ax).toBe(0);
+  });
+
+  it('is a no-op for a lone node in its own group', () => {
+    const nodes = [{ x: 5, y: 5, z: 5, group: 'solo' }];
+    applyAccel(forceCluster((d) => d.group), nodes);
+    expect(nodes[0].__ax).toBe(0);
+    expect(nodes[0].__ay).toBe(0);
+    expect(nodes[0].__az).toBe(0);
   });
 });
 

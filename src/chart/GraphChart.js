@@ -2,6 +2,8 @@ import { accessor, Selection, diffData } from '../compose/index.js';
 import { material } from '../material/index.js';
 import { resolve as resolveEasing } from '../anim/index.js';
 import { GraphObjectFactory } from '../object/index.js';
+import { applyAxisScaleDomain, resolveAxisAccessor } from './axisField.js';
+import { resolveChartMaterial } from './materialField.js';
 
 // Real material factories only — `material` also carries two unrelated
 // utilities (addPlanarReflection, setPaletteForAttribute) that aren't presets
@@ -113,6 +115,8 @@ export class GraphChart {
   #sizeAccessor = null;
   /** @type {((datum:*, index:number) => *)|null} */
   #shapeAccessor = null;
+  /** @type {((datum:*, index:number) => *)|null} */
+  #opacityAccessor = null;
   /** @type {{presetName: string, options: object}|null} */
   #materialConfig = null;
   /** @type {((datum:*, index:number) => boolean)|null} */
@@ -281,6 +285,24 @@ export class GraphChart {
     this.#assertNotDisposed('shape');
     if (valueOrFn === undefined) return this.#shapeAccessor;
     this.#shapeAccessor = accessor(valueOrFn);
+    return this;
+  }
+
+  /**
+   * Gets or sets a constant opacity, or a per-datum accessor, applied via
+   * `chart/opacityField.js`'s `applyOpacityField` after every
+   * `render()`/`update()` — moved here from `ScatterChart` (Prompt 134's
+   * original, sole consumer) once `HeatmapChart` (Prompt 136) needed the
+   * identical setter (CLAUDE.md §1.1 DRY two-strike rule).
+   * @param {number|((datum:*, index:number) => number)} [valueOrFn]
+   * @returns {((datum:*, index:number) => number)|null|this}
+   * @example chart.opacity(0.6);
+   * @example chart.opacity((d) => d.confidence);
+   */
+  opacity(valueOrFn) {
+    this.#assertNotDisposed('opacity');
+    if (valueOrFn === undefined) return this.#opacityAccessor;
+    this.#opacityAccessor = accessor(valueOrFn);
     return this;
   }
 
@@ -600,65 +622,20 @@ export class GraphChart {
    * @returns {{positions: Float32Array, scales: Float32Array, colors: (Float32Array|null), attributes: object}}
    */
   #computeBuffers(data) {
-    this.#applyScaleDomain(this.#xField, data);
-    this.#applyScaleDomain(this.#yField, data);
-    this.#applyScaleDomain(this.#zField, data);
+    applyAxisScaleDomain(this.#xField, data);
+    applyAxisScaleDomain(this.#yField, data);
+    applyAxisScaleDomain(this.#zField, data);
 
-    if (typeof this.#generator.x === 'function') this.#generator.x(this.#resolvedAccessor(this.#xField));
-    if (typeof this.#generator.y === 'function') this.#generator.y(this.#resolvedAccessor(this.#yField));
-    if (typeof this.#generator.z === 'function') this.#generator.z(this.#resolvedAccessor(this.#zField));
+    if (typeof this.#generator.x === 'function') this.#generator.x(resolveAxisAccessor(this.#xField));
+    if (typeof this.#generator.y === 'function') this.#generator.y(resolveAxisAccessor(this.#yField));
+    if (typeof this.#generator.z === 'function') this.#generator.z(resolveAxisAccessor(this.#zField));
 
     return this.#generator.compute(data);
   }
 
   /** @returns {THREE.Material} The configured material preset, or `material.standard()` by default. */
   #resolveMaterial() {
-    return this.#materialConfig
-      ? material[this.#materialConfig.presetName](this.#materialConfig.options)
-      : material.standard();
-  }
-
-  /**
-   * Fits a scaled axis field's domain to `data`, via that field's own
-   * accessor — continuous scales (anything exposing `.invert`, e.g.
-   * `scale.linear`) get `[min, max]`; ordinal-like scales (`.band`/`.point`/
-   * `.ordinal`, no `.invert`) get the raw per-datum values, since their own
-   * `domain()` setter already dedupes (`ordinal.js`). No-op if the field has
-   * no scale attached. Manual min/max loop rather than
-   * `Math.min(...values)` — this project's north star is million-datum
-   * charts, and spreading that many arguments risks a stack overflow.
-   * @param {{accessor: (datum:*, index:number) => *, scale: object|null}} field
-   * @param {Array} data
-   */
-  #applyScaleDomain(field, data) {
-    const { accessor: fieldAccessor, scale } = field;
-    if (!scale) return;
-    if (typeof scale.invert === 'function') {
-      let min = Infinity;
-      let max = -Infinity;
-      for (let i = 0; i < data.length; i++) {
-        const v = fieldAccessor(data[i], i);
-        if (v < min) min = v;
-        if (v > max) max = v;
-      }
-      scale.domain([min, max]);
-    } else {
-      const values = new Array(data.length);
-      for (let i = 0; i < data.length; i++) values[i] = fieldAccessor(data[i], i);
-      scale.domain(values);
-    }
-  }
-
-  /**
-   * Composes an axis field's accessor with its scale (if any) into the single
-   * `(datum, index) => value` function the generator's own `x`/`y`/`z`
-   * setter expects.
-   * @param {{accessor: (datum:*, index:number) => *, scale: object|null}} field
-   * @returns {(datum:*, index:number) => *}
-   */
-  #resolvedAccessor(field) {
-    const { accessor: fieldAccessor, scale } = field;
-    return scale ? (d, i) => scale(fieldAccessor(d, i)) : fieldAccessor;
+    return resolveChartMaterial(this.#materialConfig);
   }
 
   /**

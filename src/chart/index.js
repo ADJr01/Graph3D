@@ -1,1 +1,12 @@
 export { GraphChart } from './GraphChart.js';
+export { BarChart } from './BarChart.js';
+export { LineChart } from './LineChart.js';
+export { ScatterChart } from './ScatterChart.js';
+export { AreaChart } from './AreaChart.js';
+export { SurfaceChart } from './SurfaceChart.js';
+export { HeatmapChart } from './HeatmapChart.js';
+export { NetworkChart } from './NetworkChart.js';
+export { TreeChart } from './TreeChart.js';
+export { PackChart } from './PackChart.js';
+export { PieChart } from './PieChart.js';
+export { VolumeChart } from './VolumeChart.js';

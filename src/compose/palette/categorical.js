@@ -8,13 +8,21 @@ import { categorical } from '../color/categorical.js';
  * `color.categorical`, CLAUDE.md §1.1 DRY — no separate cycling logic), and
  * `.colors` exposes the original array for direct use (e.g.
  * `scale.ordinal().range(palette.category10.colors)`), matching the
- * `.colors` convention set by the sequential/diverging palettes.
+ * `.colors` convention set by the sequential/diverging palettes. `.categorical`
+ * (`true`) tags it as a direct key→color mapping (call it with the raw
+ * datum value itself, no `[min, max]` domain-fitting) — the discriminator
+ * `chart/colorField.js`'s `applyColorField` (Prompt 139's colorField fix)
+ * uses to tell it apart from a continuous ramp like `palette.viridis` (which
+ * expects a `t` in `[0, 1]` and needs `color.sequential`'s domain-fitting
+ * first). Every sequential/diverging palette leaves `.categorical` unset
+ * (falsy), so existing callers checking only `.colors` are unaffected.
  * @param {string[]} colors
- * @returns {{ (value: *): string, colors: string[] }}
+ * @returns {{ (value: *): string, colors: string[], categorical: true }}
  */
 function schemeToPalette(colors) {
   const fn = categorical(colors);
   fn.colors = colors;
+  fn.categorical = true;
   return fn;
 }
 

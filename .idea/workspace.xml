@@ -1,22 +1,30 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="33557d05-3974-4e5d-9972-8791b8163414" name="Changes" comment="Phase 5 — anim/:                                                                            &#10;  - GraphAnimCurve easings, GraphAnimTimeline (groups, loop modes, interrupt                  &#10;    registry), Transition (D3-style ms API), CameraTour, reduced-motion support               &#10;  - compose/selection/SelectionTransition wires .transition() into data-bound                 &#10;    selections on both meshes and instanced backends                                          &#10;  - GraphInstancedObject bulk setters (setAllPositions/Scales/Colors) animate                 &#10;    via Transition instead of snapping                                                        &#10;  - examples/05-transitions hero example, docs/concepts/anim.md                               &#10;                                                                                              &#10;  Phase 6 — material/:                                                                        &#10;  - Preset namespace: PBR passthroughs (standard/physical/basic/lambert/                      &#10;    phong/toon/matcap) plus custom-shader looks (holographic, crystal, glass,                 &#10;    neon, glow, velvet, metals, dataDriven)                                                   &#10;  - texture namespace: gradient/noise/voronoi/checkerboard/dots/lines/                        &#10;    cellular/paletteTexture procedural generators                                             &#10;  - SDFText MSDF text engine (atlas loading, glyph layout, shader)                            &#10;  - addPlanarReflection, GraphObjectMaterial texture ref-counting disposal,                   &#10;    setPaletteForAttribute convenience, applyShader dev-mode hot-reload                       &#10;  - examples/06-materials hero gallery, docs/concepts/material.md">
+    <list default="true" id="33557d05-3974-4e5d-9972-8791b8163414" name="Changes" comment="Phase 7 On Process">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/BUILD_PLAN.md" beforeDir="false" afterPath="$PROJECT_DIR$/BUILD_PLAN.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/CLAUDE.md" beforeDir="false" afterPath="$PROJECT_DIR$/CLAUDE.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/concepts/material.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/concepts/material.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/concepts/compose.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/concepts/compose.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/skipping_list.md" beforeDir="false" afterPath="$PROJECT_DIR$/skipping_list.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/compose/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/index.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/chart/GraphChart.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/chart/GraphChart.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/chart/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/chart/index.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/compose/generator/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/generator/index.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/compose/generator/surface.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/generator/surface.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/compose/layout/force/forces.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/layout/force/forces.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/compose/layout/force/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/layout/force/index.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/compose/layout/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/layout/index.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/compose/palette/categorical.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/palette/categorical.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/compose/selection/Selection.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/selection/Selection.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/compose/selection/SelectionTransition.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/selection/SelectionTransition.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/compose/selection/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/selection/index.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/core/Graph3D.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/Graph3D.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/index.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/material/planarReflection.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/material/planarReflection.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/scene/GraphSceneEnvironment.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/scene/GraphSceneEnvironment.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/compose/selection/Selection.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/compose/selection/Selection.test.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/core/Graph3D.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/core/Graph3D.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/material/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/material/index.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/object/GraphObjectFactory.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/object/GraphObjectFactory.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/object/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/object/index.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/compose/generator/index.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/compose/generator/index.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/compose/layout/force/forces.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/compose/layout/force/forces.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/compose/layout/force/index.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/compose/layout/force/index.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/compose/layout/index.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/compose/layout/index.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/material/index.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/material/index.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/object/GraphObjectFactory.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/object/GraphObjectFactory.test.js" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -46,6 +54,7 @@
     &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
     &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
     &quot;javascript.preferred.runtime.type.id&quot;: &quot;node&quot;,
     &quot;node.js.detected.package.@glint/core&quot;: &quot;true&quot;,
     &quot;node.js.selected.package.@glint/core&quot;: &quot;&quot;,
@@ -78,7 +87,12 @@
       <workItem from="1782986967441" duration="2552000" />
       <workItem from="1782997533672" duration="16176000" />
       <workItem from="1783055593824" duration="32058000" />
-      <workItem from="1783176135511" duration="9832000" />
+      <workItem from="1783176135511" duration="10167000" />
+      <workItem from="1783225214771" duration="1357000" />
+      <workItem from="1783236342132" duration="1263000" />
+      <workItem from="1783244458264" duration="1442000" />
+      <workItem from="1783249155717" duration="5242000" />
+      <workItem from="1783262025897" duration="12597000" />
     </task>
     <task id="LOCAL-00001" summary="graph3D created">
       <option name="closed" value="true" />
@@ -120,7 +134,15 @@
       <option name="project" value="LOCAL" />
       <updated>1783148737466</updated>
     </task>
-    <option name="localTasksCounter" value="6" />
+    <task id="LOCAL-00006" summary="Phase 7 On Process">
+      <option name="closed" value="true" />
+      <created>1783186346439</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1783186346439</updated>
+    </task>
+    <option name="localTasksCounter" value="7" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -131,6 +153,7 @@
     <MESSAGE value="graph3D phase3 completed" />
     <MESSAGE value="graph3D phase4" />
     <MESSAGE value="Phase 5 — anim/:                                                                            &#10;  - GraphAnimCurve easings, GraphAnimTimeline (groups, loop modes, interrupt                  &#10;    registry), Transition (D3-style ms API), CameraTour, reduced-motion support               &#10;  - compose/selection/SelectionTransition wires .transition() into data-bound                 &#10;    selections on both meshes and instanced backends                                          &#10;  - GraphInstancedObject bulk setters (setAllPositions/Scales/Colors) animate                 &#10;    via Transition instead of snapping                                                        &#10;  - examples/05-transitions hero example, docs/concepts/anim.md                               &#10;                                                                                              &#10;  Phase 6 — material/:                                                                        &#10;  - Preset namespace: PBR passthroughs (standard/physical/basic/lambert/                      &#10;    phong/toon/matcap) plus custom-shader looks (holographic, crystal, glass,                 &#10;    neon, glow, velvet, metals, dataDriven)                                                   &#10;  - texture namespace: gradient/noise/voronoi/checkerboard/dots/lines/                        &#10;    cellular/paletteTexture procedural generators                                             &#10;  - SDFText MSDF text engine (atlas loading, glyph layout, shader)                            &#10;  - addPlanarReflection, GraphObjectMaterial texture ref-counting disposal,                   &#10;    setPaletteForAttribute convenience, applyShader dev-mode hot-reload                       &#10;  - examples/06-materials hero gallery, docs/concepts/material.md" />
-    <option name="LAST_COMMIT_MESSAGE" value="Phase 5 — anim/:                                                                            &#10;  - GraphAnimCurve easings, GraphAnimTimeline (groups, loop modes, interrupt                  &#10;    registry), Transition (D3-style ms API), CameraTour, reduced-motion support               &#10;  - compose/selection/SelectionTransition wires .transition() into data-bound                 &#10;    selections on both meshes and instanced backends                                          &#10;  - GraphInstancedObject bulk setters (setAllPositions/Scales/Colors) animate                 &#10;    via Transition instead of snapping                                                        &#10;  - examples/05-transitions hero example, docs/concepts/anim.md                               &#10;                                                                                              &#10;  Phase 6 — material/:                                                                        &#10;  - Preset namespace: PBR passthroughs (standard/physical/basic/lambert/                      &#10;    phong/toon/matcap) plus custom-shader looks (holographic, crystal, glass,                 &#10;    neon, glow, velvet, metals, dataDriven)                                                   &#10;  - texture namespace: gradient/noise/voronoi/checkerboard/dots/lines/                        &#10;    cellular/paletteTexture procedural generators                                             &#10;  - SDFText MSDF text engine (atlas loading, glyph layout, shader)                            &#10;  - addPlanarReflection, GraphObjectMaterial texture ref-counting disposal,                   &#10;    setPaletteForAttribute convenience, applyShader dev-mode hot-reload                       &#10;  - examples/06-materials hero gallery, docs/concepts/material.md" />
+    <MESSAGE value="Phase 7 On Process" />
+    <option name="LAST_COMMIT_MESSAGE" value="Phase 7 On Process" />
   </component>
 </project>

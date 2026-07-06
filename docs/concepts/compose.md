@@ -39,7 +39,7 @@ const { positions, scales } = bars.compute(data);
 
 ## Layouts — `layout.*`
 
-Pure data-in, positioned-data-out (no Three.js import): `layout.stack` turns per-key values into stacked `[y0,y1]` series (d3-shape parity); `layout.grid` centers a `rows × cols` small-multiples grid; `layout.force` is a 3D force simulation (velocity Verlet + Barnes-Hut octree charge) stepped externally via `loop.add`; `layout.pack`/`layout.tree` are d3-hierarchy-parity sphere-packing/radial-tree layouts.
+Pure data-in, positioned-data-out (no Three.js import): `layout.stack` turns per-key values into stacked `[y0,y1]` series (d3-shape parity); `layout.grid` centers a `rows × cols` small-multiples grid; `layout.force` is a 3D force simulation (velocity Verlet + Barnes-Hut octree charge) stepped externally via `loop.add`; `layout.pack`/`layout.tree` are d3-hierarchy-parity sphere-packing/radial-tree layouts; `layout.pie` (Prompt 139) is a d3-shape-parity layout turning per-datum values into proportional angular `[startAngle, endAngle]` slices summing to a full sweep (`.value()`/`.sort()`/`.startAngle()`/`.endAngle()`/`.padAngle()`) — `PieChart`'s underlying layout, matching `d3.pie()`'s own padAngle convention (every slice, including the last, reserves a trailing pad).
 
 ```js
 const sim = layout.force()

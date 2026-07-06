@@ -101,3 +101,39 @@ describe('GraphObjectFactory instanced path', () => {
     expect(obj.three.material).toBe(material);
   });
 });
+
+describe('GraphObjectFactory.createTriangleMesh', () => {
+  const positions = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]);
+  const normals = new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]);
+  const indices = new Uint32Array([0, 1, 2]);
+
+  it('builds a single GraphMesh from raw positions/indices/normals', () => {
+    const scene = new THREE.Scene();
+    const mesh = GraphObjectFactory.createTriangleMesh('terrain', { scene, positions, indices, normals });
+
+    expect(mesh).toBeInstanceOf(GraphMesh);
+    expect(mesh.three.geometry.getAttribute('position').array).toBe(positions);
+    expect(mesh.three.geometry.getAttribute('normal').array).toBe(normals);
+    expect(mesh.three.geometry.getIndex().array).toBe(indices);
+    expect(scene.children).toContain(mesh.three);
+  });
+
+  it('defaults to a plain white MeshStandardMaterial when none is given', () => {
+    const mesh = GraphObjectFactory.createTriangleMesh('terrain', { scene: new THREE.Scene(), positions, indices, normals });
+    expect(mesh.three.material).toBeInstanceOf(THREE.MeshStandardMaterial);
+    expect(mesh.three.material.color.getHex()).toBe(0xffffff);
+  });
+
+  it('uses the caller-supplied material directly (no clone)', () => {
+    const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+    const mesh = GraphObjectFactory.createTriangleMesh('terrain', { scene: new THREE.Scene(), positions, indices, normals, material });
+    expect(mesh.three.material).toBe(material);
+  });
+
+  it('throws TypeError for wrong typed-array kinds', () => {
+    const scene = new THREE.Scene();
+    expect(() => GraphObjectFactory.createTriangleMesh('t', { scene, positions: [0, 0, 0], indices, normals })).toThrow(TypeError);
+    expect(() => GraphObjectFactory.createTriangleMesh('t', { scene, positions, indices: [0, 1, 2], normals })).toThrow(TypeError);
+    expect(() => GraphObjectFactory.createTriangleMesh('t', { scene, positions, indices, normals: [0, 0, 1] })).toThrow(TypeError);
+  });
+});

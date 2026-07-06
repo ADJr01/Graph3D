@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Graph3D — Phase 8 ScatterChart</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { overflow: hidden; background: #000; font-family: system-ui, sans-serif; }
+      canvas { display: block; }
+
+      #panel {
+        position: fixed;
+        top: 12px;
+        left: 12px;
+        background: rgba(20, 20, 24, 0.75);
+        color: #eee;
+        padding: 12px 14px;
+        border-radius: 8px;
+        font-size: 13px;
+        backdrop-filter: blur(6px);
+        max-width: 340px;
+      }
+      #panel .row { display: flex; gap: 8px; margin-bottom: 4px; }
+      #panel .label { opacity: 0.6; width: 90px; }
+      #panel p { opacity: 0.7; font-size: 11px; margin-top: 6px; line-height: 1.4; }
+    </style>
+  </head>
+  <body>
+    <div id="panel">
+      <div class="row"><span class="label">Points</span><span id="count"></span></div>
+      <div class="row"><span class="label">Hovered</span><span id="hovered">—</span></div>
+      <p>
+        <code>ScatterChart</code> (Prompt 134): 5,000 instanced points, sized by
+        <code>.size(fn)</code>, colored by <code>.color(fn)</code> via <code>palette.viridis</code>, and faded via
+        <code>.opacity(0.85)</code>. Hover queries <code>chart.pick(raycaster)</code>, which reaches the instanced
+        backend's already octree-backed <code>GraphInstancedObject.pick()</code> — no brute-force scan over 5,000
+        points per pointer move.
+      </p>
+    </div>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

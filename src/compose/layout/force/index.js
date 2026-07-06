@@ -1,4 +1,4 @@
-import { forceLink, forceCharge, forceCenter, forceCollide, forceRadial } from './forces.js';
+import { forceLink, forceCharge, forceCenter, forceCollide, forceRadial, forceCluster } from './forces.js';
 
 const DEFAULT_ALPHA_MIN = 0.001;
 // d3-force's convention: alphaDecay is picked so alpha decays from 1 to
@@ -185,3 +185,4 @@ force.charge = forceCharge;
 force.center = forceCenter;
 force.collide = forceCollide;
 force.radial = forceRadial;
+force.cluster = forceCluster;

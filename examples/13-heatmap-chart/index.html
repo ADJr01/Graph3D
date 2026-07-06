@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Graph3D — Phase 8 HeatmapChart</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { overflow: hidden; background: #000; font-family: system-ui, sans-serif; }
+      canvas { display: block; }
+
+      #panel {
+        position: fixed;
+        top: 12px;
+        left: 12px;
+        background: rgba(20, 20, 24, 0.75);
+        color: #eee;
+        padding: 12px 14px;
+        border-radius: 8px;
+        font-size: 13px;
+        backdrop-filter: blur(6px);
+        max-width: 340px;
+      }
+      #panel .row { display: flex; gap: 8px; margin-bottom: 4px; }
+      #panel .label { opacity: 0.6; width: 90px; }
+      #panel button {
+        margin-top: 8px;
+        padding: 6px 10px;
+        font-size: 12px;
+        border-radius: 6px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.08);
+        color: #eee;
+        cursor: pointer;
+      }
+      #panel p { opacity: 0.7; font-size: 11px; margin-top: 6px; line-height: 1.4; }
+    </style>
+  </head>
+  <body>
+    <div id="panel">
+      <div class="row"><span class="label">Mode</span><span id="modeState"></span></div>
+      <div class="row"><span class="label">Cells</span><span id="cellCount"></span></div>
+      <button id="toggle">Toggle plane / voxel</button>
+      <p>
+        <code>HeatmapChart</code> (Prompt 136): a 24×24 animated grid, colored via
+        <code>.color(fn)</code> (<code>palette.viridis</code>). <code>'plane'</code> mode renders thin flat tiles;
+        <code>'voxel'</code> mode renders full cubes with <code>.opacity(fn)</code> encoding the same value as
+        density. Both modes render the whole grid as one instanced <code>GraphInstancedObject</code>.
+      </p>
+    </div>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Graph3D — Phase 8 PieChart</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { overflow: hidden; background: #000; font-family: system-ui, sans-serif; }
+      canvas { display: block; }
+
+      #panel {
+        position: fixed;
+        top: 12px;
+        left: 12px;
+        background: rgba(20, 20, 24, 0.75);
+        color: #eee;
+        padding: 12px 14px;
+        border-radius: 8px;
+        font-size: 13px;
+        backdrop-filter: blur(6px);
+        max-width: 340px;
+      }
+      #panel .row { display: flex; gap: 8px; margin-bottom: 4px; }
+      #panel .label { opacity: 0.6; width: 90px; }
+      #panel button {
+        margin-top: 8px;
+        margin-right: 6px;
+        padding: 6px 10px;
+        font-size: 12px;
+        border-radius: 6px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.08);
+        color: #eee;
+        cursor: pointer;
+      }
+      #panel p { opacity: 0.7; font-size: 11px; margin-top: 6px; line-height: 1.4; }
+    </style>
+  </head>
+  <body>
+    <div id="panel">
+      <div class="row"><span class="label">Slices</span><span id="sliceCount"></span></div>
+      <div class="row"><span class="label">Hovered</span><span id="hovered">—</span></div>
+      <button id="toggleDonut">Toggle donut</button>
+      <p>
+        <code>PieChart</code> (Prompt 139): a `layout.pie` proportional sweep drives one wedge
+        mesh per slice (<code>generator.arc()</code>), colored by category (<code>.color()</code>,
+        <code>palette.category10</code>). Hover a slice to explode it outward — the example wires
+        its own <code>pointermove</code> + raycaster + <code>chart.pick()</code>/
+        <code>chart.explode()</code>, since there's no <code>interact/</code> layer yet.
+      </p>
+    </div>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

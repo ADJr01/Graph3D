@@ -168,6 +168,44 @@ export function forceCollide(radius = 1, strength = 1) {
 }
 
 /**
+ * Clustering force: pulls every node toward the centroid of every node
+ * sharing its `keyFn`'s resolved group value — grouping nodes by category
+ * (e.g. `NetworkChart.cluster((d) => d.group)`, Prompt 137) without needing
+ * an explicit `.link` between every pair in the same group.
+ * @param {(node: object) => *} keyFn Resolves each node's cluster identity.
+ * @param {number} [strength] Default `0.3`.
+ * @returns {(nodes: object[], alpha: number) => void}
+ */
+export function forceCluster(keyFn, strength = 0.3) {
+  return function clusterForce(nodes, alpha) {
+    const centroids = new Map();
+    for (const node of nodes) {
+      const key = keyFn(node);
+      let centroid = centroids.get(key);
+      if (!centroid) {
+        centroid = { x: 0, y: 0, z: 0, count: 0 };
+        centroids.set(key, centroid);
+      }
+      centroid.x += node.x;
+      centroid.y += node.y;
+      centroid.z += node.z;
+      centroid.count += 1;
+    }
+    for (const centroid of centroids.values()) {
+      centroid.x /= centroid.count;
+      centroid.y /= centroid.count;
+      centroid.z /= centroid.count;
+    }
+    for (const node of nodes) {
+      const centroid = centroids.get(keyFn(node));
+      node.__ax += (centroid.x - node.x) * strength * alpha;
+      node.__ay += (centroid.y - node.y) * strength * alpha;
+      node.__az += (centroid.z - node.z) * strength * alpha;
+    }
+  };
+}
+
+/**
  * Radial force pulling every node onto (or pushing it off) a sphere of
  * `radius` centered at `(x, y, z)`.
  * @param {(number|((node: object) => number))} radius

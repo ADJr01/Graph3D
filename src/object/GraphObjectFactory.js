@@ -178,4 +178,31 @@ export class GraphObjectFactory {
       material: options.material ?? new THREE.MeshStandardMaterial({ color: 0xffffff }),
     });
   }
+
+  /**
+   * A single continuous triangulated mesh built directly from a generator's
+   * raw `{positions, indices, normals}` output (`generator.surface()`,
+   * `generator.arc()`, `generator.area()`, Prompt 135) — unlike every other
+   * factory above, this is never instanced: a heightfield or an extruded
+   * wall is one continuous surface, not N independent datums, so there's no
+   * `count`/`INSTANCING_THRESHOLD` dispatch to make.
+   * @param {string} name
+   * @param {{ scene: THREE.Scene, positions: Float32Array, indices: Uint32Array,
+   *   normals: Float32Array, material?: THREE.Material|THREE.Material[] }} options
+   * @returns {GraphMesh}
+   * @throws {TypeError} If `positions`/`normals` aren't `Float32Array`, or `indices` isn't `Uint32Array`.
+   * @example GraphObjectFactory.createTriangleMesh('terrain', { scene, ...surfaceBuffers });
+   */
+  static createTriangleMesh(name, { scene, positions, indices, normals, material }) {
+    if (!(positions instanceof Float32Array) || !(normals instanceof Float32Array) || !(indices instanceof Uint32Array)) {
+      throw new TypeError(
+        'GraphObjectFactory.createTriangleMesh: positions/normals must be Float32Array and indices must be Uint32Array.',
+      );
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
+    geometry.setIndex(new THREE.BufferAttribute(indices, 1));
+    return new GraphMesh({ scene, name, geometry, material: material ?? new THREE.MeshStandardMaterial({ color: 0xffffff }) });
+  }
 }

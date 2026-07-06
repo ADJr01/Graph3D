@@ -12,6 +12,7 @@ import { copper } from './presets/copper.js';
 import { pearl } from './presets/pearl.js';
 import { obsidian } from './presets/obsidian.js';
 import { dataDriven } from './presets/dataDriven.js';
+import { volumeRaymarch } from './presets/volumeRaymarch.js';
 import { gradient, noise, voronoi, checkerboard, dots, lines, cellular, paletteTexture } from './texture/procedural.js';
 import { addPlanarReflection } from './planarReflection.js';
 import { setPaletteForAttribute } from './setPaletteForAttribute.js';
@@ -57,6 +58,7 @@ export const material = {
   pearl,
   obsidian,
   dataDriven,
+  volumeRaymarch,
   addPlanarReflection,
   setPaletteForAttribute,
 };

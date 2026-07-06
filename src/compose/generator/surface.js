@@ -14,13 +14,16 @@ function isDomain(value) {
  * `compute()` returns plain `Float32Array`/`Uint32Array` buffers (no Three.js
  * import, per CLAUDE.md §1.4 SoC); a higher layer wraps them in a
  * `BufferGeometry`. Vertex normals are the average of each vertex's
- * surrounding face normals (smooth shading).
+ * surrounding face normals (smooth shading). `rows`/`cols` (the grid's
+ * segment counts) come along too — `SurfaceChart`'s optional contour overlay
+ * (Prompt 135, `compose/generator/contour.js`) traces isolines through this
+ * same already-computed `positions` grid rather than re-deriving it.
  * @returns {{
  *   values: (source?: (number[][]|((x: number, z: number) => number))) => (Function|object),
  *   xDomain: (domain?: [number, number]) => ([number, number]|object),
  *   zDomain: (domain?: [number, number]) => ([number, number]|object),
  *   resolution: (segments?: number) => (number|object),
- *   compute: () => { positions: Float32Array, indices: Uint32Array, normals: Float32Array },
+ *   compute: () => { positions: Float32Array, indices: Uint32Array, normals: Float32Array, rows: number, cols: number },
  * }}
  * @example
  * const terrain = generator.surface()
@@ -111,7 +114,7 @@ export function surface() {
 
   /**
    * Computes a triangulated mesh for the current `values` source.
-   * @returns {{ positions: Float32Array, indices: Uint32Array, normals: Float32Array }}
+   * @returns {{ positions: Float32Array, indices: Uint32Array, normals: Float32Array, rows: number, cols: number }}
    * @throws {TypeError} If `values` hasn't been set, or is a grid smaller than 2x2.
    */
   gen.compute = function () {
@@ -193,7 +196,7 @@ export function surface() {
       normals[v * 3 + 2] = nz;
     }
 
-    return { positions, indices, normals };
+    return { positions, indices, normals, rows, cols };
   };
 
   return gen;

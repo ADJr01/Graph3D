@@ -104,6 +104,21 @@ export class Selection {
   }
 
   /**
+   * Escape hatch to the raw backend this selection wraps — mirrors
+   * `GraphObject`'s own `get three()` (an escape hatch to raw Three.js).
+   * Most callers should prefer `Selection`'s own uniform methods (`attr`,
+   * `style`, `filter`, ...) instead; this exists for chart-type-specific
+   * operations those don't cover, e.g. `ScatterChart.pick()` (Prompt 134)
+   * needing the real `GraphInstancedObject` to reach its already
+   * octree-backed `pick(raycaster)`.
+   * @returns {{type: 'meshes', meshes: GraphMesh[]}|{type: 'instanced', object: GraphInstancedObject, indices: Uint32Array}}
+   * @example selection.backend.type; // 'meshes' | 'instanced'
+   */
+  get backend() {
+    return this.#backend;
+  }
+
+  /**
    * @returns {number} The number of datums this selection covers.
    * @example selection.size(); // 3
    */

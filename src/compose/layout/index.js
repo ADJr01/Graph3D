@@ -3,6 +3,7 @@ import { grid } from './grid.js';
 import { force } from './force/index.js';
 import { pack } from './pack.js';
 import { tree } from './tree.js';
+import { pie } from './pie.js';
 
 /**
  * The `layout` namespace (CLAUDE.md §5) — pure data-in, positioned-data-out
@@ -11,10 +12,15 @@ import { tree } from './tree.js';
  * `grid` (Prompt 71) centers `rows * cols` cells on the origin for
  * small-multiples positioning. `force` (Prompt 72) is a 3D force-directed
  * simulation (velocity Verlet + Barnes-Hut octree charge); its `.link`,
- * `.charge`, `.center`, `.collide`, `.radial` static properties are the
- * individual force factories `simulation.force(name, ...)` registers. `pack`
+ * `.charge`, `.center`, `.collide`, `.radial`, `.cluster` static properties
+ * are the individual force factories `simulation.force(name, ...)` registers
+ * (`.cluster`, Prompt 137, groups nodes sharing a key toward their shared
+ * centroid — `NetworkChart.cluster()`'s underlying force). `pack`
  * and `tree` (Prompt 73) are d3-hierarchy-parity layouts: `pack` nests
  * value-sized spheres inside their parent, `tree` fans a hierarchy radially
- * by depth.
+ * by depth. `pie` (Prompt 139) is a d3-shape-parity layout turning per-datum
+ * values into proportional angular `[startAngle, endAngle]` slices summing
+ * to a full sweep — `PieChart`'s underlying layout, `generator.arc()`
+ * extrudes each slice into a wedge.
  */
-export const layout = { stack, grid, force, pack, tree };
+export const layout = { stack, grid, force, pack, tree, pie };
