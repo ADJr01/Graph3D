@@ -2,6 +2,9 @@ import { layout, Selection } from '../compose/index.js';
 import { GraphChart } from './GraphChart.js';
 import { GraphObjectFactory, GraphLine } from '../object/index.js';
 import { applyColorField } from './colorField.js';
+import { applyOpacityField } from './opacityField.js';
+import { applyVisibleField } from './visibleField.js';
+import { applySizeField } from './sizeField.js';
 import { resolveChartMaterial } from './materialField.js';
 import { flattenHierarchyNodes, nodeScaleForRadius } from './hierarchyField.js';
 
@@ -15,12 +18,17 @@ const EDGE_POINT_COUNT = 6;
  * `LineChart`/`SurfaceChart`/`NetworkChart`, `TreeChart` overrides
  * `data()`/`render()`/`update()`/`destroy()` entirely rather than building on
  * `GraphChart`'s per-datum pipeline. `GraphChart`'s inherited `x()`/`y()`/
- * `z()`/`size()`/`shape()`/`opacity()`/`filter()`/`sort()`/`on()` are inert
- * here (position/membership come from `layout.tree()` and `.children()`
- * instead); `.color()` and `.material()` still work, via the same
- * `applyColorField`/`resolveChartMaterial` helpers every other chart type
- * uses (CLAUDE.md §1.1 DRY) — `.selection()` is overridden to expose a real
- * `Selection` over the node backend so they have something to write to.
+ * `z()`/`shape()`/`filter()`/`sort()`/`on()` are inert here (position/
+ * membership come from `layout.tree()` and `.children()` instead);
+ * `.color()`/`.opacity()`/`.visible()` still work, via the same
+ * `applyColorField`/`applyOpacityField`/`applyVisibleField`/
+ * `resolveChartMaterial` helpers every other chart type uses (CLAUDE.md
+ * §1.1 DRY) — `.selection()` is overridden to expose a real `Selection`
+ * over the node backend so they have something to write to. `.size(fn)`
+ * (Prompt 141) multiplies each node's rendered radius on top of the
+ * `.r`-driven base `nodeScaleForRadius` already computes — a *second*
+ * independent per-datum factor, not a replacement of the hierarchy's own
+ * value-driven sizing.
  * `.color()`'s accessor receives each hierarchy node itself (not the raw
  * datum), so `(d) => d.depth`/`(d) => d.value`/`(d) => d.data.someField` all
  * work.
@@ -280,6 +288,9 @@ export class TreeChart extends GraphChart {
     this.#links = this.#flattenLinks(root);
     this.#buildBackend();
     applyColorField(this, this.#nodes);
+    applyOpacityField(this);
+    applyVisibleField(this);
+    applySizeField(this); // uniform — multiplies on top of the .r-driven base radius
   }
 
   /**

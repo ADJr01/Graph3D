@@ -2,6 +2,9 @@ import { layout, Selection } from '../compose/index.js';
 import { GraphChart } from './GraphChart.js';
 import { GraphObjectFactory } from '../object/index.js';
 import { applyColorField } from './colorField.js';
+import { applyOpacityField } from './opacityField.js';
+import { applyVisibleField } from './visibleField.js';
+import { applySizeField } from './sizeField.js';
 import { resolveChartMaterial } from './materialField.js';
 import { flattenHierarchyNodes, nodeScaleForRadius } from './hierarchyField.js';
 
@@ -11,20 +14,28 @@ import { flattenHierarchyNodes, nodeScaleForRadius } from './hierarchyField.js';
  * a live simulation and not an accessor+scale computation — so, like
  * `TreeChart`/`NetworkChart`, `PackChart` overrides `data()`/`render()`/
  * `update()`/`destroy()` entirely rather than building on `GraphChart`'s
- * per-datum pipeline. `GraphChart`'s inherited `x()`/`y()`/`z()`/`size()`/
- * `shape()`/`opacity()`/`filter()`/`sort()`/`on()` are inert here
- * (position/membership come from `layout.pack()` and `.children()` instead);
- * `.color()` and `.material()` still work, via the same `applyColorField`/
- * `resolveChartMaterial` helpers every other chart type uses (CLAUDE.md
- * §1.1 DRY) — `.selection()` is overridden to expose a real `Selection` over
- * the node backend so they have something to write to. `.color()`'s
- * accessor receives each hierarchy node itself (not the raw datum), so
- * `(d) => d.depth`/`(d) => d.value`/`(d) => d.data.someField` all work.
+ * per-datum pipeline. `GraphChart`'s inherited `x()`/`y()`/`z()`/`shape()`/
+ * `filter()`/`sort()`/`on()` are inert here (position/membership come from
+ * `layout.pack()` and `.children()` instead); `.color()`/`.opacity()`/
+ * `.visible()` still work, via the same `applyColorField`/`applyOpacityField`/
+ * `applyVisibleField`/`resolveChartMaterial` helpers every other chart type
+ * uses (CLAUDE.md §1.1 DRY) — `.selection()` is overridden to expose a real
+ * `Selection` over the node backend so they have something to write to.
+ * `.color()`'s accessor receives each hierarchy node itself (not the raw
+ * datum), so `(d) => d.depth`/`(d) => d.value`/`(d) => d.data.someField` all
+ * work.
  * ponytail: `.material()` defaults to the same opaque `material.standard()`
  * every other chart uses — but an opaque root sphere fully hides every
  * nested child from any outside view. Pass `.material('standard', {
  * transparent: true, opacity: <0.5ish> })` for a legible pack; see
  * skipping_list.md's "PackChart's default material is opaque" entry.
+ * ponytail: `.size(fn)` (Prompt 141) multiplies each node's already-packed
+ * radius by a per-datum factor — unlike every other chart this applies to,
+ * growing a node here can make it overlap its siblings, since `layout.pack()`
+ * only guarantees non-overlap for the *unmultiplied* radii it actually
+ * packed against. A deliberate tradeoff (the same shared, DRY `.size()`
+ * mechanism every chart gets, not a pack-specific carve-out) — keep any
+ * `.size()` multiplier modest, or pair it with extra `.padding()`.
  *
  * Every node (root, internal, and leaf) renders as a sphere
  * (`GraphObjectFactory.createNodes`, instanced above `INSTANCING_THRESHOLD`),
@@ -255,6 +266,9 @@ export class PackChart extends GraphChart {
     this.#nodes = flattenHierarchyNodes(root);
     this.#buildBackend();
     applyColorField(this, this.#nodes);
+    applyOpacityField(this);
+    applyVisibleField(this);
+    applySizeField(this); // uniform — see class doc's note on overlap risk
   }
 
   /**

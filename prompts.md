@@ -304,7 +304,15 @@ chart.selection()
 
 **Prompt 150.** Default state visuals: hovered → outline pass + 5% scale; selected → outline variant. Configurable via `chart.hoverStyle/selectStyle`.
 
-**Prompt 151.** `src/interact/Tooltip.js`: HTML-overlay mode + 3D-billboard (SDF text + glass quad) mode; `show/hide/pin`.
+**Prompt 150.** State visuals + hover shader effects. **(a) Defaults:** hovered → outline pass + 5% scale; selected → outline variant; configurable via `chart.hoverStyle({...})` / `chart.selectStyle({...})`. **(b) Premade hover effects (NEW):** create `src/material/effects/` with a **registry of named, premade GLSL shader effects** and wire them to mouse events so a user can apply an effect to the *specific hovered datum* — hover a bar, that one bar catches fire:
+
+```js
+chart.hoverEffect('fire', { intensity: 1.2 });        // hovered datum only
+chart.selectEffect('glow', { color: '#22ffcc' });      // applied on select, cleared on deselect
+chart.on('hover', (d, mesh) => mesh.effect('crackers')); // imperative per-event form
+```
+
+Ship the initial preset set (each a self-contained vertex/fragment chunk pair with a declared uniform block, applied non-destructively via `onBeforeCompile` so the original material is restored byte-identically on hover-leave): `glow` (emissive halo pulse), `fire` (animated noise-driven flame ramp rising along local Y with heat distortion), `crackers` (spark bursts — bright short-lived points ejected from the surface, GPU-only, no particle system dependency), `lightenup` (brightness/exposure lift with a soft bloom-friendly rim), `pulse` (rhythmic scale-synced emissive beat), `ripple` (radial highlight wave across the datum), `neonEdge` (glowing silhouette edge). Per-datum targeting: on instanced backends the effect writes an effect-mask + phase instance attribute (Prompt 38) so ONLY the hovered instance renders the effect in a single draw call; on mesh backends the injection applies to that mesh's material clone. Effects animate in over ~150ms and out on leave via the standard transition path; rapid hover sweeps must not stack injections (idempotent apply, verified by shader-program-count assertions). **Strict scope limit: no user-authored/custom GLSL in this prompt** — `hoverEffect(name)` accepts ONLY registered preset names; unknown names throw with a Levenshtein suggestion listing the valid presets (Fail Fast). Add a registry entry point `effects.list()` returning the preset names + option schemas so docs and tooling can enumerate them. Document custom user shaders explicitly as future work (the polishing pass, Prompt 269+, later generalizes this registry into the full `EffectSystem` with an authoring guide — this prompt builds the registry and injector that Prompt 269 extends; one injector, DRY).
 
 **Prompt 152.** `src/interact/Brush.js` (draggable AABB → selected Selection) and `src/interact/Lasso.js` (screen-space polygon → selected Selection). Both emit `select` with a real `Selection`, so users apply micro-control to the result directly.
 

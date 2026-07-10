@@ -1,4 +1,6 @@
 import { continuous } from './continuous.js';
+import { ticks as linearTicks } from './ticks.js';
+import { siPrefixFor, precisionFixed, formatFixed, parseSpecifier } from './tickFormat.js';
 
 function assertLogDomain(arr) {
   const allPositive = arr.every((v) => Number(v) > 0);
@@ -16,10 +18,10 @@ function assertLogDomain(arr) {
  * one tick per power of `base` when the domain spans many decades, else
  * subdivided by every digit `1..base-1` within the one-or-few decades it
  * spans — e.g. base 10 over `[2, 8]` gives `[2,3,4,5,6,7,8]`, over
- * `[1, 1000]` gives `[1, 10, 100, 1000]`.
- * ponytail: skips d3-array's extra "too few ticks? fall back to linear
- * ticks in log space" refinement — add it if sparse decade-spanning ticks
- * ever prove too coarse for an axis.
+ * `[1, 1000]` gives `[1, 10, 100, 1000]`. Mirrors d3-array's own
+ * "too few ticks? fall back to ordinary linear ticks" refinement: a domain
+ * confined to a thin slice of one decade (e.g. `[2, 3]`) can produce too few
+ * digit-multiple ticks to be useful as axis gridlines.
  */
 function logTickMagnitudes(magLo, magHi, count, base) {
   const i = Math.floor(Math.log(magLo) / Math.log(base));
@@ -33,6 +35,7 @@ function logTickMagnitudes(magLo, magHi, count, base) {
         if (t >= magLo && t <= magHi) result.push(t);
       }
     }
+    if (result.length * 2 < count) return linearTicks(magLo, magHi, count);
   } else {
     for (let p = i; p <= j; p++) {
       const t = base ** p;
@@ -51,6 +54,21 @@ function isPowerOfBase(value, base) {
 /** Cleans up float noise (e.g. `0.30000000000000004`) via a high-precision round-trip. */
 function formatLogNumber(value) {
   return String(Number(value.toPrecision(12)));
+}
+
+/**
+ * SI-prefix formatting for one log-scale tick value (e.g. `1000` → `'1k'`).
+ * Unlike `tickFormat.js`'s domain-wide `'s'` formatter (one shared prefix for
+ * every tick, appropriate when all ticks share an order of magnitude), each
+ * log-scale tick picks its own prefix — consecutive power-of-base ticks
+ * routinely span whole decades, so a single shared prefix would leave most
+ * of them showing tiny or huge scaled numbers.
+ */
+function formatLogSI(value, precision) {
+  const prefix = siPrefixFor(value);
+  const scaled = value / 10 ** prefix.exp;
+  const p = precision == null ? precisionFixed(scaled) : precision;
+  return `${formatFixed(scaled, p)}${prefix.symbol}`;
 }
 
 /**
@@ -119,14 +137,13 @@ export function log(base = 10) {
     return result;
   };
 
-  // ponytail: 's'/precision specifiers format every tick plainly here (no
-  // domain-derived step exists for a log scale the way linear has one); only
-  // the default 'f' gets the "blank the non-power ticks" axis-label behavior.
   s.tickFormat = function (_count = 10, specifier) {
-    if (specifier != null && specifier !== 'f') {
-      return (value) => formatLogNumber(value);
-    }
-    return (value) => (isPowerOfBase(value, currentBase) ? formatLogNumber(value) : '');
+    const { type, precision } = parseSpecifier(specifier);
+    const format =
+      type === 's'
+        ? (value) => formatLogSI(value, precision)
+        : (value) => (precision == null ? formatLogNumber(value) : formatFixed(value, precision));
+    return (value) => (isPowerOfBase(value, currentBase) ? format(value) : '');
   };
 
   s.copy = function () {

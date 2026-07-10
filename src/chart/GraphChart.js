@@ -1,9 +1,10 @@
 import { accessor, Selection, diffData } from '../compose/index.js';
-import { material } from '../material/index.js';
+import { material, effects } from '../material/index.js';
 import { resolve as resolveEasing } from '../anim/index.js';
 import { GraphObjectFactory } from '../object/index.js';
 import { applyAxisScaleDomain, resolveAxisAccessor } from './axisField.js';
 import { resolveChartMaterial } from './materialField.js';
+import { applyLegend } from './legendField.js';
 
 // Real material factories only — `material` also carries two unrelated
 // utilities (addPlanarReflection, setPaletteForAttribute) that aren't presets
@@ -12,6 +13,29 @@ import { resolveChartMaterial } from './materialField.js';
 const NON_PRESET_MATERIAL_KEYS = new Set(['addPlanarReflection', 'setPaletteForAttribute']);
 
 const CHART_EVENTS = new Set(['enter', 'update', 'exit']);
+
+// Prompt 156's "full event surface on charts" — dispatched externally by
+// interact/'s PointerRouter/Brush/Lasso/KeyboardNav (which import chart/, the
+// allowed direction; chart/ cannot detect a pointer/keyboard event itself)
+// via the new dispatch() method below, never by GraphChart itself. Kept in a
+// separate set/Map from CHART_EVENTS/#handlers rather than merged into them:
+// enter/update/exit are driven internally by update()'s own data-join and
+// always called automatically, while these are driven by an external
+// interact/-layer event — conflating the two storage/dispatch paths would
+// make dispatch() able to accidentally re-fire a lifecycle handler, which
+// nothing should ever do outside update() itself.
+const INTERACTION_EVENTS = new Set([
+  'hover',
+  'select',
+  'deselect',
+  'brushStart',
+  'brushEnd',
+  'lassoStart',
+  'lassoEnd',
+  'dragStart',
+  'dragEnd',
+  'focus',
+]);
 
 /** @param {*} accessorOrScale @returns {boolean} */
 function isValidAxisInput(accessorOrScale) {
@@ -22,8 +46,9 @@ function isValidAxisInput(accessorOrScale) {
  * Fluent, chainable base class every chart type (Prompt 132+: `BarChart`,
  * `LineChart`, `ScatterChart`, ...) extends. Owns the configuration state a
  * chart accumulates before it renders anything — data, per-axis accessor/scale
- * pairs, color/size/shape accessors, material choice, filter/sort, transition
- * defaults, and lifecycle handlers — via a D3-flavored setter/getter method
+ * pairs, color/size/shape accessors, material choice, filter/sort, `.use()`
+ * middleware transforms, transition defaults, and lifecycle handlers — via a
+ * D3-flavored setter/getter method
  * per field (no-arg call reads, one-or-more-arg call writes and returns `this`
  * for chaining).
  *
@@ -117,16 +142,36 @@ export class GraphChart {
   #shapeAccessor = null;
   /** @type {((datum:*, index:number) => *)|null} */
   #opacityAccessor = null;
+  /** @type {((datum:*, index:number) => boolean)|null} */
+  #visibleAccessor = null;
   /** @type {{presetName: string, options: object}|null} */
   #materialConfig = null;
   /** @type {((datum:*, index:number) => boolean)|null} */
   #filterFn = null;
   /** @type {((a:*, b:*) => number)|null} */
   #sortFn = null;
+  /** @type {((data: Array) => Array)[]} */
+  #middlewares = [];
+  /** @type {{container: object}|null} */
+  #legendConfig = null;
+  /** @type {((datum:*, index:number) => *)|null} */
+  #tooltipHandler = null;
+
+  #hoverEffectConfig = null;
+
+  #selectEffectConfig = null;
   /** @type {{durationMs: number, easing: (string|((t:number)=>number))}|null} */
   #transitionConfig = null;
+  /** @type {{name: string, options: {system: {preset: Function}}}|null} */
+  #exitAnimationConfig = null;
   /** @type {{enter: Function[], update: Function[], exit: Function[]}} */
   #handlers = { enter: [], update: [], exit: [] };
+  /** @type {Map<string, Function[]>} Prompt 156's interaction-event handlers, keyed by event — separate from `#handlers` (see `INTERACTION_EVENTS`'s own comment). */
+  #interactionHandlers = new Map();
+  /** @type {boolean} Whether `PointerRouter` (Prompt 154) should let a pointer drag reposition this chart's datums. */
+  #draggable = false;
+  /** @type {boolean} Whether `Picker` (Prompt 156) hit-tests this chart at all. */
+  #pickingEnabled = true;
 
   /**
    * @param {object} scene The raw `THREE.Scene` this chart will attach to.
@@ -307,6 +352,26 @@ export class GraphChart {
   }
 
   /**
+   * Gets or sets a constant visibility, or a per-datum predicate, applied
+   * via `chart/visibleField.js`'s `applyVisibleField` after every
+   * `render()`/`update()` (Prompt 141) — a direct passthrough to
+   * `Selection.attr('visible', ...)` (Prompt 75), same shape as `.opacity()`.
+   * Unlike `.filter()` (which excludes a datum from `data()`/layout entirely,
+   * before `render()` ever runs), `.visible()` only toggles a rendered
+   * member's `Object3D.visible`/instance-visibility after the fact — the
+   * datum still occupies its computed position/scale, just hidden.
+   * @param {boolean|((datum:*, index:number) => boolean)} [valueOrFn]
+   * @returns {((datum:*, index:number) => boolean)|null|this}
+   * @example chart.visible((d) => d.value > 0);
+   */
+  visible(valueOrFn) {
+    this.#assertNotDisposed('visible');
+    if (valueOrFn === undefined) return this.#visibleAccessor;
+    this.#visibleAccessor = accessor(valueOrFn);
+    return this;
+  }
+
+  /**
    * Gets or sets the material preset used to render this chart's datums.
    * @param {string} [presetName] One of `material`'s preset keys (e.g. `'standard'`, `'neon'`, `'glow'`).
    * @param {object} [options] Options forwarded to the preset factory.
@@ -324,6 +389,110 @@ export class GraphChart {
       throw new TypeError(`GraphChart.material: options must be a plain object, received ${JSON.stringify(options)}.`);
     }
     this.#materialConfig = { presetName, options };
+    return this;
+  }
+
+  /**
+   * Gets or sets an HTML overlay legend synced to `.color()`/`.size()`
+   * (Prompt 143) — a gradient bar (or swatch list, for a categorical
+   * palette) for `.color()`'s encoding, and three sample dots at the data's
+   * min/mid/max `.size()` multiplier, rendered into `options.container` via
+   * `chart/legendField.js`'s `applyLegend` (called immediately here, then
+   * again on every later `render()`/`update()` by the chart types that
+   * consume it — the same per-chart "sync" pattern `.opacity()`/`.visible()`/
+   * `.size()` already follow). The chart only ever writes into the container
+   * it's given — it never creates or positions DOM elements of its own.
+   * Inert on `TreeChart`/`PackChart` (bind a single root datum, not an
+   * array — no per-datum domain to fit).
+   * @param {{container: object}} [options] `container` must be a DOM element (duck-typed to `.appendChild`).
+   * @returns {{container: object}|null|this}
+   * @throws {TypeError} If `options` isn't a plain object, or `options.container` isn't a DOM element.
+   * @example chart.color((d) => d.value).legend({ container: document.getElementById('legend') });
+   */
+  legend(options) {
+    this.#assertNotDisposed('legend');
+    if (options === undefined) return this.#legendConfig;
+    if (options === null || typeof options !== 'object' || Array.isArray(options)) {
+      throw new TypeError(`GraphChart.legend: options must be a plain object, received ${JSON.stringify(options)}.`);
+    }
+    if (typeof options.container?.appendChild !== 'function') {
+      throw new TypeError(`GraphChart.legend: options.container must be a DOM element, received ${JSON.stringify(options.container)}.`);
+    }
+    this.#legendConfig = { container: options.container };
+    applyLegend(this);
+    return this;
+  }
+
+  /**
+   * Gets or sets the tooltip content handler (Prompt 143).
+   * ponytail: config-only, doesn't show anything itself — no hover-detection
+   * mechanism exists yet in this phase (Phase 9's `interact/Tooltip.js`,
+   * Prompt 151, owns the actual DOM element and pointer wiring); this only
+   * stores what to show once that lands. `chart/tooltipField.js`'s `resolveTooltipContent` is the
+   * "sensible default on hover when no handler is set" this prompt asks
+   * for: it calls `handlerFn(datum, index)` if one is configured, otherwise
+   * formats the datum itself.
+   * @param {(datum:*, index:number) => *} [handlerFn]
+   * @returns {((datum:*, index:number) => *)|null|this}
+   * @throws {TypeError} If `handlerFn` is given and isn't a function.
+   * @example chart.tooltip((d) => `${d.label}: ${d.value}`);
+   */
+  tooltip(handlerFn) {
+    this.#assertNotDisposed('tooltip');
+    if (handlerFn === undefined) return this.#tooltipHandler;
+    if (typeof handlerFn !== 'function') {
+      throw new TypeError(`GraphChart.tooltip: handlerFn must be a function, received ${JSON.stringify(handlerFn)}.`);
+    }
+    this.#tooltipHandler = handlerFn;
+    return this;
+  }
+
+  /**
+   * Gets or sets which registered `material.effects` preset (Prompt 150)
+   * plays on the hovered datum only — `interact/StateMachine` (via
+   * `interact/PointerRouter`'s existing hover detection) reads this back on
+   * every hover-enter/leave and applies/removes it through
+   * `material.applyEffect`/`removeEffect`, the same way it already applies
+   * its own built-in default (a `neonEdge` outline) when this is left
+   * unconfigured — config-only, same "doesn't show anything itself" shape
+   * as `tooltip()`, since the actual hover-detection lives one layer up.
+   * @param {string} [presetName] A registered effect name (`effects.list()`).
+   * @param {Object} [options] Merged over the preset's own `defaultOptions`.
+   * @returns {{name: string, options: Object}|null|this}
+   * @throws {Error} If `presetName` isn't a registered effect (includes a "did you mean" suggestion).
+   * @throws {TypeError} If `options` is given and isn't a plain object.
+   * @example chart.hoverEffect('fire', { intensity: 1.2 });
+   */
+  hoverEffect(presetName, options = {}) {
+    this.#assertNotDisposed('hoverEffect');
+    if (presetName === undefined) return this.#hoverEffectConfig;
+    effects.get(presetName); // throws with a suggestion if unregistered (Fail Fast)
+    if (options === null || typeof options !== 'object' || Array.isArray(options)) {
+      throw new TypeError(`GraphChart.hoverEffect: options must be a plain object, received ${JSON.stringify(options)}.`);
+    }
+    this.#hoverEffectConfig = { name: presetName, options };
+    return this;
+  }
+
+  /**
+   * Gets or sets which registered `material.effects` preset (Prompt 150)
+   * plays on selected datums, cleared on deselect — same config-only shape
+   * and `StateMachine` resolution as `hoverEffect`.
+   * @param {string} [presetName] A registered effect name (`effects.list()`).
+   * @param {Object} [options] Merged over the preset's own `defaultOptions`.
+   * @returns {{name: string, options: Object}|null|this}
+   * @throws {Error} If `presetName` isn't a registered effect (includes a "did you mean" suggestion).
+   * @throws {TypeError} If `options` is given and isn't a plain object.
+   * @example chart.selectEffect('glow', { color: '#22ffcc' });
+   */
+  selectEffect(presetName, options = {}) {
+    this.#assertNotDisposed('selectEffect');
+    if (presetName === undefined) return this.#selectEffectConfig;
+    effects.get(presetName);
+    if (options === null || typeof options !== 'object' || Array.isArray(options)) {
+      throw new TypeError(`GraphChart.selectEffect: options must be a plain object, received ${JSON.stringify(options)}.`);
+    }
+    this.#selectEffectConfig = { name: presetName, options };
     return this;
   }
 
@@ -362,6 +531,28 @@ export class GraphChart {
   }
 
   /**
+   * Registers a data-transform middleware (Prompt 142), run in registration
+   * order against the last array passed to `data()` — after `.filter()`,
+   * before `.sort()` — every time `render()`/`update()` recomputes buffers.
+   * Each middleware is a plain `(data) => data` function; `compose/transform`
+   * (`transform.smooth`/`decimate`/`aggregate`/`normalize`/`sort`) provides
+   * ready-made ones, but any function of that shape works. Composable — call
+   * `.use()` multiple times to chain several transforms.
+   * @param {(data: Array) => Array} middlewareFn
+   * @returns {this}
+   * @throws {TypeError} If `middlewareFn` isn't a function.
+   * @example chart.data(rawSamples).use(transform.smooth(5)).use(transform.decimate(200));
+   */
+  use(middlewareFn) {
+    this.#assertNotDisposed('use');
+    if (typeof middlewareFn !== 'function') {
+      throw new TypeError(`GraphChart.use: middlewareFn must be a function, received ${JSON.stringify(middlewareFn)}.`);
+    }
+    this.#middlewares.push(middlewareFn);
+    return this;
+  }
+
+  /**
    * Gets or sets the default transition duration/easing `update()` (Prompt
    * 130) will use for enter/update/exit animation. Validates `easingNameOrFn`
    * eagerly against `GraphAnimCurve.resolve` (CLAUDE.md §1.1 DRY — no second
@@ -384,27 +575,203 @@ export class GraphChart {
   }
 
   /**
-   * Registers a lifecycle handler, fired by `update()` (Prompt 130) as datums
-   * enter, update, or exit on each `data()` call.
-   * @param {'enter'|'update'|'exit'} event
+   * Gets or sets a default particle exit animation (Prompt 122) for
+   * `update()`'s exit-join: departing datums play `options.system.preset(name,
+   * ...)` and are removed immediately, instead of the built-in shrink-and-fade
+   * dissolve. Only takes effect when no `on('exit', fn)` handler is
+   * registered — a registered handler always has full control (it can still
+   * call `exited.remove(name, options)` itself). Delegates straight to
+   * `Selection.remove(animationName, options)` (CLAUDE.md §1.1 DRY — no
+   * second particle-triggering implementation here); `options.system` is a
+   * `postfx/particles` `ParticleSystem`, duck-typed rather than imported,
+   * since `chart/` has no renderer/camera of its own to build one — the
+   * caller constructs and passes it, exactly as a direct
+   * `Selection.remove('dissolve', { system })` call already requires.
+   * @param {string} [name] A preset name registered on `options.system`. Omit to read the current config.
+   * @param {Object} [options={}]
+   * @param {{preset: function(string, Object): void}} [options.system] Required when `name` is given.
+   * @returns {{name: string, options: Object}|null|this}
+   * @throws {TypeError} If `name` is given and isn't a non-empty string, or `options.system` doesn't expose `.preset(name, opts)`.
+   * @example chart.exitAnimation('dissolve', { system: particleSystem });
+   */
+  exitAnimation(name, options = {}) {
+    this.#assertNotDisposed('exitAnimation');
+    if (name === undefined) return this.#exitAnimationConfig;
+    if (typeof name !== 'string' || name.length === 0) {
+      throw new TypeError(`GraphChart.exitAnimation: name must be a non-empty string, received ${JSON.stringify(name)}.`);
+    }
+    if (!options.system || typeof options.system.preset !== 'function') {
+      throw new TypeError(
+        `GraphChart.exitAnimation('${name}'): options.system must be a particle system exposing .preset(name, opts) (e.g. a postfx ParticleSystem).`,
+      );
+    }
+    this.#exitAnimationConfig = { name, options };
+    return this;
+  }
+
+  /**
+   * Gets or sets whether `PointerRouter` (Prompt 154) lets a pointer drag
+   * reposition this chart's datums — config-only, same "doesn't show
+   * anything itself" shape as `tooltip()`/`hoverEffect()`, since `chart/`
+   * sits below `interact/` and cannot itself detect a pointer drag.
+   * `PointerRouter` duck-type-checks this method before starting a drag
+   * gesture, so a chart that never calls `draggable(true)` behaves exactly
+   * as before this prompt. Default `false`.
+   * @param {boolean} [value] Omit to read the current value.
+   * @returns {boolean|this}
+   * @throws {TypeError} If `value` is given and isn't a boolean.
+   * @example chart.draggable(true);
+   */
+  draggable(value) {
+    this.#assertNotDisposed('draggable');
+    if (value === undefined) return this.#draggable;
+    if (typeof value !== 'boolean') {
+      throw new TypeError(`GraphChart.draggable: value must be a boolean, received ${JSON.stringify(value)}.`);
+    }
+    this.#draggable = value;
+    return this;
+  }
+
+  /**
+   * Gets or sets whether `Picker` (Prompt 147) hit-tests this chart at all —
+   * config-only, same shape as `draggable()`/`tooltip()`, since `chart/`
+   * cannot itself skip a raycast (`Picker.pickAt()` duck-type-checks this
+   * before testing a registered chart, Prompt 156). Lets a large, static
+   * "backdrop" chart nobody interacts with opt out of every future pick's
+   * cost. Default `true`.
+   * @param {boolean} [value] Omit to read the current value.
+   * @returns {boolean|this}
+   * @throws {TypeError} If `value` is given and isn't a boolean.
+   * @example staticBackgroundChart.pickingEnabled(false);
+   */
+  pickingEnabled(value) {
+    this.#assertNotDisposed('pickingEnabled');
+    if (value === undefined) return this.#pickingEnabled;
+    if (typeof value !== 'boolean') {
+      throw new TypeError(`GraphChart.pickingEnabled: value must be a boolean, received ${JSON.stringify(value)}.`);
+    }
+    this.#pickingEnabled = value;
+    return this;
+  }
+
+  /**
+   * Converts a list of this chart's currently-selected datums (e.g. from
+   * `PointerRouter.selectedEntries()`/`KeyboardNav`) into portable join keys
+   * — the same `keyFn` passed to the last `data(arr, keyFn)` call (or the
+   * datum itself, if none was given) — suitable for `JSON.stringify` and
+   * later restoring via `importSelection()`. Necessary because interactive
+   * selection is tracked by `interact/`'s `PointerRouter`/`KeyboardNav` keyed
+   * on datum *object identity*, which `chart/` cannot depend on (CLAUDE.md
+   * §1.4) and which breaks across a fresh `data(newRows)` call anyway — even
+   * same-content rows become new object instances.
+   * @param {Array<*>} selectedData Datums currently marked selected.
+   * @returns {Array<*>} Portable keys, in `selectedData`'s order.
+   * @throws {TypeError} If `selectedData` isn't an array.
+   * @throws {Error} If `data(arr)` hasn't been called yet.
+   * @example
+   * const keys = chart.exportSelection(router.selectedEntries().map((e) => e.datum));
+   * localStorage.setItem('selection', JSON.stringify(keys));
+   */
+  exportSelection(selectedData) {
+    this.#assertNotDisposed('exportSelection');
+    if (!Array.isArray(selectedData)) {
+      throw new TypeError(`GraphChart.exportSelection: expected an array, received ${JSON.stringify(selectedData)}.`);
+    }
+    if (this.#pendingData === null) {
+      throw new Error('GraphChart.exportSelection: call data(arr) before exportSelection().');
+    }
+    const keyFn = this.#pendingKeyFn ?? ((d) => d);
+    return selectedData.map((d) => keyFn(d, this.#pendingData.indexOf(d)));
+  }
+
+  /**
+   * The inverse of `exportSelection()`: resolves a previously-exported list
+   * of keys back to this chart's *current* live `data()` entries — for a
+   * caller to re-apply whatever interactive selected state it manages (e.g.
+   * `stateMachineFor(chart).setState(datum, 'selected')` for each) after a
+   * fresh `data(newRows)` call has replaced the underlying datum objects.
+   * @param {Array<*>} keys Keys previously returned by `exportSelection()`.
+   * @returns {Array<*>} The subset of the current `data()` array whose key matches, in `data()` order.
+   * @throws {TypeError} If `keys` isn't an array.
+   * @throws {Error} If `data(arr)` hasn't been called yet.
+   * @example
+   * chart.data(reloadedRows, (d) => d.id);
+   * for (const datum of chart.importSelection(savedKeys)) stateMachineFor(chart).setState(datum, 'selected');
+   */
+  importSelection(keys) {
+    this.#assertNotDisposed('importSelection');
+    if (!Array.isArray(keys)) {
+      throw new TypeError(`GraphChart.importSelection: expected an array, received ${JSON.stringify(keys)}.`);
+    }
+    if (this.#pendingData === null) {
+      throw new Error('GraphChart.importSelection: call data(arr) before importSelection().');
+    }
+    const keyFn = this.#pendingKeyFn ?? ((d) => d);
+    const keySet = new Set(keys);
+    return this.#pendingData.filter((d, i) => keySet.has(keyFn(d, i)));
+  }
+
+  /**
+   * Registers a handler for either a lifecycle event (`'enter'`/`'update'`/
+   * `'exit'` — fired internally by `update()`, Prompt 130, as datums enter,
+   * update, or exit on each `data()` call, `handler(selection)`) or an
+   * interaction event (`'hover'`/`'select'`/`'deselect'`/`'brushStart'`/
+   * `'brushEnd'`/`'lassoStart'`/`'lassoEnd'`/`'dragStart'`/`'dragEnd'`/
+   * `'focus'` — fired externally via `dispatch()`, Prompt 156, by whichever
+   * `interact/` class detected it: `PointerRouter` for `hover`/`select`/
+   * `deselect`/`dragStart`/`dragEnd`, `Brush`/`Lasso` for their `*Start`/
+   * `*End` pairs, `KeyboardNav` for `focus`/`select`/`deselect`,
+   * `handler(payload)`). Both share this one entry point (matching D3's own
+   * unified `.on()`) but are stored and dispatched separately internally —
+   * see `INTERACTION_EVENTS`'s own comment for why.
+   * @param {'enter'|'update'|'exit'|'hover'|'select'|'deselect'|'brushStart'|'brushEnd'|'lassoStart'|'lassoEnd'|'dragStart'|'dragEnd'|'focus'} event
    * @param {(...args: *) => void} handler
    * @returns {this}
    * @throws {TypeError} If `event` isn't recognized, or `handler` isn't a function.
    * @example chart.on('exit', (selection) => selection.transition().duration(400).attr('opacity', 0).remove());
+   * @example chart.on('select', ({ datum }) => console.log('selected', datum));
    */
   on(event, handler) {
     this.#assertNotDisposed('on');
-    if (!CHART_EVENTS.has(event)) {
-      throw new TypeError(`GraphChart.on: event must be one of 'enter'/'update'/'exit', received ${JSON.stringify(event)}.`);
+    if (!CHART_EVENTS.has(event) && !INTERACTION_EVENTS.has(event)) {
+      throw new TypeError(`GraphChart.on: event must be one of ${[...CHART_EVENTS, ...INTERACTION_EVENTS].join(', ')}, received ${JSON.stringify(event)}.`);
     }
     if (typeof handler !== 'function') {
       throw new TypeError(`GraphChart.on: handler must be a function, received ${JSON.stringify(handler)}.`);
     }
-    this.#handlers[event].push(handler);
+    if (CHART_EVENTS.has(event)) {
+      this.#handlers[event].push(handler);
+    } else {
+      if (!this.#interactionHandlers.has(event)) this.#interactionHandlers.set(event, []);
+      this.#interactionHandlers.get(event).push(handler);
+    }
     return this;
   }
 
-  /** @returns {{enter: Function[], update: Function[], exit: Function[]}} Registered lifecycle handlers, keyed by event. */
+  /**
+   * Fires every handler `on(event, handler)` registered for one of the
+   * *interaction* events (Prompt 156) — called by `interact/`'s
+   * `PointerRouter`/`Brush`/`Lasso`/`KeyboardNav`, which import `chart/` (the
+   * allowed direction); `chart/` never calls this on itself, since it cannot
+   * detect a pointer/keyboard event. Deliberately rejects `'enter'`/
+   * `'update'`/`'exit'` — those are only ever dispatched internally by
+   * `update()`'s own data-join, never through this generic path.
+   * @param {'hover'|'select'|'deselect'|'brushStart'|'brushEnd'|'lassoStart'|'lassoEnd'|'dragStart'|'dragEnd'|'focus'} event
+   * @param {*} payload
+   * @returns {this}
+   * @throws {TypeError} If `event` isn't a recognized interaction event.
+   * @example chart.dispatch('select', { chart, datum, mesh, instanceIndex, worldPoint, domEvent });
+   */
+  dispatch(event, payload) {
+    this.#assertNotDisposed('dispatch');
+    if (!INTERACTION_EVENTS.has(event)) {
+      throw new TypeError(`GraphChart.dispatch: event must be one of ${[...INTERACTION_EVENTS].join(', ')}, received ${JSON.stringify(event)}.`);
+    }
+    for (const fn of this.#interactionHandlers.get(event) ?? []) fn(payload);
+    return this;
+  }
+
+  /** @returns {{enter: Function[], update: Function[], exit: Function[]}} Registered *lifecycle* handlers, keyed by event — interaction-event handlers (registered via the same `on()`) live in a separate internal map, not reflected here. */
   handlers() {
     this.#assertNotDisposed('handlers');
     return this.#handlers;
@@ -582,6 +949,12 @@ export class GraphChart {
 
     if (this.#handlers.exit.length > 0) {
       for (const fn of this.#handlers.exit) fn(exited);
+    } else if (exited.size() > 0 && this.#exitAnimationConfig) {
+      // A configured exitAnimation() replaces the built-in dissolve entirely
+      // — the particle burst is the visual, so there's nothing left to
+      // shrink/fade/transition. Selection.remove() frees the node right away
+      // (matches its own documented "no delay" contract).
+      exited.remove(this.#exitAnimationConfig.name, this.#exitAnimationConfig.options);
     } else if (exited.size() > 0) {
       // Guarded by size (not called unconditionally): an empty exit set would
       // still register a live SelectionTransition on the shared anim engine
@@ -602,13 +975,18 @@ export class GraphChart {
   }
 
   /**
-   * Applies `filter`/`sort` (if set) to the last array passed to `data()` —
-   * shared by `render()` and `update()` (CLAUDE.md §1.1 DRY two-strike rule).
+   * Applies `filter`, then every `.use()` middleware in registration order,
+   * then `sort` (each step skipped if unset) to the last array passed to
+   * `data()` — shared by `render()` and `update()` (CLAUDE.md §1.1 DRY
+   * two-strike rule). Middleware runs between filter and sort so it can
+   * both shrink/reshape the filtered set (`decimate`, `aggregate`) and still
+   * have its output re-ordered by a separately-configured `.sort()`.
    * @returns {Array}
    */
   #prepareData() {
     let data = this.#pendingData;
     if (this.#filterFn) data = data.filter(this.#filterFn);
+    for (const middlewareFn of this.#middlewares) data = middlewareFn(data);
     if (this.#sortFn) data = data.slice().sort(this.#sortFn);
     return data;
   }
@@ -687,7 +1065,8 @@ export class GraphChart {
    * mid dissolve-out (excluded from `#backendSelection` since they're
    * departing, not live — see `#pendingExits`), disposes the live backend
    * itself (every `GraphMesh`, or the one `GraphInstancedObject`, via
-   * `Selection.dispose()`), and drops registered lifecycle handlers.
+   * `Selection.dispose()`), and drops registered lifecycle *and*
+   * interaction-event handlers.
    * Idempotent — safe to call twice. Every other public method throws
    * afterward (CLAUDE.md's Disposal Contract).
    *
@@ -706,6 +1085,12 @@ export class GraphChart {
     this.#pendingExits.clear();
     this.#backendSelection.dispose();
     this.#handlers = { enter: [], update: [], exit: [] };
+    this.#interactionHandlers.clear();
+    if (this.#legendConfig) {
+      const { container } = this.#legendConfig;
+      while (container.firstChild) container.removeChild(container.firstChild);
+      this.#legendConfig = null;
+    }
   }
 
   /** @param {string} method @throws {Error} */

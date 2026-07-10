@@ -1,6 +1,6 @@
-# Chart — Phase 8 (in progress)
+# Chart — Phase 8 (complete)
 
-Chart is Layer 8 of Graph3D.js — the fluent, D3-flavored chart types built on every layer below (`compose/` scales, generators, layouts, palettes; `object/` instancing; `anim/` transitions; `material/` presets). `GraphChart` (Prompts 127–131) is the shared base every concrete chart type extends; it owns configuration state, join-native `data()`, and the `render()`/`update()`/`destroy()` lifecycle. `BarChart` (Prompt 132), `LineChart` (Prompt 133), `ScatterChart` (Prompt 134), `AreaChart`/`SurfaceChart` (Prompt 135), `HeatmapChart` (Prompt 136), `NetworkChart` (Prompt 137), `TreeChart`/`PackChart` (Prompt 138), and `PieChart`/`VolumeChart` (Prompt 139) are the chart types built on it so far.
+Chart is Layer 8 of Graph3D.js — the fluent, D3-flavored chart types built on every layer below (`compose/` scales, generators, layouts, palettes; `object/` instancing; `anim/` transitions; `material/` presets). `GraphChart` (Prompts 127–131) is the shared base every concrete chart type extends; it owns configuration state, join-native `data()`, and the `render()`/`update()`/`destroy()` lifecycle. `BarChart` (Prompt 132), `LineChart` (Prompt 133), `ScatterChart` (Prompt 134), `AreaChart`/`SurfaceChart` (Prompt 135), `HeatmapChart` (Prompt 136), `NetworkChart` (Prompt 137), `TreeChart`/`PackChart` (Prompt 138), and `PieChart`/`VolumeChart` (Prompt 139) are the eleven chart types built on it — Phase 8's complete roster, rounded out by `Graph3D.chart(typeName)` dispatch (Prompt 140), per-datum styling accessors (Prompt 141), `.use()` data-transform middleware (Prompt 142), and `.legend()`/`.tooltip()` (Prompt 143), all below.
 
 ```js
 import { BarChart, scale, palette } from 'graph3d';
@@ -15,6 +15,61 @@ new BarChart(scene)
   .color((d) => d.value) // falls back to palette.viridis
   .render();
 ```
+
+---
+
+## The chart contract
+
+Every concrete chart type below is built on the same handful of guarantees, regardless of how differently each one materializes (per-datum instanced primitives, one continuous mesh, a live physics simulation, a one-shot hierarchy layout):
+
+- **Constructed against a real `THREE.Scene`.** `new BarChart(scene)` (any concrete class) or `g.chart(typeName)` (Prompt 140 — resolves `Graph3D`'s own active scene automatically, requires one to be set first).
+- **Every setter is a chainable getter/setter.** Called with no arguments it reads the current config; called with one or more it writes and returns `this` — except `data(arr, keyFn)`'s *join* form (`BarChart`/`ScatterChart`/`HeatmapChart`, inheriting `GraphChart.data()` verbatim), which returns the resulting `JoinResult` instead, and inputs are validated at the boundary (Fail Fast) rather than failing silently or downstream.
+- **First `render()` call materializes; every later call routes to `update()`.** There's no separate "is this the first render" flag to manage by hand.
+- **`destroy()` is idempotent and total.** It disposes every scene/GPU resource the chart created (geometries, materials, textures, live `SelectionTransition`s including ones still mid-flight), and every other public method throws `"<Class>.<method>: this chart has been destroyed"` afterward (CLAUDE.md's Disposal Contract).
+- **Instanced-by-default where a flat per-datum backend exists.** `BarChart`/`ScatterChart`/`HeatmapChart` (via `GraphChart`) and `NetworkChart`'s nodes/`TreeChart`/`PackChart` (via their own overridden `render()`/`update()`) all pick one `GraphInstancedObject` above `INSTANCING_THRESHOLD` (50 datums) or a `GraphMesh[]` below it, automatically. `LineChart`/`AreaChart`/`SurfaceChart`/`VolumeChart` render one continuous mesh/field instead — there's no flat per-datum set to choose an instancing strategy for. `PieChart` is deliberately never instanced — every slice's wedge shape genuinely differs, so it's always one `GraphMesh` per slice.
+- **Inert fields are documented, not silently swallowed.** A chart type that has no matching concept for an inherited `GraphChart` setter (e.g. `.filter()`/`.sort()`/`.shape()` on `NetworkChart`, since node position/membership come from the simulation, not those accessors) says so explicitly in its own section below, rather than accepting the call and doing nothing unexplained.
+
+## Join lifecycle — enter / update / exit
+
+Every chart type with a real per-datum backend runs the identical enter/update/exit dispatch on each `update()` call, whether that's `GraphChart.update()` itself (`BarChart`/`ScatterChart`/`HeatmapChart`) or a concrete override doing the equivalent (`NetworkChart`/`TreeChart`/`PackChart`/`PieChart`):
+
+```
+ chart.data(newRows, keyFn)
+         │
+         ▼
+ #prepareData(): filter() → each .use() middleware, in order → sort()
+         │
+         ▼
+ generator.compute(data)  →  fresh positions/scales/colors
+         │
+         ▼
+ diffData(oldData, newData, keyFn)  (compose/selection/diff.js)
+         │
+   ┌─────┼────────────────────────┬──────────────────────────┐
+   ▼     ▼                        ▼                           ▼
+ enter                        update                        exit
+ (key only in newData)   (key in both old & new)      (key only in oldData)
+   │                            │                              │
+ on('enter', fn) set?     on('update', fn) set?         on('exit', fn) set?
+  yes │      │ no          yes │     │ no                yes │      │ no
+      ▼      ▼                 ▼      ▼                       ▼      ▼
+  fn(entered)  write        fn(joined)  write             fn(exited)  dissolve:
+               computed                  computed                     scale→0,
+               position/scale            position/scale               opacity→0,
+               (snapped, or                                           then .remove()
+                animated via
+                SelectionTransition
+                if .transition() is set)
+      │                          │                                    │
+      └──────────────────────────┴────────────────────────────────────┘
+                                  ▼
+                #backendSelection = joined.merge(entered)
+```
+
+- **Handler *or* default, never both.** A registered `on('enter'|'update'|'exit', fn)` handler replaces the default write for that group entirely (Prompt 130's "user's join fns **or** defaults" semantics) — it doesn't run alongside it.
+- **The default `update`/`enter` write only ever touches `position`/`scale`** (`GraphChart.js`'s `#writeComputedTransform`) — never `color`/`opacity`/`visible`/a custom attribute. A micro-edit written by hand through `chart.selection().attr(...)` on a datum whose data is unchanged survives a later `update()` call for exactly this reason (`tests/integration/phase8.test.js`).
+- **An empty group is skipped entirely** — an empty `exit` set never schedules a dangling `SelectionTransition` on the shared `anim` engine for nothing.
+- **`chart.exitAnimation(name, { system, ...opts })`** (Prompt 122, `docs/concepts/postfx.md`) replaces the diagram's default "dissolve: scale→0, opacity→0, then `.remove()`" branch with an immediate `exited.remove(name, options)` — a particle burst (via `options.system`, a caller-constructed `postfx/particles/ParticleSystem`) instead of a shrink/fade tween. Still only applies when there's no registered `on('exit', fn)` handler; a handler can call `exited.remove(name, options)` itself for the same effect with full custom control.
 
 ---
 
@@ -269,3 +324,81 @@ new VolumeChart(scene)
 - Two real GLSL compile bugs shipped in the first draft of `material.volumeRaymarch` and were only caught by loading `examples/18-volume-chart/` in an actual browser (this project's jsdom test environment can't compile shaders — see `skipping_list.md`): `gl_FragColor` (removed in GLSL ES 300, which `GLSL3`/`sampler3D` requires — needs a declared `out vec4`) and an undeclared `modelMatrix` uniform (Three.js auto-injects `cameraPosition`/`modelViewMatrix`/`projectionMatrix` into a bare `ShaderMaterial` but not `modelMatrix` alone). A third bug was a raymarching classic: the ray's start position sits exactly on the cube's boundary, and GPU perspective-correct varying interpolation isn't bit-exact, so the very first bounds check could fail before a single sample — fixed with a small boundary epsilon.
 
 See `examples/17-pie-chart/` for an explode-on-hover pie with a donut toggle, and `examples/18-volume-chart/` for a switchable Gaussian-blobs/torus scalar field with a steps quality toggle.
+
+---
+
+## `Graph3D.chart(typeName)` dispatch (Prompt 140)
+
+Every chart type built in this phase is now registered on `Graph3D` itself, so `g.chart(typeName)` is a real, working entry point — not just the per-type constructors (`new BarChart(scene.three)`, etc.) every example above uses directly. Both forms produce an identical, unconfigured chart instance; `g.chart(typeName)` additionally validates `typeName` against the registry and binds the chart to `g`'s own active scene automatically.
+
+```js
+const g = new Graph3D({ canvas });
+g.setActiveScene(g.createScene('main')); // chart() requires an active scene, same as g.postfx
+
+g.chart('bar').data(rows, (d) => d.id).x((d) => d.label).y((d) => d.value).render();
+```
+
+- **Registered names:** `'bar'`, `'line'`, `'scatter'`, `'area'`, `'surface'`, `'heatmap'`, `'network'`, `'tree'`, `'pack'`, `'pie'`, `'volume'` — one entry per chart type across Prompts 132–139.
+- **Requires an active scene first** (`g.setActiveScene(...)`) — the same requirement `g.postfx` already has, and for the same reason: there's no scene to attach chart objects to otherwise.
+- **Unknown type names get a spell-check, not just a list.** `g.chart('baar')` throws `"unknown chart type 'baar'. Did you mean 'bar'?"` (a small Levenshtein/edit-distance helper, distance ≤ 3) rather than always dumping the full registered-name list — that list is still the fallback when nothing is close enough to guess confidently.
+- **Implementation note:** `Graph3D.js` imports every concrete `chart/` class directly — a third instance of the same "composition root" cross-layer exception `GraphScene`/`PostFX` already established in `core/` (CLAUDE.md §1.4): `Graph3D` is the one place that legitimately wires every layer together. This doesn't introduce a circular dependency (`madge --circular src/` stays clean) since `chart/` never imports back into `core/Graph3D.js` itself (only its two leaf utility modules, `Graph3DLoop.js`/`GraphDisposal.js`, which every object/material/anim file already imports today).
+
+---
+
+## Per-datum styling accessors — `.opacity(fn)`/`.visible(fn)`/`.size(fn)` (Prompt 141)
+
+`.color(fn)` (Prompt 127) already worked across every chart with a real per-datum backend. Prompt 141 fills in the other three the same "thin sugar over `chart.selection().attr(...)`" way, via three small shared modules (`chart/opacityField.js`, the new `chart/visibleField.js`, and the new `chart/sizeField.js`) — one code path, wired into `BarChart`, `ScatterChart`, `HeatmapChart`, `NetworkChart`, `TreeChart`, `PackChart`, and `PieChart` (the seven chart types with N real rendered members; `LineChart`/`AreaChart`/`SurfaceChart`/`VolumeChart` stay exempt, as already documented — a continuous path/mesh/field has no per-datum concept for these to address).
+
+```js
+new BarChart(scene)
+  .y((d) => d.value)
+  .opacity((d) => d.confidence)
+  .visible((d) => d.value > 0)
+  .size((d) => d.emphasis) // multiplies the bar's footprint (x/z), never its height
+  .render();
+```
+
+- **`.visible(fn)`** is brand new (`GraphChart`, mirrors `.opacity()` exactly) — a direct passthrough to `Selection.attr('visible', ...)` (Prompt 75, already supported both backends, just never had a chart-level setter). Unlike `.filter()` (excludes a datum from `data()`/layout entirely, before `render()` runs), `.visible()` only toggles a rendered member's visibility after the fact — the datum still occupies its computed position.
+- **`.size(fn)` is a multiplier, not a replacement.** It reads each member's *current* scale (via `chart.selection().backend`, the same escape hatch `ScatterChart.pick()` established) and multiplies it by the accessor's result, writing back through `.attr('scale.x'|'y'|'z', ...)`. This matters because several charts' scale already encodes real data — a bar's height, a `TreeChart`/`PackChart` node's `.r`-driven radius — and `.size()` must layer on top of that, never replace it. Safe against double-multiplying across repeated `update()` calls because every chart here fully recomputes its base scale from scratch on every call (the established full-rebuild-per-update precedent), so what's on the backend the moment `.size()`'s multiply runs is always the fresh, un-multiplied base value.
+- **Which axes `.size()` touches is chart-specific:** `NetworkChart`/`TreeChart`/`PackChart`/`PieChart` multiply all three axes uniformly (their base shape is a sphere or a wedge scaled around its own center); `BarChart`/`HeatmapChart` restrict it to the *footprint* only (`x`/`z` normally, or `y`/`z` when `BarChart.horizontal()` is active) — the value-encoding axis is never touched.
+- **`ScatterChart.size()` was deliberately left alone**, not migrated to the shared multiplier mechanism — it already had a working, more efficient compute-time mechanism (baked directly into the initial instanced buffer, the only thing ever affecting a point's scale), and CLAUDE.md's Surgical Changes principle weighs against refactoring already-correct, already-shipped code for a behaviorally-identical result. See `skipping_list.md` for the full reasoning.
+- **`PackChart.size()` can visually overlap siblings** — `layout.pack()` only guarantees non-overlap for the un-multiplied radii it actually packed against; a `.size()` multiplier is applied afterward. A documented tradeoff of using one shared `.size()` mechanism everywhere, not a `PackChart`-specific bug (see `skipping_list.md`).
+
+## `chart.use(middleware)` data transforms (Prompt 142)
+
+`compose/transform/` is a new namespace of pure `(data) => data` middleware factories — `transform.smooth`, `.decimate`, `.aggregate`, `.normalize`, `.sort` — that run against the array before it reaches scales/generators, the same layer `scale`/`generator`/`layout` already live in (no Three.js, per CLAUDE.md §1.4 SoC). `GraphChart.use(fn)` registers one (or several — it's composable, call it repeatedly), run in registration order inside `#prepareData()` between `.filter()` and `.sort()`:
+
+```js
+import { transform } from 'graph3d';
+
+chart
+  .data(rawSamples) // number[] — GraphChart's default y accessor is the identity function
+  .filter((d) => d > 0)
+  .use(transform.smooth(5))
+  .use(transform.decimate(500))
+  .sort((a, b) => a - b)
+  .render();
+```
+
+- **`smooth(window)`** moving-averages a plain `number[]` — no per-datum field parameter. This was a deliberate, asked-and-confirmed choice: `normalize(field)` clearly needs to name a property on an object datum, but `smooth` doesn't, since `GraphChart`'s default `y` accessor is already the identity function — bare-number arrays (the common case for a raw sample series) work with `smooth` directly, no pre-mapping required.
+- **`decimate(target)`** uniform-stride-samples down to `target` elements; a no-op if the array is already that size or smaller.
+- **`aggregate(keyFn, reducer)`** groups by `keyFn(datum, index)` (first-occurrence order) and reduces each group to one output datum via `reducer(group, key)` — fully general, no separate "value field" concept needed.
+- **`normalize(field)`** min-max rescales one named field to `[0, 1]`, returning new objects (never mutates the input, per CLAUDE.md immutability); an all-equal field maps to `0` rather than dividing by zero.
+- **`sort(cmp)`** is the same comparator shape as `chart.sort()`, exposed as a transform too so it can be interleaved with the others inside one `.use()` pipeline instead of only ever running last.
+
+Pipeline order is fixed: `.filter()` → every `.use()` middleware in registration order → `.sort()`. Filtering narrows the set before any transform sees it; sorting is the final step so a middleware that reshuffles or resizes the array (`aggregate`, `decimate`) still gets ordered predictably afterward.
+
+## `chart.legend(options)` / `chart.tooltip(handlerFn)` (Prompt 143)
+
+```js
+const chart = new BarChart(scene)
+  .y((d) => d.value)
+  .color((d) => d.value)
+  .size((d) => d.weight)
+  .legend({ container: document.getElementById('legend') })
+  .tooltip((d) => `${d.label}: ${d.value}`);
+chart.data(rows).render();
+```
+
+- **`.legend({ container })`** renders into a DOM element you supply — the chart never creates or positions elements of its own, it only writes into the container it's given. Shows a gradient bar with min/max labels for a continuous `.color()` palette (or a swatch list for a categorical one), and three sample dots at the data's min/mid/max `.size()` multiplier. Stays synced automatically: it's re-rendered from scratch on every `render()`/`update()` for `BarChart`/`ScatterChart`/`HeatmapChart`/`NetworkChart`/`PieChart` (the five chart types with a real flat data array — `TreeChart`/`PackChart` bind a single root datum, not an array, so `.legend()` is inert for them, same precedent as their other inert inherited fields). `destroy()` clears the container's content (the one DOM resource this feature creates) but leaves the container element itself alone — the caller owns it.
+- **`.tooltip(handlerFn)` is config-only right now.** It stores a handler, retrievable via `chart/tooltipField.js`'s `resolveTooltipContent(chart, datum, index)` — the "sensible default on hover when no handler is set" this prompt asks for: it calls `handlerFn(datum, index)` if one is configured, or falls back to a `"key: value"` listing (object datums) / `String(datum)` (primitives). Nothing shows on screen from this alone — there was no hover-detection mechanism in this phase. Phase 9 (`docs/concepts/interact.md`) later gave every chart type real picking (`Picker`, Prompt 147) and a full pointer-driven interaction surface, but never built a dedicated centralized tooltip-display class — the `interact/Tooltip.js` this paragraph once expected under a "Prompt 151" slot was renumbered out of the actual `prompts.md` sequence and never landed. A caller wires the actual DOM display by hand off `chart.on('hover', ...)` (Prompt 156), as `examples/20-interaction/main.js` (Prompt 157) demonstrates — see `docs/concepts/interact.md`'s own "What's genuinely out of scope for Phase 9" section.

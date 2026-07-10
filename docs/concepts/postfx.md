@@ -180,7 +180,7 @@ joined.exit().remove('dissolve', { system: rain });
 
 `options.system` must expose `.preset(name, opts)` — duck-typed rather than imported (`compose/` must not import `postfx/`, and `Selection` has no scene/camera/renderer of its own to build a `ParticleSystem`). Meshes-backend nodes pass their raw `THREE.Mesh` (so `dissolve`'s surface-sample path works); instanced-backend nodes pass their local-space position instead (a point burst). The node is still freed immediately after — the burst is a short-lived visual, not a removal delay.
 
-`chart.exitAnimation('dissolve')` — the other half of Prompt 122 — is **not** wired: `GraphChart` doesn't exist until Phase 8 (Prompt 127+). Once it does, it should call this same `Selection.remove` path rather than a second implementation (see `skipping_list.md`).
+`chart.exitAnimation(name, { system, ...opts })` — the other half of Prompt 122 — is now wired on `GraphChart` (see `docs/concepts/chart.md`): it stores a default exit animation, and `update()`'s exit-join calls this same `Selection.remove(name, options)` path directly (no second implementation) whenever it's configured and no `on('exit', fn)` handler is registered. `options.system` is still an explicit, caller-constructed `ParticleSystem` — `GraphChart` has no camera/renderer of its own to build one automatically (see `skipping_list.md`'s resolved entry for why).
 
 ---
 

@@ -1,6 +1,10 @@
 import { generator, layout } from '../compose/index.js';
 import { GraphChart } from './GraphChart.js';
 import { applyColorField } from './colorField.js';
+import { applyOpacityField } from './opacityField.js';
+import { applyVisibleField } from './visibleField.js';
+import { applySizeField } from './sizeField.js';
+import { applyLegend } from './legendField.js';
 
 const DEFAULT_TRANSITION_MS = 800;
 
@@ -34,6 +38,9 @@ function swapXY(buffers) {
  * combined with `.grouped()`. `.color(fn)` (Prompt 127) without an explicit
  * palette falls back to `palette.viridis` here — `GraphChart` itself never
  * consumes `#colorField` (no chart type existed for it to serve until now).
+ * `.opacity(fn)`/`.visible(fn)`/`.size(fn)` (Prompt 141) are likewise applied
+ * per-datum after every render/update — `.size(fn)` multiplies the bar's
+ * footprint only (see `#applyStyleFields`), never the value-encoding axis.
  * @example
  * new BarChart(scene)
  *   .data(rows, (d) => d.id)
@@ -150,26 +157,42 @@ export class BarChart extends GraphChart {
    * First call materializes via `GraphChart.render()`; every later call
    * routes to this class's own `update()` override (same "first render vs.
    * update" dispatch `GraphChart.render()` already implements). Applies
-   * `.color()`'s palette fallback afterward either way.
+   * `.color()`'s palette fallback, `.opacity()`, `.visible()`, and `.size()`
+   * (Prompt 141) afterward either way.
    * @returns {this}
    * @throws {Error} If `data(arr)` was never called before this render.
    */
   render() {
     super.render();
-    applyColorField(this, this.data());
+    this.#applyStyleFields();
     return this;
   }
 
   /**
    * Diffs and rewrites bound data via `GraphChart.update()`, then re-applies
-   * `.color()`'s palette fallback across the (possibly changed) live selection.
+   * every Prompt 127/141 style field across the (possibly changed) live selection.
    * @returns {this}
    * @throws {Error} If `render()` hasn't successfully run yet.
    */
   update() {
     super.update();
-    applyColorField(this, this.data());
+    this.#applyStyleFields();
     return this;
+  }
+
+  /**
+   * Shared by `render()`/`update()` (CLAUDE.md §1.1 DRY two-strike rule).
+   * `.size()` multiplies the bar's *footprint* only (`x`/`z` normally, `y`/`z`
+   * when `.horizontal()` is active — whichever two axes aren't the value
+   * axis `.horizontal()`/`.vertical()` controls), never the axis that
+   * encodes `.y(fn)`'s (or `.x(fn)`'s, if horizontal) real value.
+   */
+  #applyStyleFields() {
+    applyColorField(this, this.data());
+    applyOpacityField(this);
+    applyVisibleField(this);
+    applySizeField(this, this.#orientation === 'horizontal' ? ['y', 'z'] : ['x', 'z']);
+    applyLegend(this);
   }
 
   /**

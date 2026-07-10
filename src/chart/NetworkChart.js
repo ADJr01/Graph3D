@@ -2,7 +2,11 @@ import { layout, Selection } from '../compose/index.js';
 import { GraphChart } from './GraphChart.js';
 import { GraphObjectFactory, GraphLine } from '../object/index.js';
 import { applyColorField } from './colorField.js';
+import { applyOpacityField } from './opacityField.js';
+import { applyVisibleField } from './visibleField.js';
+import { applySizeField } from './sizeField.js';
 import { resolveChartMaterial } from './materialField.js';
+import { applyLegend } from './legendField.js';
 
 /** Number of `[x, y, z]` numbers a link's two endpoints need — a `GraphLine` segment. */
 const EDGE_POINT_COUNT = 6;
@@ -13,13 +17,17 @@ const EDGE_POINT_COUNT = 6;
  * accessor+scale computation — so, like `LineChart`/`SurfaceChart`,
  * `NetworkChart` overrides `data()`/`render()`/`update()`/`destroy()`
  * entirely rather than building on `GraphChart`'s per-datum pipeline.
- * `GraphChart`'s inherited `x()`/`y()`/`z()`/`size()`/`shape()`/`opacity()`/
- * `filter()`/`sort()`/`on()` are inert here (positions/membership are driven
- * by the simulation and `.links()`, not those accessors); `.color()` and
- * `.material()` still work, via the same `applyColorField`/
- * `resolveChartMaterial` helpers every other chart type uses (CLAUDE.md
- * §1.1 DRY) — `.selection()` is overridden to expose a real `Selection`
- * over the node backend so they have something to write to.
+ * `GraphChart`'s inherited `x()`/`y()`/`z()`/`shape()`/`filter()`/`sort()`/
+ * `on()` are inert here (positions/membership are driven by the simulation
+ * and `.links()`, not those accessors); `.color()`/`.opacity()`/`.visible()`
+ * still work, via the same `applyColorField`/`applyOpacityField`/
+ * `applyVisibleField`/`resolveChartMaterial` helpers every other chart type
+ * uses (CLAUDE.md §1.1 DRY) — `.selection()` is overridden to expose a real
+ * `Selection` over the node backend so they have something to write to.
+ * `.size(fn)` (Prompt 141) multiplies each node's rendered radius by a
+ * per-datum factor — nodes have no other source of scale (`#buildBackend`
+ * never calls `setScale`/`setInstanceScale` itself), so the base scale
+ * `applySizeField` reads and multiplies is always the sphere's own default.
  *
  * Nodes render as spheres (`GraphObjectFactory.createNodes`, instanced
  * above `INSTANCING_THRESHOLD`); edges render as one `GraphLine` (a `Line2`,
@@ -310,6 +318,10 @@ export class NetworkChart extends GraphChart {
     this.#buildBackend();
     this.#syncPositions();
     applyColorField(this, this.data());
+    applyOpacityField(this);
+    applyVisibleField(this);
+    applySizeField(this); // uniform — nodes are spheres, all 3 axes
+    applyLegend(this);
     this.#simulation.restart();
   }
 

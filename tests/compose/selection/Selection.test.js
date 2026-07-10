@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import * as THREE from 'three';
 import { Selection } from '../../../src/compose/selection/Selection.js';
 import { SelectionTransition } from '../../../src/compose/selection/SelectionTransition.js';
@@ -237,9 +237,133 @@ describe('Selection.transition', () => {
   });
 });
 
-describe('Selection.on', () => {
-  it('throws a clear "requires Phase 9" error', () => {
+describe('Selection.on / Selection.dispatch', () => {
+  it('throws TypeError for a non-string/empty event, or a non-function handler', () => {
     const selection = new Selection({ type: 'meshes', meshes: [] });
-    expect(() => selection.on('click', () => {})).toThrow(/Phase 9/);
+    expect(() => selection.on('', () => {})).toThrow(TypeError);
+    expect(() => selection.on(123, () => {})).toThrow(TypeError);
+    expect(() => selection.on('click', 'nope')).toThrow(TypeError);
+  });
+
+  it('returns this for chaining', () => {
+    const selection = new Selection({ type: 'meshes', meshes: [] });
+    expect(selection.on('click', () => {})).toBe(selection);
+  });
+
+  it('dispatch() calls the handler with (datum, index, domEvent, worldPoint) when the hit mesh is a member (meshes backend)', () => {
+    const scene = new THREE.Scene();
+    const meshA = makeMesh(scene, 'a', { value: 1 });
+    const meshB = makeMesh(scene, 'b', { value: 2 });
+    const selection = new Selection({ type: 'meshes', meshes: [meshA, meshB] });
+    const calls = [];
+    selection.on('click', (...args) => calls.push(args));
+
+    const worldPoint = new THREE.Vector3(1, 2, 3);
+    const domEvent = { type: 'click' };
+    Selection.dispatch('click', { mesh: meshB.three, instanceIndex: null, datum: { value: 2 }, worldPoint, domEvent });
+
+    expect(calls).toEqual([[{ value: 2 }, 1, domEvent, worldPoint]]);
+  });
+
+  it('dispatch() calls the handler for the matching instance (instanced backend)', () => {
+    const scene = new THREE.Scene();
+    const object = makeInstanced(scene);
+    object.setInstanceUserData(0, { value: 1 }).setInstanceUserData(1, { value: 2 });
+    const selection = new Selection({ type: 'instanced', object, indices: Uint32Array.from([0, 1]) });
+    const handler = vi.fn();
+    selection.on('click', handler);
+
+    Selection.dispatch('click', { mesh: object.three, instanceIndex: 1, datum: { value: 2 }, worldPoint: new THREE.Vector3(), domEvent: {} });
+
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(handler.mock.calls[0][1]).toBe(1); // local index within this selection
+  });
+
+  it('dispatch() is a no-op when the hit node is not a member of the selection', () => {
+    const scene = new THREE.Scene();
+    const meshA = makeMesh(scene, 'a', { value: 1 });
+    const meshB = makeMesh(scene, 'b', { value: 2 });
+    const selection = new Selection({ type: 'meshes', meshes: [meshA] });
+    const handler = vi.fn();
+    selection.on('click', handler);
+
+    Selection.dispatch('click', { mesh: meshB.three, instanceIndex: null, datum: { value: 2 }, worldPoint: new THREE.Vector3(), domEvent: {} });
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('dispatch() only fires handlers registered for the matching event name', () => {
+    const scene = new THREE.Scene();
+    const mesh = makeMesh(scene, 'a', { value: 1 });
+    const selection = new Selection({ type: 'meshes', meshes: [mesh] });
+    const clickHandler = vi.fn();
+    const hoverHandler = vi.fn();
+    selection.on('click', clickHandler);
+    selection.on('hover-enter', hoverHandler);
+
+    Selection.dispatch('hover-enter', { mesh: mesh.three, instanceIndex: null, datum: { value: 1 }, worldPoint: new THREE.Vector3(), domEvent: {} });
+    expect(hoverHandler).toHaveBeenCalledTimes(1);
+    expect(clickHandler).not.toHaveBeenCalled();
+  });
+
+  it('filtering a selection scopes its handlers to only the filtered members', () => {
+    const scene = new THREE.Scene();
+    const meshA = makeMesh(scene, 'a', { value: 1 });
+    const meshB = makeMesh(scene, 'b', { value: 91 });
+    const selection = new Selection({ type: 'meshes', meshes: [meshA, meshB] });
+    const filtered = selection.filter((d) => d.value > 90);
+    const handler = vi.fn();
+    filtered.on('click', handler);
+
+    Selection.dispatch('click', { mesh: meshA.three, instanceIndex: null, datum: { value: 1 }, worldPoint: new THREE.Vector3(), domEvent: {} });
+    expect(handler).not.toHaveBeenCalled();
+
+    Selection.dispatch('click', { mesh: meshB.three, instanceIndex: null, datum: { value: 91 }, worldPoint: new THREE.Vector3(), domEvent: {} });
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  it('filtering an instanced-backend selection scopes its handlers to only the filtered members (Prompt 158)', () => {
+    const scene = new THREE.Scene();
+    const object = makeInstanced(scene);
+    object.setInstanceUserData(0, { value: 1 }).setInstanceUserData(1, { value: 91 }).setInstanceUserData(2, { value: 2 });
+    const selection = new Selection({ type: 'instanced', object, indices: Uint32Array.from([0, 1, 2]) });
+    const filtered = selection.filter((d) => d.value > 90);
+    const handler = vi.fn();
+    filtered.on('click', handler);
+
+    // Instance 0 (value 1) isn't in the filtered set — dispatch for it must not fire.
+    Selection.dispatch('click', { mesh: object.three, instanceIndex: 0, datum: { value: 1 }, worldPoint: new THREE.Vector3(), domEvent: {} });
+    expect(handler).not.toHaveBeenCalled();
+
+    // Instance 1 (value 91) is the only filtered-in member.
+    Selection.dispatch('click', { mesh: object.three, instanceIndex: 1, datum: { value: 91 }, worldPoint: new THREE.Vector3(), domEvent: {} });
+    expect(handler).toHaveBeenCalledTimes(1);
+
+    // Instance 2 (value 2) is bound but filtered out too.
+    Selection.dispatch('click', { mesh: object.three, instanceIndex: 2, datum: { value: 2 }, worldPoint: new THREE.Vector3(), domEvent: {} });
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  it('accumulates multiple handlers for the same event, called in registration order', () => {
+    const scene = new THREE.Scene();
+    const mesh = makeMesh(scene, 'a', { value: 1 });
+    const selection = new Selection({ type: 'meshes', meshes: [mesh] });
+    const order = [];
+    selection.on('click', () => order.push(1));
+    selection.on('click', () => order.push(2));
+
+    Selection.dispatch('click', { mesh: mesh.three, instanceIndex: null, datum: { value: 1 }, worldPoint: new THREE.Vector3(), domEvent: {} });
+    expect(order).toEqual([1, 2]);
+  });
+
+  it('dispose() deregisters the selection — its handlers stop firing afterward', () => {
+    const scene = new THREE.Scene();
+    const mesh = makeMesh(scene, 'a', { value: 1 });
+    const selection = new Selection({ type: 'meshes', meshes: [mesh] });
+    const handler = vi.fn();
+    selection.on('click', handler);
+    selection.dispose();
+
+    Selection.dispatch('click', { mesh: mesh.three, instanceIndex: null, datum: { value: 1 }, worldPoint: new THREE.Vector3(), domEvent: {} });
+    expect(handler).not.toHaveBeenCalled();
   });
 });

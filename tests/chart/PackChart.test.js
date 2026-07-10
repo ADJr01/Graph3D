@@ -151,6 +151,46 @@ describe('PackChart', () => {
     });
   });
 
+  describe('.opacity()/.visible()/.size() (Prompt 141)', () => {
+    it('applies per-datum opacity and visibility', () => {
+      const scene = makeScene();
+      const root = { name: 'root', children: [{ name: 'a', value: 1 }] };
+      const chart = new PackChart(scene)
+        .data(root)
+        .opacity((d) => (d.depth === 0 ? 1 : 0.5))
+        .visible((d) => d.depth === 0);
+      chart.render();
+
+      const meshes = scene.children.filter((c) => !c.isLine2);
+      const rootMesh = meshes.find((m) => m.userData.graph3d.datum.data === root);
+      const childMesh = meshes.find((m) => m.userData.graph3d.datum.data === root.children[0]);
+
+      expect(rootMesh.material.opacity).toBeCloseTo(1);
+      expect(childMesh.material.opacity).toBeCloseTo(0.5);
+      expect(rootMesh.visible).toBe(true);
+      expect(childMesh.visible).toBe(false);
+    });
+
+    it('.size(fn) multiplies the packed base radius uniformly on all 3 axes', () => {
+      const scene = makeScene();
+      const makeRoot = () => ({ name: 'root', children: [{ name: 'a', value: 1 }] });
+
+      const base = new PackChart(scene).data(makeRoot());
+      base.render();
+      const baseMesh = scene.children.find((c) => c.userData.graph3d.datum.depth === 1);
+      const baseScale = baseMesh.scale.x;
+      base.destroy();
+
+      const sized = new PackChart(scene).data(makeRoot()).size(() => 2);
+      sized.render();
+      const sizedMesh = scene.children.find((c) => c.userData.graph3d.datum.depth === 1);
+
+      expect(sizedMesh.scale.x).toBeCloseTo(baseScale * 2);
+      expect(sizedMesh.scale.y).toBeCloseTo(sizedMesh.scale.x);
+      expect(sizedMesh.scale.z).toBeCloseTo(sizedMesh.scale.x);
+    });
+  });
+
   describe('destroy()', () => {
     it('disposes every node object and is idempotent', () => {
       const scene = makeScene();

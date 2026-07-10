@@ -16,7 +16,14 @@ describe('annotation.callout', () => {
 
     expect(c.type).toBe('callout');
     expect(c.line.getPosition()).toEqual(new THREE.Vector3(0, 2.5, 0));
-    expect(c.label).toEqual({ type: 'label', text: 'Peak: 5', position: { x: 0, y: 5, z: 0 }, style: {} });
+    expect(c.label).toEqual({
+      type: 'label',
+      text: 'Peak: 5',
+      position: { x: 0, y: 5, z: 0 },
+      style: {},
+      on: expect.any(Function),
+      emit: expect.any(Function),
+    });
     expect(scene.children).toContain(c.line.three);
   });
 

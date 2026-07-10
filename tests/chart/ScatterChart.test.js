@@ -115,6 +115,39 @@ describe('ScatterChart', () => {
     });
   });
 
+  describe('.visible(valueOrFn) (Prompt 141)', () => {
+    it('applies a per-datum visibility accessor', () => {
+      const scene = makeScene();
+      const chart = new ScatterChart(scene).y(() => 0).visible((d) => d.v);
+      chart.data([{ v: false }, { v: true }]);
+      chart.render();
+
+      expect(scene.children[0].visible).toBe(false);
+      expect(scene.children[1].visible).toBe(true);
+    });
+
+    it('leaves visibility untouched (true) when never called', () => {
+      const scene = makeScene();
+      const chart = new ScatterChart(scene);
+      chart.data([1, 2]);
+      chart.render();
+      expect(scene.children[0].visible).toBe(true);
+    });
+  });
+
+  describe('.legend(options) (Prompt 143)', () => {
+    it('renders into the configured container on render()', () => {
+      const scene = makeScene();
+      const container = document.createElement('div');
+      const chart = new ScatterChart(scene).y(() => 0).color((d) => d.v).legend({ container });
+      chart.data([{ v: 1 }, { v: 9 }]);
+      chart.render();
+
+      expect(container.childNodes.length).toBe(1);
+      expect(container.textContent).toContain('9');
+    });
+  });
+
   describe('.pick(raycaster) — meshes backend', () => {
     it('returns the datum hit by the ray, or null on a miss', () => {
       const scene = makeScene();

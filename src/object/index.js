@@ -5,3 +5,6 @@ export { GraphLine } from './GraphLine.js';
 export { GraphObjectFactory, INSTANCING_THRESHOLD } from './GraphObjectFactory.js';
 export { GraphObjectLoader } from './GraphObjectLoader.js';
 export { Octree } from './Octree.js';
+export { assignDepthJitter } from './depthOffset.js';
+export { validateGeometry } from './validateGeometry.js';
+export { recomputeNormals, fixWinding } from './normals.js';

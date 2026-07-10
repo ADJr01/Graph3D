@@ -757,6 +757,45 @@ describe('GraphInstancedObject.pick', () => {
   });
 });
 
+describe('GraphInstancedObject.pickDetailed', () => {
+  function makePickable(count = 3) {
+    const obj = makeInstanced({ count });
+    for (let i = 0; i < count; i++) {
+      obj.setInstanceMatrix(i, new THREE.Matrix4().makeTranslation(i * 3, 0, 0));
+    }
+    obj.commitMatrix();
+    return obj;
+  }
+
+  it('returns the same instance index as pick(), plus a world-space point and distance', () => {
+    const obj = makePickable();
+    const raycaster = new THREE.Raycaster();
+    raycaster.set(new THREE.Vector3(3, 0, 5), new THREE.Vector3(0, 0, -1));
+
+    const detailed = obj.pickDetailed(raycaster);
+    expect(detailed.instanceIndex).toBe(1);
+    expect(detailed.instanceIndex).toBe(obj.pick(raycaster));
+    // BoxGeometry() is a 1x1x1 unit cube centered on the instance's own
+    // translation, so a ray straight down -z hits its front face at z=0.5.
+    expect(detailed.point.x).toBeCloseTo(3);
+    expect(detailed.point.y).toBeCloseTo(0);
+    expect(detailed.point.z).toBeCloseTo(0.5);
+    expect(detailed.distance).toBeCloseTo(4.5);
+  });
+
+  it('returns null on a miss', () => {
+    const obj = makePickable();
+    const raycaster = new THREE.Raycaster();
+    raycaster.set(new THREE.Vector3(1000, 1000, 1000), new THREE.Vector3(0, 0, -1));
+    expect(obj.pickDetailed(raycaster)).toBeNull();
+  });
+
+  it('throws TypeError for a non-Raycaster', () => {
+    const obj = makeInstanced();
+    expect(() => obj.pickDetailed({})).toThrow(TypeError);
+  });
+});
+
 // ── Frustum culling ──────────────────────────────────────────────────────────
 
 describe('GraphInstancedObject frustum culling', () => {
@@ -1115,6 +1154,7 @@ describe('GraphInstancedObject disposal', () => {
     expect(() => obj.commitColor()).toThrow(pattern);
     expect(() => obj.commitAttribute('pulsePhase')).toThrow(pattern);
     expect(() => obj.pick(new THREE.Raycaster())).toThrow(pattern);
+    expect(() => obj.pickDetailed(new THREE.Raycaster())).toThrow(pattern);
     expect(() => obj.enableInstanceCulling({ camera: makeCamera() })).toThrow(pattern);
     expect(() => obj.disableInstanceCulling()).toThrow(pattern);
     expect(() => obj.updateCulling()).toThrow(pattern);

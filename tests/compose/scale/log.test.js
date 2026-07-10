@@ -62,6 +62,11 @@ describe('scale.log', () => {
       const s = scale.log().domain([-1000, -1]);
       expect(s.ticks(2)).toEqual([-1000, -100, -10, -1]);
     });
+
+    it('falls back to ordinary linear ticks when a narrow domain produces too few digit ticks', () => {
+      const s = scale.log().domain([2, 3]);
+      expect(s.ticks()).toEqual([2, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3]);
+    });
   });
 
   describe('tickFormat', () => {
@@ -73,10 +78,24 @@ describe('scale.log', () => {
       expect(f(5)).toBe('');
     });
 
-    it('labels every tick plainly when a non-fixed specifier is given', () => {
-      const s = scale.log().domain([2, 8]);
+    it('formats power-of-base ticks with an SI prefix when the specifier is "s"', () => {
+      const s = scale.log().domain([1, 1e6]);
       const f = s.tickFormat(10, 's');
-      expect(f(3)).toBe('3');
+      expect(f(1)).toBe('1');
+      expect(f(1000)).toBe('1k');
+      expect(f(1000000)).toBe('1M');
+      expect(f(500)).toBe(''); // not a power of the base — still blanked, like the 'f' formatter
+    });
+
+    it('supports an explicit precision in the specifier, e.g. ".1s"', () => {
+      const s = scale.log(2).domain([1, 1024]);
+      const f = s.tickFormat(10, '.1s');
+      expect(f(1024)).toBe('1.0k');
+    });
+
+    it('throws TypeError for an unsupported specifier', () => {
+      const s = scale.log().domain([1, 1000]);
+      expect(() => s.tickFormat(10, 'garbage')).toThrow(TypeError);
     });
   });
 });

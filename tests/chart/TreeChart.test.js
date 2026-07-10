@@ -161,6 +161,55 @@ describe('TreeChart', () => {
     });
   });
 
+  describe('.opacity()/.visible()/.size() (Prompt 141)', () => {
+    it('applies per-datum opacity and visibility', () => {
+      const scene = makeScene();
+      const root = { name: 'root', children: [{ name: 'a', value: 1 }] };
+      const chart = new TreeChart(scene)
+        .data(root)
+        .opacity((d) => (d.depth === 0 ? 1 : 0.5))
+        .visible((d) => d.depth === 0);
+      chart.render();
+
+      const meshes = scene.children.filter((c) => !c.isLine2);
+      const rootMesh = meshes.find((m) => m.userData.graph3d.datum.data === root);
+      const childMesh = meshes.find((m) => m.userData.graph3d.datum.data === root.children[0]);
+
+      expect(rootMesh.material.opacity).toBeCloseTo(1);
+      expect(childMesh.material.opacity).toBeCloseTo(0.5);
+      expect(rootMesh.visible).toBe(true);
+      expect(childMesh.visible).toBe(false);
+    });
+
+    it('.size(fn) multiplies the .r-driven base radius uniformly on all 3 axes', () => {
+      const scene = makeScene();
+      const makeRoot = () => ({ name: 'root', children: [{ name: 'a', value: 1 }] });
+
+      const base = new TreeChart(scene).data(makeRoot());
+      base.render();
+      const baseMesh = scene.children.find((c) => !c.isLine2 && c.userData.graph3d.datum.depth === 1);
+      const baseScale = baseMesh.scale.x;
+      base.destroy();
+
+      const sized = new TreeChart(scene).data(makeRoot()).size(() => 2);
+      sized.render();
+      const sizedMesh = scene.children.find((c) => !c.isLine2 && c.userData.graph3d.datum.depth === 1);
+
+      expect(sizedMesh.scale.x).toBeCloseTo(baseScale * 2);
+      expect(sizedMesh.scale.y).toBeCloseTo(sizedMesh.scale.x);
+      expect(sizedMesh.scale.z).toBeCloseTo(sizedMesh.scale.x);
+    });
+
+    it('leaves opacity/visible/size untouched when never called', () => {
+      const scene = makeScene();
+      const chart = new TreeChart(scene).data({ name: 'root' });
+      chart.render();
+      const mesh = scene.children.find((c) => !c.isLine2);
+      expect(mesh.material.opacity).toBe(1);
+      expect(mesh.visible).toBe(true);
+    });
+  });
+
   describe('destroy()', () => {
     it('disposes every node/edge object and is idempotent', () => {
       const scene = makeScene();

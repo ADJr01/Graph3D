@@ -469,6 +469,8 @@ describe('Graph3D pause / resume', () => {
 // ── chart() ───────────────────────────────────────────────────────────────────
 
 describe('Graph3D.chart()', () => {
+  const REGISTERED_TYPES = ['bar', 'line', 'scatter', 'area', 'surface', 'heatmap', 'network', 'tree', 'pack', 'pie', 'volume'];
+
   it('throws TypeError on empty string typeName', () => {
     const g = new Graph3D({ canvas: makeCanvas() });
     expect(() => g.chart('')).toThrow(TypeError);
@@ -481,15 +483,41 @@ describe('Graph3D.chart()', () => {
     expect(() => g.chart(42)).toThrow(TypeError);
   });
 
-  it('throws Error for a valid-but-unregistered chart type', () => {
+  it('throws when no active scene exists yet', () => {
     const g = new Graph3D({ canvas: makeCanvas() });
-    expect(() => g.chart('bar')).toThrow(/unknown chart type 'bar'/);
-    expect(() => g.chart('scatter')).toThrow(/unknown chart type 'scatter'/);
+    expect(() => g.chart('bar')).toThrow(/no active scene/);
+    expect(() => g.chart('bar')).toThrow(/setActiveScene/);
   });
 
-  it('error message includes "none registered yet" when the registry is empty', () => {
+  it('throws when no active scene exists, even for a completely unknown typeName', () => {
+    // The active-scene check runs before the registry lookup — this is
+    // deliberately not a "which error wins" ambiguity.
     const g = new Graph3D({ canvas: makeCanvas() });
-    expect(() => g.chart('bar')).toThrow(/none registered yet/);
+    expect(() => g.chart('nonexistent')).toThrow(/no active scene/);
+  });
+
+  it.each(REGISTERED_TYPES)('returns a working %s chart bound to the active scene', (typeName) => {
+    const g = new Graph3D({ canvas: makeCanvas() });
+    const scene = g.createScene('main');
+    g.setActiveScene(scene);
+    const chart = g.chart(typeName);
+    expect(chart.scene).toBe(scene.three);
+  });
+
+  it('throws Error for an unregistered chart type, listing every registered type when nothing close matches', () => {
+    const g = new Graph3D({ canvas: makeCanvas() });
+    g.setActiveScene(g.createScene('main'));
+    expect(() => g.chart('zzzzznope')).toThrow(/unknown chart type 'zzzzznope'/);
+    expect(() => g.chart('zzzzznope')).toThrow(/Expected one of: bar, line, scatter/);
+    expect(() => g.chart('zzzzznope')).not.toThrow(/Did you mean/);
+  });
+
+  it('suggests the closest registered type name for a near-miss typo (Levenshtein distance)', () => {
+    const g = new Graph3D({ canvas: makeCanvas() });
+    g.setActiveScene(g.createScene('main'));
+    expect(() => g.chart('baar')).toThrow(/Did you mean 'bar'\?/);
+    expect(() => g.chart('lin')).toThrow(/Did you mean 'line'\?/);
+    expect(() => g.chart('piee')).toThrow(/Did you mean 'pie'\?/);
   });
 
   it('throws after dispose()', () => {

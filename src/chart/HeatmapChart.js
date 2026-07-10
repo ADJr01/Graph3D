@@ -2,6 +2,9 @@ import { generator } from '../compose/index.js';
 import { GraphChart } from './GraphChart.js';
 import { applyColorField } from './colorField.js';
 import { applyOpacityField } from './opacityField.js';
+import { applyVisibleField } from './visibleField.js';
+import { applySizeField } from './sizeField.js';
+import { applyLegend } from './legendField.js';
 
 const PLANE_THICKNESS = 0.1;
 const VALID_MODES = new Set(['plane', 'voxel']);
@@ -122,9 +125,17 @@ export class HeatmapChart extends GraphChart {
     return rawCompute(data);
   }
 
-  /** Shared by `render()`/`update()` (CLAUDE.md §1.1 DRY two-strike rule). */
+  /**
+   * Shared by `render()`/`update()` (CLAUDE.md §1.1 DRY two-strike rule).
+   * `.size()` (Prompt 141) multiplies each tile's `x`/`z` footprint only —
+   * `y` stays whatever `.mode()` computed (a thin plane constant, or the
+   * real cube height in `'voxel'` mode), never touched by `.size()`.
+   */
   #applyPostAttributes() {
     applyColorField(this, this.data());
     applyOpacityField(this);
+    applyVisibleField(this);
+    applySizeField(this, ['x', 'z']);
+    applyLegend(this);
   }
 }

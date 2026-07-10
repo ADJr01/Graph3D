@@ -13,7 +13,7 @@ const SI_PREFIXES = [
   { exp: 12, symbol: 'T' },
 ];
 
-function siPrefixFor(value) {
+export function siPrefixFor(value) {
   if (value === 0) return SI_PREFIXES[3];
   const rawExp = Math.floor(Math.log10(Math.abs(value)) / 3) * 3;
   const clampedExp = Math.max(
@@ -24,18 +24,18 @@ function siPrefixFor(value) {
 }
 
 /** Decimal digits needed so steps of size `step` are distinguishable — d3-format's `precisionFixed`. */
-function precisionFixed(step) {
+export function precisionFixed(step) {
   if (step === 0) return 0;
   return Math.max(0, -Math.floor(Math.log10(Math.abs(step)) + 1e-12));
 }
 
 /** `toFixed`, with the "-0.00" gotcha (small negatives rounding to zero) trimmed. */
-function formatFixed(value, precision) {
+export function formatFixed(value, precision) {
   const formatted = value.toFixed(precision);
   return /^-0(\.0+)?$/.test(formatted) ? formatted.slice(1) : formatted;
 }
 
-function parseSpecifier(specifier) {
+export function parseSpecifier(specifier) {
   if (specifier == null || specifier === '') return { type: 'f', precision: null };
   const match = /^(?:\.(\d+))?(f|s)$/.exec(specifier);
   if (!match) {

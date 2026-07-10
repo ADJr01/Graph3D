@@ -200,6 +200,51 @@ describe('NetworkChart', () => {
     });
   });
 
+  describe('.opacity()/.visible()/.size() (Prompt 141)', () => {
+    it('applies per-datum opacity, visibility, and a uniform size multiplier on the node spheres', () => {
+      const scene = makeScene();
+      const nodes = [{ id: 0, weight: 1 }, { id: 1, weight: 3 }];
+      const chart = new NetworkChart(scene)
+        .data(nodes)
+        .opacity((d) => d.weight / 3)
+        .visible((d) => d.id === 0)
+        .size((d) => d.weight);
+      chart.render();
+
+      const meshes = scene.children.filter((c) => !c.isLine2);
+      expect(meshes[0].material.opacity).toBeCloseTo(1 / 3);
+      expect(meshes[1].material.opacity).toBeCloseTo(1);
+      expect(meshes[0].visible).toBe(true);
+      expect(meshes[1].visible).toBe(false);
+      // Base node scale is always 1 (NetworkChart never calls setScale itself).
+      expect(meshes[0].scale.x).toBeCloseTo(1);
+      expect(meshes[1].scale.x).toBeCloseTo(3);
+    });
+
+    it('leaves opacity/visible/size untouched when never called', () => {
+      const scene = makeScene();
+      const chart = new NetworkChart(scene).data([{ id: 0 }]);
+      chart.render();
+      const mesh = scene.children.find((c) => !c.isLine2);
+      expect(mesh.material.opacity).toBe(1);
+      expect(mesh.visible).toBe(true);
+      expect(mesh.scale.x).toBeCloseTo(1);
+    });
+  });
+
+  describe('.legend(options) (Prompt 143)', () => {
+    it('renders into the configured container on render()', () => {
+      const scene = makeScene();
+      const container = document.createElement('div');
+      const nodes = [{ id: 0, weight: 1 }, { id: 1, weight: 9 }];
+      const chart = new NetworkChart(scene).data(nodes).color((d) => d.weight).legend({ container });
+      chart.render();
+
+      expect(container.childNodes.length).toBe(1);
+      expect(container.textContent).toContain('9');
+    });
+  });
+
   describe('destroy()', () => {
     it('disposes every node/edge object and is idempotent', () => {
       const scene = makeScene();

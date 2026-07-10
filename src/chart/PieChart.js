@@ -2,7 +2,11 @@ import { layout, generator, Selection } from '../compose/index.js';
 import { GraphChart } from './GraphChart.js';
 import { GraphObjectFactory } from '../object/index.js';
 import { applyColorField } from './colorField.js';
+import { applyOpacityField } from './opacityField.js';
+import { applyVisibleField } from './visibleField.js';
+import { applySizeField } from './sizeField.js';
 import { resolveChartMaterial } from './materialField.js';
+import { applyLegend } from './legendField.js';
 
 const DEFAULT_INNER_RADIUS = 0;
 const DEFAULT_OUTER_RADIUS = 1;
@@ -29,14 +33,21 @@ const DEFAULT_EXPLODE_OFFSET = 0.3;
  * scale (a handful to a few dozen slices); see skipping_list.md's "PieChart's
  * wedges are one GraphMesh per slice" entry.
  *
- * `GraphChart`'s inherited `x()`/`y()`/`z()`/`size()`/`shape()`/`opacity()`/
- * `filter()`/`sort()`/`on()` are inert here (position/angle come from
- * `layout.pie()`/`.value()` instead); `.color()` and `.material()` still
- * work, via the same `applyColorField`/`resolveChartMaterial` helpers every
- * other chart type uses (CLAUDE.md §1.1 DRY) — `.selection()` is overridden
- * to expose a real `Selection` over the per-slice meshes so they have
- * something to write to. `.color()`'s accessor receives each slice's own
- * datum, same as `BarChart`/`ScatterChart`.
+ * `GraphChart`'s inherited `x()`/`y()`/`z()`/`shape()`/`filter()`/`sort()`/
+ * `on()` are inert here (position/angle come from `layout.pie()`/`.value()`
+ * instead); `.color()`/`.opacity()`/`.visible()` still work, via the same
+ * `applyColorField`/`applyOpacityField`/`applyVisibleField`/
+ * `resolveChartMaterial` helpers every other chart type uses (CLAUDE.md
+ * §1.1 DRY) — `.selection()` is overridden to expose a real `Selection`
+ * over the per-slice meshes so they have something to write to. `.color()`'s
+ * accessor receives each slice's own datum, same as `BarChart`/`ScatterChart`.
+ * `.size(fn)` (Prompt 141) multiplies the whole wedge mesh's scale uniformly
+ * around its own local origin (the pie's center) — every slice mesh's base
+ * scale is always `(1,1,1)` (position/shape are already baked into the
+ * wedge's own vertex buffer by `generator.arc()`, not represented via a
+ * scale multiplier the way instanced spheres/boxes are), so `.size()` grows
+ * or shrinks a slice's radius and thickness together, independent of
+ * `.explode()`'s separate position offset.
  *
  * "Explode-on-hover" (the prompt's own wording) isn't wired to real pointer
  * events here — `interact/` (picking, hover state) doesn't exist yet. Instead,
@@ -414,6 +425,10 @@ export class PieChart extends GraphChart {
 
     for (let i = 0; i < this.#data.length; i++) this.#applyExplode(i);
     applyColorField(this, this.#data);
+    applyOpacityField(this);
+    applyVisibleField(this);
+    applySizeField(this); // uniform — scales the whole wedge shape around its own center
+    applyLegend(this);
   }
 
   /**

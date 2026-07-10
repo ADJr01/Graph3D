@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Graph3D — Phase 9 Interaction</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { overflow: hidden; background: #000; font-family: system-ui, sans-serif; }
+      canvas { display: block; }
+
+      .panel {
+        position: fixed;
+        background: rgba(20, 20, 24, 0.75);
+        color: #eee;
+        padding: 12px 14px;
+        border-radius: 8px;
+        font-size: 13px;
+        backdrop-filter: blur(6px);
+      }
+      #controls { top: 12px; left: 12px; max-width: 340px; }
+      #controls h1 { font-size: 15px; margin-bottom: 6px; }
+      #controls p { opacity: 0.7; font-size: 11px; margin-top: 6px; line-height: 1.4; }
+      #controls .row { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+      #controls .label { opacity: 0.6; }
+      #controls button {
+        padding: 6px 10px;
+        font-size: 12px;
+        border-radius: 6px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.08);
+        color: #eee;
+        cursor: pointer;
+      }
+
+      #selected { top: 12px; right: 12px; width: 240px; max-height: 70vh; overflow-y: auto; }
+      #selected h2 { font-size: 13px; margin-bottom: 6px; }
+      #selectedPanel { list-style: none; font-size: 12px; line-height: 1.7; }
+      #selectedPanel .empty { opacity: 0.5; }
+
+      #tooltip {
+        position: fixed;
+        display: none;
+        background: rgba(10, 10, 12, 0.92);
+        color: #fff;
+        padding: 6px 8px;
+        border-radius: 6px;
+        font-size: 12px;
+        line-height: 1.4;
+        white-space: pre-line;
+        pointer-events: none;
+        z-index: 10;
+      }
+
+      #brushRect {
+        position: fixed;
+        display: none;
+        border: 1px solid rgba(102, 204, 255, 0.85);
+        background: rgba(102, 204, 255, 0.15);
+        pointer-events: none;
+        z-index: 5;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="controls" class="panel">
+      <h1>Linked interaction (Prompt 157)</h1>
+      <p>
+        Left: <b>Scatter</b> (price vs. rating) — drag to brush-select a region, filtering the
+        center <b>Bar</b> chart (<code>link()</code>) and the right <b>Pie</b> chart (re-aggregated
+        by category). Click any point/bar/slice to select it (hover for a tooltip).
+      </p>
+      <div class="row">
+        <span class="label">Brushed:</span>
+        <span id="brushedCount"></span>
+        <button id="resetFilter">Reset filter</button>
+      </div>
+    </div>
+
+    <div id="selected" class="panel">
+      <h2>Selected data</h2>
+      <ul id="selectedPanel"></ul>
+    </div>
+
+    <div id="tooltip"></div>
+    <div id="brushRect"></div>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

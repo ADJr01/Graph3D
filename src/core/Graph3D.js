@@ -9,6 +9,66 @@ import { createWorkerFactory } from './worker/workerBlob.js';
 import { GraphScene } from '../scene/index.js';
 // Cross-layer import: same composition-root exception as GraphScene above (CLAUDE.md §1.4).
 import { PostFX } from '../postfx/index.js';
+// Cross-layer import: a third instance of the same composition-root exception
+// (Prompt 140) — Graph3D.chart(typeName) is the one place that legitimately
+// wires every registered chart type to a live instance; chart/ itself never
+// imports back into core/ (only into core/Graph3DLoop.js/GraphDisposal.js,
+// two leaf utility modules), so this doesn't close a cycle.
+import { BarChart, LineChart, ScatterChart, AreaChart, SurfaceChart, HeatmapChart, NetworkChart, TreeChart, PackChart, PieChart, VolumeChart } from '../chart/index.js';
+
+// A suggestion beyond this edit distance is more likely to be noise than a
+// genuine typo (e.g. 'volume' vs 'network' — both valid names, unrelated) —
+// Graph3D.chart() falls back to listing every registered type instead.
+const MAX_SUGGESTION_DISTANCE = 3;
+
+/**
+ * Classic Wagner–Fischer edit distance between two strings — the minimum
+ * number of single-character insertions/deletions/substitutions to turn `a`
+ * into `b`. Used only for `Graph3D.chart()`'s "did you mean" suggestion; not
+ * exported, since chart-type-name typo correction is its only consumer.
+ * @param {string} a
+ * @param {string} b
+ * @returns {number}
+ */
+function levenshteinDistance(a, b) {
+  const rows = a.length + 1;
+  const cols = b.length + 1;
+  const distances = Array.from({ length: rows }, () => new Array(cols).fill(0));
+  for (let i = 0; i < rows; i++) distances[i][0] = i;
+  for (let j = 0; j < cols; j++) distances[0][j] = j;
+
+  for (let i = 1; i < rows; i++) {
+    for (let j = 1; j < cols; j++) {
+      const substitutionCost = a[i - 1] === b[j - 1] ? 0 : 1;
+      distances[i][j] = Math.min(
+        distances[i - 1][j] + 1, // deletion
+        distances[i][j - 1] + 1, // insertion
+        distances[i - 1][j - 1] + substitutionCost, // substitution
+      );
+    }
+  }
+  return distances[rows - 1][cols - 1];
+}
+
+/**
+ * The registered chart type name closest to `typeName` by edit distance, or
+ * `null` if nothing is within `MAX_SUGGESTION_DISTANCE`.
+ * @param {string} typeName
+ * @param {string[]} candidates
+ * @returns {string|null}
+ */
+function closestChartTypeName(typeName, candidates) {
+  let best = null;
+  let bestDistance = Infinity;
+  for (const candidate of candidates) {
+    const distance = levenshteinDistance(typeName, candidate);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = candidate;
+    }
+  }
+  return bestDistance <= MAX_SUGGESTION_DISTANCE ? best : null;
+}
 
 /**
  * @typedef {Object} Graph3DOptions
@@ -33,7 +93,8 @@ import { PostFX } from '../postfx/index.js';
  *
  * @example
  * const g = new Graph3D({ canvas, pixelRatio: 2, hdr: '/env/studio.hdr', theme: 'studio-dark' });
- * g.chart('bar').data(values).render(); // chart types registered in Phase 8
+ * g.setActiveScene(g.createScene('main'));
+ * g.chart('bar').data(values, (d) => d.id).render();
  */
 export class Graph3D {
   /** @type {CapabilityProbe} */
@@ -70,11 +131,23 @@ export class Graph3D {
   #resizeObserver = null;
 
   /**
-   * Chart type registry. Phase 8 populates this map via `Graph3D.#chartTypes.set(name, Cls)`
-   * inside this module when chart types are imported.
-   * @type {Map<string, function(new:*, Graph3D): *>}
+   * Chart type registry (Prompt 140) — every concrete `chart/` class,
+   * keyed by the fluent-API name `.chart(typeName)` dispatches on.
+   * @type {Map<string, function(new:*, object): *>}
    */
-  static #chartTypes = new Map();
+  static #chartTypes = new Map([
+    ['bar', BarChart],
+    ['line', LineChart],
+    ['scatter', ScatterChart],
+    ['area', AreaChart],
+    ['surface', SurfaceChart],
+    ['heatmap', HeatmapChart],
+    ['network', NetworkChart],
+    ['tree', TreeChart],
+    ['pack', PackChart],
+    ['pie', PieChart],
+    ['volume', VolumeChart],
+  ]);
 
   // Stored for higher layers: hdr → GraphSceneEnvironment (Phase 2), theme → material presets (Phase 6).
   /** @type {string|undefined} */
@@ -380,18 +453,22 @@ export class Graph3D {
   }
 
   /**
-   * Entry point to the fluent chart API. Looks up a registered chart type and
-   * returns a new chart builder bound to this instance.
+   * Entry point to the fluent chart API (Prompt 140). Looks up a registered
+   * chart type and returns a new chart instance bound to the active scene's
+   * raw `THREE.Scene` (`setActiveScene()` must be called first — the same
+   * requirement `postfx` already has, for the same reason: there's no scene
+   * to attach anything to otherwise).
    *
-   * Chart types are registered in Phase 8. Calling this before then throws an
-   * informative error rather than silently failing.
-   *
-   * @param {string} typeName - Registered chart type, e.g. `'bar'`, `'scatter'`.
-   * @returns {*} A chart builder (type defined in Phase 8).
+   * @param {'bar'|'line'|'scatter'|'area'|'surface'|'heatmap'|'network'|'tree'|'pack'|'pie'|'volume'} typeName
+   * @returns {import('../chart/index.js').GraphChart} A new, unconfigured chart instance — call its own `.data(...)`/`.render()`, etc.
    * @throws {TypeError} If `typeName` is not a non-empty string.
-   * @throws {Error} If `typeName` is not a registered chart type.
+   * @throws {Error} If no active scene exists (call `setActiveScene()` first).
+   * @throws {Error} If `typeName` is not a registered chart type — the message
+   *   suggests the closest registered name (Levenshtein distance ≤ 3) when one exists.
    * @throws {Error} If called after `dispose()`.
-   * @example g.chart('bar').data(values, d => d.id).render();
+   * @example
+   * g.setActiveScene(g.createScene('main'));
+   * g.chart('bar').data(values, (d) => d.id).x((d) => d.label).y((d) => d.value).render();
    */
   chart(typeName) {
     this.#assertNotDisposed('chart');
@@ -400,15 +477,21 @@ export class Graph3D {
         `Graph3D.chart: typeName must be a non-empty string, received ${JSON.stringify(typeName)}.`,
       );
     }
+    if (!this.#activeScene) {
+      throw new Error(
+        'Graph3D.chart: no active scene. Call setActiveScene() before creating a chart.',
+      );
+    }
     const ChartClass = Graph3D.#chartTypes.get(typeName);
     if (!ChartClass) {
       const registered = [...Graph3D.#chartTypes.keys()];
-      throw new Error(
-        `Graph3D.chart: unknown chart type '${typeName}'. ` +
-          `Expected one of: [${registered.length ? registered.join(', ') : 'none registered yet'}].`,
-      );
+      const suggestion = closestChartTypeName(typeName, registered);
+      const hint = suggestion
+        ? `Did you mean '${suggestion}'?`
+        : `Expected one of: ${registered.join(', ')}.`;
+      throw new Error(`Graph3D.chart: unknown chart type '${typeName}'. ${hint}`);
     }
-    return new ChartClass(this);
+    return new ChartClass(this.#activeScene.three);
   }
 
   // ── Static methods ─────────────────────────────────────────────────────────

@@ -97,6 +97,29 @@ describe('HeatmapChart', () => {
     });
   });
 
+  describe('.visible(valueOrFn)/.size(fn) (Prompt 141)', () => {
+    it('applies per-datum visibility', () => {
+      const scene = makeScene();
+      const chart = new HeatmapChart(scene).x((d) => d.col).z((d) => d.row).visible((d) => d.col === 0);
+      chart.data([{ col: 0, row: 0 }, { col: 1, row: 0 }]);
+      chart.render();
+
+      expect(scene.children[0].visible).toBe(true);
+      expect(scene.children[1].visible).toBe(false);
+    });
+
+    it('.size(fn) multiplies x/z footprint only, leaving y (plane thickness) untouched', () => {
+      const scene = makeScene();
+      const chart = new HeatmapChart(scene).x((d) => d.col).z((d) => d.row).size(() => 2);
+      chart.data([{ col: 0, row: 0 }]);
+      chart.render();
+
+      expect(scene.children[0].scale.x).toBeCloseTo(1.6); // 0.8 default cell size * 2
+      expect(scene.children[0].scale.z).toBeCloseTo(1.6);
+      expect(scene.children[0].scale.y).toBeCloseTo(0.1); // plane thickness, untouched
+    });
+  });
+
   describe('update()', () => {
     it('re-applies color/opacity and reflects new data', () => {
       const scene = makeScene();
@@ -108,6 +131,23 @@ describe('HeatmapChart', () => {
       chart.update();
       expect(chart.data()).toEqual([{ col: 0, row: 0, value: 2 }]);
       expect(scene.children[0].material.opacity).toBeCloseTo(0.5);
+    });
+  });
+
+  describe('.legend(options) (Prompt 143)', () => {
+    it('renders into the configured container on render()', () => {
+      const scene = makeScene();
+      const container = document.createElement('div');
+      const chart = new HeatmapChart(scene)
+        .x((d) => d.col)
+        .z((d) => d.row)
+        .color((d) => d.value)
+        .legend({ container });
+      chart.data([{ col: 0, row: 0, value: 3 }, { col: 1, row: 0, value: 7 }]);
+      chart.render();
+
+      expect(container.childNodes.length).toBe(1);
+      expect(container.textContent).toContain('7');
     });
   });
 });

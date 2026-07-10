@@ -185,6 +185,94 @@ describe('GraphChart', () => {
     });
   });
 
+  describe('legend(options)', () => {
+    it('defaults to null', () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      expect(chart.legend()).toBeNull();
+    });
+
+    it('sets and returns this for chaining', () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      const container = document.createElement('div');
+      expect(chart.legend({ container })).toBe(chart);
+      expect(chart.legend()).toEqual({ container });
+    });
+
+    it('throws if options is not a plain object, or container is not a DOM element', () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      expect(() => chart.legend(null)).toThrow(TypeError);
+      expect(() => chart.legend('nope')).toThrow(TypeError);
+      expect(() => chart.legend({})).toThrow(TypeError);
+      expect(() => chart.legend({ container: 'nope' })).toThrow(TypeError);
+    });
+
+    it('renders immediately when configured after color()/data()', () => {
+      const scene = makeScene();
+      const chart = new GraphChart(scene, generator.bar());
+      const container = document.createElement('div');
+      chart.data([{ v: 1 }, { v: 5 }]);
+      chart.color((d) => d.v);
+
+      chart.legend({ container });
+
+      expect(container.childNodes.length).toBe(1);
+    });
+  });
+
+  describe('tooltip(handlerFn)', () => {
+    it('defaults to null', () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      expect(chart.tooltip()).toBeNull();
+    });
+
+    it('sets and returns this for chaining', () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      const handler = (d) => d.label;
+      expect(chart.tooltip(handler)).toBe(chart);
+      expect(chart.tooltip()).toBe(handler);
+    });
+
+    it('throws if given a non-function', () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      expect(() => chart.tooltip('nope')).toThrow(TypeError);
+    });
+  });
+
+  describe('hoverEffect(presetName, options) / selectEffect(presetName, options)', () => {
+    it('default to null', () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      expect(chart.hoverEffect()).toBeNull();
+      expect(chart.selectEffect()).toBeNull();
+    });
+
+    it('set and return this for chaining, reading back { name, options }', () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      expect(chart.hoverEffect('fire', { intensity: 1.2 })).toBe(chart);
+      expect(chart.hoverEffect()).toEqual({ name: 'fire', options: { intensity: 1.2 } });
+
+      expect(chart.selectEffect('glow', { color: '#22ffcc' })).toBe(chart);
+      expect(chart.selectEffect()).toEqual({ name: 'glow', options: { color: '#22ffcc' } });
+    });
+
+    it('options defaults to {} when omitted', () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      chart.hoverEffect('pulse');
+      expect(chart.hoverEffect()).toEqual({ name: 'pulse', options: {} });
+    });
+
+    it('throws with a "did you mean" suggestion for an unregistered preset name', () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      expect(() => chart.hoverEffect('galow')).toThrow(/did you mean 'glow'/i);
+      expect(() => chart.selectEffect('nonexistent-effect')).toThrow(/Unknown effect/);
+    });
+
+    it('throws TypeError if options is given and is not a plain object', () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      expect(() => chart.hoverEffect('glow', 'nope')).toThrow(TypeError);
+      expect(() => chart.selectEffect('glow', 42)).toThrow(TypeError);
+    });
+  });
+
   describe('filter(predicateFn) / sort(compareFn)', () => {
     it('default to null', () => {
       const chart = new GraphChart(makeScene(), makeGenerator());
@@ -206,6 +294,29 @@ describe('GraphChart', () => {
       const chart = new GraphChart(makeScene(), makeGenerator());
       expect(() => chart.filter('nope')).toThrow(TypeError);
       expect(() => chart.sort('nope')).toThrow(TypeError);
+    });
+  });
+
+  describe('use(middlewareFn)', () => {
+    it('returns this for chaining, and throws for a non-function', () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      expect(chart.use((data) => data)).toBe(chart);
+      expect(() => chart.use('nope')).toThrow(TypeError);
+    });
+
+    it('runs registered middleware in order, between filter() and sort()', () => {
+      const scene = makeScene();
+      const chart = new GraphChart(scene, generator.bar());
+      chart.data([1, 2, 3, 4, 5]);
+      chart
+        .filter((d) => d > 1)
+        .use((data) => data.map((d) => d * 10))
+        .use((data) => data.filter((d) => d !== 30))
+        .sort((a, b) => b - a);
+
+      chart.render();
+
+      expect(chart.selection().data()).toEqual([50, 40, 20]);
     });
   });
 
@@ -239,6 +350,140 @@ describe('GraphChart', () => {
     });
   });
 
+  describe('exitAnimation(name, options) (Prompt 122)', () => {
+    function makeSystem() {
+      return { preset: vi.fn() };
+    }
+
+    it('defaults to null', () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      expect(chart.exitAnimation()).toBeNull();
+    });
+
+    it('sets name/options, returns this for chaining', () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      const system = makeSystem();
+      expect(chart.exitAnimation('dissolve', { system })).toBe(chart);
+      expect(chart.exitAnimation()).toEqual({ name: 'dissolve', options: { system } });
+    });
+
+    it('throws for a non-string or empty name', () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      const system = makeSystem();
+      expect(() => chart.exitAnimation(42, { system })).toThrow(TypeError);
+      expect(() => chart.exitAnimation('', { system })).toThrow(TypeError);
+    });
+
+    it('throws when options.system is missing or lacks preset()', () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      expect(() => chart.exitAnimation('dissolve')).toThrow(TypeError);
+      expect(() => chart.exitAnimation('dissolve', { system: {} })).toThrow(TypeError);
+    });
+  });
+
+  describe('draggable(value)', () => {
+    it('defaults to false', () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      expect(chart.draggable()).toBe(false);
+    });
+
+    it('sets the value, returns this for chaining', () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      expect(chart.draggable(true)).toBe(chart);
+      expect(chart.draggable()).toBe(true);
+    });
+
+    it('throws for a non-boolean value', () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      expect(() => chart.draggable('yes')).toThrow(TypeError);
+    });
+  });
+
+  describe('pickingEnabled(value) (Prompt 156)', () => {
+    it('defaults to true', () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      expect(chart.pickingEnabled()).toBe(true);
+    });
+
+    it('sets the value, returns this for chaining', () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      expect(chart.pickingEnabled(false)).toBe(chart);
+      expect(chart.pickingEnabled()).toBe(false);
+    });
+
+    it('throws for a non-boolean value', () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      expect(() => chart.pickingEnabled('nope')).toThrow(TypeError);
+    });
+  });
+
+  describe('exportSelection(selectedData) / importSelection(keys) (Prompt 155)', () => {
+    it('exports the keyFn-derived key for each selected datum', () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      const rows = [{ id: 'a', value: 1 }, { id: 'b', value: 2 }, { id: 'c', value: 3 }];
+      chart.data(rows, (d) => d.id);
+
+      expect(chart.exportSelection([rows[0], rows[2]])).toEqual(['a', 'c']);
+    });
+
+    it('falls back to the datum itself as its own key when no keyFn was given', () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      const rows = [{ id: 'a' }, { id: 'b' }];
+      chart.data(rows);
+
+      expect(chart.exportSelection([rows[1]])).toEqual([rows[1]]);
+    });
+
+    it('importSelection resolves keys back to the current data() entries', () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      const rows = [{ id: 'a', value: 1 }, { id: 'b', value: 2 }, { id: 'c', value: 3 }];
+      chart.data(rows, (d) => d.id);
+
+      expect(chart.importSelection(['a', 'c'])).toEqual([rows[0], rows[2]]);
+    });
+
+    it('round-trips a selection through a data() reload with new object instances', () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      const rows = [{ id: 'a', value: 1 }, { id: 'b', value: 2 }];
+      chart.data(rows, (d) => d.id);
+      const keys = chart.exportSelection([rows[1]]);
+
+      // Fresh object instances, same ids — the object-identity-based
+      // selection this survives is exactly why exportSelection()/
+      // importSelection() exist (see GraphChart.js's doc comment).
+      const reloadedRows = [{ id: 'a', value: 10 }, { id: 'b', value: 20 }];
+      chart.data(reloadedRows, (d) => d.id);
+
+      expect(chart.importSelection(keys)).toEqual([reloadedRows[1]]);
+    });
+
+    it('importSelection ignores keys with no current match', () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      const rows = [{ id: 'a' }];
+      chart.data(rows, (d) => d.id);
+
+      expect(chart.importSelection(['a', 'nonexistent'])).toEqual([rows[0]]);
+    });
+
+    it('exportSelection throws for a non-array argument', () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      chart.data([{ id: 'a' }], (d) => d.id);
+      expect(() => chart.exportSelection('nope')).toThrow(TypeError);
+    });
+
+    it('importSelection throws for a non-array argument', () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      chart.data([{ id: 'a' }], (d) => d.id);
+      expect(() => chart.importSelection('nope')).toThrow(TypeError);
+    });
+
+    it('both throw a clear error when data() was never called', () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      expect(() => chart.exportSelection([])).toThrow(/data\(arr\)/);
+      expect(() => chart.importSelection([])).toThrow(/data\(arr\)/);
+    });
+  });
+
   describe('on(event, handler) / handlers()', () => {
     it('starts with empty handler lists for enter/update/exit', () => {
       const chart = new GraphChart(makeScene(), makeGenerator());
@@ -260,6 +505,62 @@ describe('GraphChart', () => {
     it('throws if handler is not a function', () => {
       const chart = new GraphChart(makeScene(), makeGenerator());
       expect(() => chart.on('enter', 'nope')).toThrow(TypeError);
+    });
+  });
+
+  describe('on(event, handler) / dispatch(event, payload) — interaction events (Prompt 156)', () => {
+    const INTERACTION_EVENTS = ['hover', 'select', 'deselect', 'brushStart', 'brushEnd', 'lassoStart', 'lassoEnd', 'dragStart', 'dragEnd', 'focus'];
+
+    it.each(INTERACTION_EVENTS)('registers and dispatches a handler for %s, returning this both times', (event) => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      const handler = vi.fn();
+      const payload = { some: 'payload' };
+      expect(chart.on(event, handler)).toBe(chart);
+      expect(chart.dispatch(event, payload)).toBe(chart);
+      expect(handler).toHaveBeenCalledTimes(1);
+      expect(handler).toHaveBeenCalledWith(payload);
+    });
+
+    it('calls multiple handlers for the same event in registration order', () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      const calls = [];
+      chart.on('select', () => calls.push('first'));
+      chart.on('select', () => calls.push('second'));
+      chart.dispatch('select', {});
+      expect(calls).toEqual(['first', 'second']);
+    });
+
+    it('does not cross-fire between different interaction events', () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      const selectHandler = vi.fn();
+      const deselectHandler = vi.fn();
+      chart.on('select', selectHandler).on('deselect', deselectHandler);
+      chart.dispatch('select', {});
+      expect(selectHandler).toHaveBeenCalledOnce();
+      expect(deselectHandler).not.toHaveBeenCalled();
+    });
+
+    it('dispatch is a no-op (no throw) when no handler is registered', () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      expect(() => chart.dispatch('hover', {})).not.toThrow();
+    });
+
+    it('dispatch throws TypeError for a lifecycle event — enter/update/exit only dispatch via update()', () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      expect(() => chart.dispatch('enter', {})).toThrow(TypeError);
+      expect(() => chart.dispatch('update', {})).toThrow(TypeError);
+      expect(() => chart.dispatch('exit', {})).toThrow(TypeError);
+    });
+
+    it('dispatch throws TypeError for an unrecognized event', () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      expect(() => chart.dispatch('click', {})).toThrow(TypeError);
+    });
+
+    it("interaction handlers don't appear in handlers()'s lifecycle-only shape", () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      chart.on('select', vi.fn());
+      expect(chart.handlers()).toEqual({ enter: [], update: [], exit: [] });
     });
   });
 
@@ -491,6 +792,25 @@ describe('GraphChart', () => {
       expect(scene.children.includes(departing)).toBe(false);
     });
 
+    it('removes exiting members immediately via the configured exitAnimation, instead of the dissolve transition', () => {
+      const scene = makeScene();
+      const chart = new GraphChart(scene, generator.bar());
+      chart.data([1, 2, 3]);
+      chart.render();
+      const departing = scene.children[2];
+      const system = { preset: vi.fn() };
+      chart.exitAnimation('dissolve', { system });
+
+      chart.data([1, 2]);
+      chart.update();
+
+      // No RAF tick needed — removal (and the particle burst) happen synchronously.
+      expect(chart.selection().size()).toBe(2);
+      expect(scene.children.includes(departing)).toBe(false);
+      expect(system.preset).toHaveBeenCalledTimes(1);
+      expect(system.preset).toHaveBeenCalledWith('dissolve', { mesh: departing });
+    });
+
     it('calls registered onUpdate/onEnter handlers instead of the default write, when set', () => {
       const scene = makeScene();
       const chart = new GraphChart(scene, generator.bar());
@@ -586,6 +906,22 @@ describe('GraphChart', () => {
       }).not.toThrow();
     });
 
+    it('clears a configured legend container', () => {
+      const scene = makeScene();
+      const chart = new GraphChart(scene, generator.bar());
+      const container = document.createElement('div');
+      chart.data([{ v: 1 }]);
+      chart.y((d) => d.v);
+      chart.color((d) => d.v);
+      chart.legend({ container });
+      chart.render();
+      expect(container.childNodes.length).toBeGreaterThan(0);
+
+      chart.destroy();
+
+      expect(container.childNodes.length).toBe(0);
+    });
+
     it('is safe to call before render() was ever invoked', () => {
       const chart = new GraphChart(makeScene(), generator.bar());
       expect(() => chart.destroy()).not.toThrow();
@@ -637,9 +973,17 @@ describe('GraphChart', () => {
       expect(() => chart.size(1)).toThrow(pattern);
       expect(() => chart.shape('sphere')).toThrow(pattern);
       expect(() => chart.material('standard')).toThrow(pattern);
+      expect(() => chart.legend({ container: document.createElement('div') })).toThrow(pattern);
+      expect(() => chart.tooltip(() => {})).toThrow(pattern);
+      expect(() => chart.hoverEffect('glow')).toThrow(pattern);
+      expect(() => chart.selectEffect('glow')).toThrow(pattern);
       expect(() => chart.filter(() => true)).toThrow(pattern);
       expect(() => chart.sort(() => 0)).toThrow(pattern);
+      expect(() => chart.use((data) => data)).toThrow(pattern);
       expect(() => chart.transition(100)).toThrow(pattern);
+      expect(() => chart.draggable(true)).toThrow(pattern);
+      expect(() => chart.pickingEnabled(true)).toThrow(pattern);
+      expect(() => chart.dispatch('select', {})).toThrow(pattern);
       expect(() => chart.on('enter', () => {})).toThrow(pattern);
       expect(() => chart.onEnter(() => {})).toThrow(pattern);
       expect(() => chart.onUpdate(() => {})).toThrow(pattern);
@@ -648,6 +992,8 @@ describe('GraphChart', () => {
       expect(() => chart.selection()).toThrow(pattern);
       expect(() => chart.render()).toThrow(pattern);
       expect(() => chart.update()).toThrow(pattern);
+      expect(() => chart.exportSelection([])).toThrow(pattern);
+      expect(() => chart.importSelection([])).toThrow(pattern);
     });
 
     it('stops an in-flight update() transition instead of letting it keep writing', () => {

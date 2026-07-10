@@ -7,6 +7,22 @@ import { computeJoin, materializeEnter, removeBackend } from './join.js';
 import { SelectionTransition } from './SelectionTransition.js';
 
 /**
+ * Every currently-live `Selection` with at least one `.on()` handler
+ * registered — `Selection.dispatch()` (Prompt 149) walks this to find which
+ * selections (across every chart) have a handler for a given event and
+ * whether the hit node is one of their members. A plain `Set`, not a
+ * `WeakSet`: dispatch needs to iterate it, which `WeakSet` doesn't support.
+ * `Selection.dispose()` removes `this` from it; a filtered/derived selection
+ * that's `.on()`'d and then discarded without ever being disposed keeps its
+ * handler(s) reachable (and therefore alive) for the app's lifetime — a
+ * documented tradeoff of "handlers register per-Selection-scope" (the
+ * prompt's own wording) requiring the scoped selection itself to persist
+ * somewhere, not a leak this file can silently avoid (see `skipping_list.md`).
+ * @type {Set<Selection>}
+ */
+const eventedSelections = new Set();
+
+/**
  * @param {*} backend
  * @returns {{ type: 'meshes', meshes: GraphMesh[] }|{ type: 'instanced', object: GraphInstancedObject, indices: Uint32Array }}
  * @throws {TypeError} If `backend` doesn't match either shape.
@@ -93,6 +109,9 @@ class SelectionNode {
 export class Selection {
   /** @type {{ type: 'meshes', meshes: GraphMesh[] }|{ type: 'instanced', object: GraphInstancedObject, indices: Uint32Array }} */
   #backend;
+
+  /** @type {Map<string, Function[]>} event name → handlers, in registration order */
+  #eventHandlers = new Map();
 
   /**
    * @param {{ type: 'meshes', meshes: GraphMesh[] }|{ type: 'instanced', object: GraphInstancedObject, indices: Uint32Array }} backend
@@ -394,6 +413,7 @@ export class Selection {
     } else {
       this.#backend.object.dispose();
     }
+    eventedSelections.delete(this);
   }
 
   /**
@@ -429,16 +449,75 @@ export class Selection {
   }
 
   /**
-   * Not implemented yet — picking and the interaction state machine land in
-   * Phase 9. Throws rather than silently no-op-ing (CLAUDE.md §1.5 Fail
-   * Fast); once wired, this will register `handler` for pointer/interaction
-   * events on this selection's members.
-   * @param {string} _event
-   * @param {(event: *) => void} _handler
-   * @throws {Error} Always — requires Phase 9.
+   * Registers `handler` for `event` (any non-empty string — pointer/
+   * interaction events like `'click'`/`'hover-enter'`/`'hover-leave'`, not a
+   * fixed vocabulary the way `GraphChart.on('enter'|'update'|'exit', ...)`
+   * is) on this selection's members only — filtering first scopes which
+   * datums it fires for: `chart.selection().filter(d => d.value > 90).on('click', fn)`
+   * only calls `fn` for datums that passed the filter. Multiple handlers for
+   * the same event accumulate (registration order), mirroring
+   * `GraphChart.on()`. Actually firing a handler is driven by
+   * `Selection.dispatch()` (Prompt 149) — called by `interact/PointerRouter`
+   * once a real pointer event and `Picker` hit resolve to a specific node;
+   * `.on()` itself has no pointer/event wiring of its own, it only records
+   * "call `handler` when a hit lands on one of my members."
+   * @param {string} event
+   * @param {(datum: *, index: number, event: *, worldPoint: import('three').Vector3) => void} handler
+   * @returns {this}
+   * @throws {TypeError} If `event` isn't a non-empty string, or `handler` isn't a function.
+   * @example chart.selection().filter((d) => d.value > 90).on('click', (d) => console.log('clicked', d));
    */
-  on(_event, _handler) {
-    throw new Error('Selection.on: requires Phase 9 (picking & the interaction state machine) — not implemented yet.');
+  on(event, handler) {
+    if (typeof event !== 'string' || event.length === 0) {
+      throw new TypeError(`Selection.on: event must be a non-empty string, received ${JSON.stringify(event)}.`);
+    }
+    if (typeof handler !== 'function') {
+      throw new TypeError(`Selection.on: handler must be a function, received ${JSON.stringify(handler)}.`);
+    }
+    if (!this.#eventHandlers.has(event)) this.#eventHandlers.set(event, []);
+    this.#eventHandlers.get(event).push(handler);
+    eventedSelections.add(this);
+    return this;
+  }
+
+  /**
+   * The one place a pointer-wiring consumer (`interact/PointerRouter`,
+   * Prompt 149) reaches into every currently-`.on()`'d `Selection` (across
+   * every chart — a `Selection` carries no chart reference of its own,
+   * `mesh`/`instanceIndex` identify the hit node directly, `Picker`'s own
+   * hit vocabulary) to find and invoke matching handlers. A no-op if no live
+   * selection has a handler for `event`, or none of them contain the hit
+   * node.
+   * @param {string} eventName
+   * @param {{mesh: import('three').Object3D, instanceIndex: number|null, datum: *, worldPoint: import('three').Vector3, domEvent: *}} hit
+   *   `mesh`/`instanceIndex` identify the hit node (same shape `Picker.pickAt()` returns, plus `domEvent` — the raw DOM event, forwarded to handlers as-is).
+   * @example Selection.dispatch('click', { mesh, instanceIndex, datum, worldPoint, domEvent: pointerEvent });
+   */
+  static dispatch(eventName, { mesh, instanceIndex, datum, worldPoint, domEvent }) {
+    for (const selection of eventedSelections) {
+      const handlers = selection.#eventHandlers.get(eventName);
+      if (!handlers || handlers.length === 0) continue;
+      const index = selection.#localIndexOf(mesh, instanceIndex);
+      if (index === -1) continue;
+      for (const handler of handlers) handler(datum, index, domEvent, worldPoint);
+    }
+  }
+
+  /**
+   * Whether `mesh`/`instanceIndex` (`Picker`'s hit vocabulary) is a member
+   * of this selection, and if so, at which position — the `index` a
+   * `.on()` handler receives (this selection's own local ordinal, matching
+   * `datum(index)`'s convention, not a raw backend/instance index).
+   * @param {import('three').Object3D} mesh
+   * @param {number|null} instanceIndex
+   * @returns {number} `-1` if not a member.
+   */
+  #localIndexOf(mesh, instanceIndex) {
+    if (this.#backend.type === 'instanced') {
+      if (this.#backend.object.three !== mesh) return -1;
+      return Array.prototype.indexOf.call(this.#backend.indices, instanceIndex);
+    }
+    return this.#backend.meshes.findIndex((m) => m.three === mesh);
   }
 
   /** @param {number} index @returns {*} */

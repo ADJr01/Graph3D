@@ -811,26 +811,28 @@ export class GraphInstancedObject extends GraphObject {
    */
   pick(raycaster) {
     this.#assertNotDisposed('pick');
-    if (!(raycaster instanceof THREE.Raycaster)) {
-      throw new TypeError('GraphInstancedObject.pick: raycaster must be a THREE.Raycaster instance.');
-    }
+    const hit = this.#closestIntersection('pick', raycaster);
+    return hit === null ? null : hit.instanceId;
+  }
 
-    const candidates = this.#octree.queryRay(raycaster.ray);
-    const intersections = [];
-    for (const index of candidates) {
-      if (index >= this.#mesh.count) continue;
-      this.#mesh.getMatrixAt(index, this.#matrixScratch);
-      this.#pickMeshScratch.matrixWorld.multiplyMatrices(this.#mesh.matrixWorld, this.#matrixScratch);
-      const hits = [];
-      this.#pickMeshScratch.raycast(raycaster, hits);
-      for (const hit of hits) {
-        hit.instanceId = index;
-        intersections.push(hit);
-      }
-    }
-    if (intersections.length === 0) return null;
-    intersections.sort((a, b) => a.distance - b.distance);
-    return intersections[0].instanceId;
+  /**
+   * Same octree-accelerated hit-test as `pick()`, but returns the full
+   * intersection detail — instance index, world-space hit point, and ray
+   * distance — instead of just the index. `pick()` only ever needed the
+   * index (`ScatterChart.pick()`, Prompt 134); the centralized picking layer
+   * (`interact/Picker`, Prompt 147) additionally needs the exact
+   * ray-surface point, so this shares the same private traversal rather
+   * than re-running it (CLAUDE.md §1.1 DRY).
+   * @param {THREE.Raycaster} raycaster
+   * @returns {{instanceIndex: number, point: THREE.Vector3, distance: number}|null}
+   * @throws {TypeError} If `raycaster` is not a `THREE.Raycaster`.
+   * @throws {Error} If called after `dispose()`.
+   * @example const hit = bars.pickDetailed(raycaster); // { instanceIndex: 42, point, distance }, or null
+   */
+  pickDetailed(raycaster) {
+    this.#assertNotDisposed('pickDetailed');
+    const hit = this.#closestIntersection('pickDetailed', raycaster);
+    return hit === null ? null : { instanceIndex: hit.instanceId, point: hit.point.clone(), distance: hit.distance };
   }
 
   // ── Frustum culling ────────────────────────────────────────────────────────
@@ -1236,6 +1238,36 @@ export class GraphInstancedObject extends GraphObject {
         `GraphInstancedObject.${method}: expected a Float32Array of length ${expectedLength}, received ${received}.`,
       );
     }
+  }
+
+  /**
+   * Shared octree-accelerated ray hit-test behind `pick()`/`pickDetailed()`:
+   * queries the octree for candidate instances, raycasts the real geometry
+   * only against those, and returns the closest hit (with `.instanceId` set
+   * to the candidate's instance index) or `null` on a miss.
+   * @param {string} method @param {THREE.Raycaster} raycaster
+   * @returns {THREE.Intersection|null}
+   */
+  #closestIntersection(method, raycaster) {
+    if (!(raycaster instanceof THREE.Raycaster)) {
+      throw new TypeError(`GraphInstancedObject.${method}: raycaster must be a THREE.Raycaster instance.`);
+    }
+    const candidates = this.#octree.queryRay(raycaster.ray);
+    const intersections = [];
+    for (const index of candidates) {
+      if (index >= this.#mesh.count) continue;
+      this.#mesh.getMatrixAt(index, this.#matrixScratch);
+      this.#pickMeshScratch.matrixWorld.multiplyMatrices(this.#mesh.matrixWorld, this.#matrixScratch);
+      const hits = [];
+      this.#pickMeshScratch.raycast(raycaster, hits);
+      for (const hit of hits) {
+        hit.instanceId = index;
+        intersections.push(hit);
+      }
+    }
+    if (intersections.length === 0) return null;
+    intersections.sort((a, b) => a.distance - b.distance);
+    return intersections[0];
   }
 
   /** Query the octree for which instances are inside the current camera frustum right now. */

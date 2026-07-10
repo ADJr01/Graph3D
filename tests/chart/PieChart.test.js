@@ -270,6 +270,69 @@ describe('PieChart', () => {
     });
   });
 
+  describe('.opacity()/.visible()/.size() (Prompt 141)', () => {
+    it('applies per-datum opacity and visibility', () => {
+      const scene = makeScene();
+      const rows = [{ id: 0, count: 1 }, { id: 1, count: 1 }];
+      const chart = new PieChart(scene)
+        .data(rows)
+        .value((d) => d.count)
+        .opacity((d) => (d.id === 0 ? 1 : 0.4))
+        .visible((d) => d.id === 0);
+      chart.render();
+
+      const meshA = scene.children.find((m) => m.userData.graph3d.datum === rows[0]);
+      const meshB = scene.children.find((m) => m.userData.graph3d.datum === rows[1]);
+      expect(meshA.material.opacity).toBeCloseTo(1);
+      expect(meshB.material.opacity).toBeCloseTo(0.4);
+      expect(meshA.visible).toBe(true);
+      expect(meshB.visible).toBe(false);
+    });
+
+    it('.size(fn) uniformly scales a slice mesh (base scale is always 1)', () => {
+      const scene = makeScene();
+      const rows = [{ id: 0, count: 1 }, { id: 1, count: 1 }];
+      const chart = new PieChart(scene)
+        .data(rows)
+        .value((d) => d.count)
+        .size((d) => (d.id === 0 ? 1 : 2));
+      chart.render();
+
+      const meshA = scene.children.find((m) => m.userData.graph3d.datum === rows[0]);
+      const meshB = scene.children.find((m) => m.userData.graph3d.datum === rows[1]);
+      expect(meshA.scale.x).toBeCloseTo(1);
+      expect(meshB.scale.x).toBeCloseTo(2);
+      expect(meshB.scale.y).toBeCloseTo(2);
+      expect(meshB.scale.z).toBeCloseTo(2);
+    });
+
+    it('leaves opacity/visible/size untouched when never called', () => {
+      const scene = makeScene();
+      const chart = new PieChart(scene).data([{ count: 1 }]).value((d) => d.count);
+      chart.render();
+      expect(scene.children[0].material.opacity).toBe(1);
+      expect(scene.children[0].visible).toBe(true);
+      expect(scene.children[0].scale.x).toBeCloseTo(1);
+    });
+  });
+
+  describe('.legend(options) (Prompt 143)', () => {
+    it('renders into the configured container on render()', () => {
+      const scene = makeScene();
+      const container = document.createElement('div');
+      const rows = [{ id: 0, count: 1 }, { id: 1, count: 9 }];
+      const chart = new PieChart(scene)
+        .data(rows)
+        .value((d) => d.count)
+        .color((d) => d.count)
+        .legend({ container });
+      chart.render();
+
+      expect(container.childNodes.length).toBe(1);
+      expect(container.textContent).toContain('9');
+    });
+  });
+
   describe('destroy()', () => {
     it('disposes every slice mesh and is idempotent', () => {
       const scene = makeScene();

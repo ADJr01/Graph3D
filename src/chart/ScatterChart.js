@@ -2,6 +2,8 @@ import { generator } from '../compose/index.js';
 import { GraphChart } from './GraphChart.js';
 import { applyColorField } from './colorField.js';
 import { applyOpacityField } from './opacityField.js';
+import { applyVisibleField } from './visibleField.js';
+import { applyLegend } from './legendField.js';
 
 /**
  * `GraphChart` specialized for scatter plots (Prompt 134). Defaults to
@@ -19,7 +21,8 @@ import { applyOpacityField } from './opacityField.js';
  * the first place `.opacity()` gets consumed (`chart/opacityField.js` —
  * originally a private field/method on this class, moved onto `GraphChart`
  * once `HeatmapChart`, Prompt 136, became the second consumer — CLAUDE.md
- * §1.1 DRY two-strike rule).
+ * §1.1 DRY two-strike rule). `.visible(fn)` (Prompt 141) is applied the same
+ * way via `chart/visibleField.js`.
  * @example
  * new ScatterChart(scene)
  *   .data(rows, (d) => d.id)
@@ -123,5 +126,7 @@ export class ScatterChart extends GraphChart {
   #applyPostAttributes() {
     applyColorField(this, this.data());
     applyOpacityField(this);
+    applyVisibleField(this);
+    applyLegend(this);
   }
 }

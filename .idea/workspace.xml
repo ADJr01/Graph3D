@@ -1,30 +1,46 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="33557d05-3974-4e5d-9972-8791b8163414" name="Changes" comment="Phase 7 On Process">
+    <list default="true" id="33557d05-3974-4e5d-9972-8791b8163414" name="Changes" comment="Phase 8 continuing">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/BUILD_PLAN.md" beforeDir="false" afterPath="$PROJECT_DIR$/BUILD_PLAN.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/concepts/compose.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/concepts/compose.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/concepts/chart.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/concepts/chart.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/concepts/object.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/concepts/object.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/concepts/postfx.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/concepts/postfx.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/prompts.md" beforeDir="false" afterPath="$PROJECT_DIR$/prompts.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/skipping_list.md" beforeDir="false" afterPath="$PROJECT_DIR$/skipping_list.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/chart/BarChart.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/chart/BarChart.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/chart/GraphChart.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/chart/GraphChart.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/chart/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/chart/index.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/compose/generator/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/generator/index.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/compose/generator/surface.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/generator/surface.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/compose/layout/force/forces.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/layout/force/forces.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/compose/layout/force/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/layout/force/index.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/compose/layout/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/layout/index.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/compose/palette/categorical.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/palette/categorical.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/chart/HeatmapChart.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/chart/HeatmapChart.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/chart/NetworkChart.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/chart/NetworkChart.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/chart/PackChart.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/chart/PackChart.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/chart/PieChart.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/chart/PieChart.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/chart/ScatterChart.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/chart/ScatterChart.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/chart/TreeChart.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/chart/TreeChart.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/compose/annotation/label.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/annotation/label.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/compose/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/index.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/compose/scale/log.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/scale/log.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/compose/scale/tickFormat.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/scale/tickFormat.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/compose/selection/Selection.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/selection/Selection.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/core/Graph3D.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/Graph3D.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/index.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/material/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/material/index.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/object/GraphObjectFactory.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/object/GraphObjectFactory.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/object/GraphInstancedObject.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/object/GraphInstancedObject.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/object/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/object/index.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/compose/generator/index.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/compose/generator/index.test.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/compose/layout/force/forces.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/compose/layout/force/forces.test.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/compose/layout/force/index.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/compose/layout/force/index.test.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/compose/layout/index.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/compose/layout/index.test.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/material/index.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/material/index.test.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/object/GraphObjectFactory.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/object/GraphObjectFactory.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/chart/BarChart.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/chart/BarChart.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/chart/GraphChart.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/chart/GraphChart.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/chart/HeatmapChart.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/chart/HeatmapChart.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/chart/NetworkChart.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/chart/NetworkChart.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/chart/PackChart.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/chart/PackChart.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/chart/PieChart.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/chart/PieChart.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/chart/ScatterChart.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/chart/ScatterChart.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/chart/TreeChart.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/chart/TreeChart.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/compose/annotation/index.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/compose/annotation/index.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/compose/annotation/label.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/compose/annotation/label.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/compose/scale/log.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/compose/scale/log.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/compose/selection/Selection.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/compose/selection/Selection.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/core/Graph3D.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/core/Graph3D.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/object/GraphInstancedObject.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/object/GraphInstancedObject.test.js" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -93,6 +109,16 @@
       <workItem from="1783244458264" duration="1442000" />
       <workItem from="1783249155717" duration="5242000" />
       <workItem from="1783262025897" duration="12597000" />
+      <workItem from="1783317032379" duration="155000" />
+      <workItem from="1783357830647" duration="2136000" />
+      <workItem from="1783401019868" duration="4429000" />
+      <workItem from="1783446156087" duration="3409000" />
+      <workItem from="1783486724420" duration="98000" />
+      <workItem from="1783525228651" duration="10235000" />
+      <workItem from="1783574209457" duration="627000" />
+      <workItem from="1783614608273" duration="3887000" />
+      <workItem from="1783658853786" duration="611000" />
+      <workItem from="1783660433298" duration="14297000" />
     </task>
     <task id="LOCAL-00001" summary="graph3D created">
       <option name="closed" value="true" />
@@ -142,7 +168,15 @@
       <option name="project" value="LOCAL" />
       <updated>1783186346439</updated>
     </task>
-    <option name="localTasksCounter" value="7" />
+    <task id="LOCAL-00007" summary="Phase 8 continuing">
+      <option name="closed" value="true" />
+      <created>1783317155031</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1783317155031</updated>
+    </task>
+    <option name="localTasksCounter" value="8" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -154,6 +188,7 @@
     <MESSAGE value="graph3D phase4" />
     <MESSAGE value="Phase 5 — anim/:                                                                            &#10;  - GraphAnimCurve easings, GraphAnimTimeline (groups, loop modes, interrupt                  &#10;    registry), Transition (D3-style ms API), CameraTour, reduced-motion support               &#10;  - compose/selection/SelectionTransition wires .transition() into data-bound                 &#10;    selections on both meshes and instanced backends                                          &#10;  - GraphInstancedObject bulk setters (setAllPositions/Scales/Colors) animate                 &#10;    via Transition instead of snapping                                                        &#10;  - examples/05-transitions hero example, docs/concepts/anim.md                               &#10;                                                                                              &#10;  Phase 6 — material/:                                                                        &#10;  - Preset namespace: PBR passthroughs (standard/physical/basic/lambert/                      &#10;    phong/toon/matcap) plus custom-shader looks (holographic, crystal, glass,                 &#10;    neon, glow, velvet, metals, dataDriven)                                                   &#10;  - texture namespace: gradient/noise/voronoi/checkerboard/dots/lines/                        &#10;    cellular/paletteTexture procedural generators                                             &#10;  - SDFText MSDF text engine (atlas loading, glyph layout, shader)                            &#10;  - addPlanarReflection, GraphObjectMaterial texture ref-counting disposal,                   &#10;    setPaletteForAttribute convenience, applyShader dev-mode hot-reload                       &#10;  - examples/06-materials hero gallery, docs/concepts/material.md" />
     <MESSAGE value="Phase 7 On Process" />
-    <option name="LAST_COMMIT_MESSAGE" value="Phase 7 On Process" />
+    <MESSAGE value="Phase 8 continuing" />
+    <option name="LAST_COMMIT_MESSAGE" value="Phase 8 continuing" />
   </component>
 </project>

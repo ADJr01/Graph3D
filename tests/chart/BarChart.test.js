@@ -193,4 +193,78 @@ describe('BarChart', () => {
       expect(scene.children[1].material.color.getHexString()).toBe(new THREE.Color(expectedScale(200)).getHexString());
     });
   });
+
+  describe('.opacity(fn)/.visible(fn)/.size(fn) (Prompt 141)', () => {
+    it('writes per-datum opacity via applyOpacityField', () => {
+      const scene = makeScene();
+      const chart = new BarChart(scene).opacity((d) => d / 100);
+      chart.data([0, 50, 100]);
+      chart.render();
+
+      expect(scene.children[0].material.opacity).toBeCloseTo(0);
+      expect(scene.children[1].material.opacity).toBeCloseTo(0.5);
+      expect(scene.children[2].material.opacity).toBeCloseTo(1);
+    });
+
+    it('writes per-datum visibility via applyVisibleField', () => {
+      const scene = makeScene();
+      const chart = new BarChart(scene).visible((d) => d > 0);
+      chart.data([0, 5]);
+      chart.render();
+
+      expect(scene.children[0].visible).toBe(false);
+      expect(scene.children[1].visible).toBe(true);
+    });
+
+    it('.size(fn) multiplies the footprint (x/z) only, leaving the value-encoding y scale untouched', () => {
+      const scene = makeScene();
+      const chart = new BarChart(scene).size(() => 2);
+      chart.data([3, 5]);
+      chart.render();
+
+      expect(scene.children[0].scale.x).toBeCloseTo(1.6); // 0.8 (default bar width) * 2
+      expect(scene.children[0].scale.z).toBeCloseTo(1.6);
+      expect(scene.children[0].scale.y).toBeCloseTo(3); // untouched — still encodes the value
+    });
+
+    it('.size(fn) multiplies y/z (not x) when .horizontal() is active', () => {
+      const scene = makeScene();
+      const chart = new BarChart(scene).horizontal().size(() => 2);
+      chart.data([3, 5]);
+      chart.render();
+
+      expect(scene.children[0].scale.x).toBeCloseTo(3); // untouched value axis
+      expect(scene.children[0].scale.y).toBeCloseTo(1.6);
+      expect(scene.children[0].scale.z).toBeCloseTo(1.6);
+    });
+
+    it('leaves opacity/visible/size untouched when never called', () => {
+      const scene = makeScene();
+      const chart = new BarChart(scene);
+      chart.data([3, 5]);
+      chart.render();
+
+      expect(scene.children[0].material.opacity).toBe(1);
+      expect(scene.children[0].visible).toBe(true);
+      expect(scene.children[0].scale.x).toBeCloseTo(0.8);
+    });
+  });
+
+  describe('.legend(options) (Prompt 143)', () => {
+    it('renders into the configured container on render(), and stays synced on update()', () => {
+      const scene = makeScene();
+      const container = document.createElement('div');
+      const chart = new BarChart(scene).color((d) => d).legend({ container });
+      chart.data([1, 2, 3]);
+      chart.render();
+
+      expect(container.childNodes.length).toBe(1);
+
+      chart.data([10, 20, 30]);
+      chart.update();
+
+      expect(container.textContent).toContain('10');
+      expect(container.textContent).toContain('30');
+    });
+  });
 });
