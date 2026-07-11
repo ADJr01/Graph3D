@@ -402,3 +402,58 @@ chart.data(rows).render();
 
 - **`.legend({ container })`** renders into a DOM element you supply — the chart never creates or positions elements of its own, it only writes into the container it's given. Shows a gradient bar with min/max labels for a continuous `.color()` palette (or a swatch list for a categorical one), and three sample dots at the data's min/mid/max `.size()` multiplier. Stays synced automatically: it's re-rendered from scratch on every `render()`/`update()` for `BarChart`/`ScatterChart`/`HeatmapChart`/`NetworkChart`/`PieChart` (the five chart types with a real flat data array — `TreeChart`/`PackChart` bind a single root datum, not an array, so `.legend()` is inert for them, same precedent as their other inert inherited fields). `destroy()` clears the container's content (the one DOM resource this feature creates) but leaves the container element itself alone — the caller owns it.
 - **`.tooltip(handlerFn)` is config-only right now.** It stores a handler, retrievable via `chart/tooltipField.js`'s `resolveTooltipContent(chart, datum, index)` — the "sensible default on hover when no handler is set" this prompt asks for: it calls `handlerFn(datum, index)` if one is configured, or falls back to a `"key: value"` listing (object datums) / `String(datum)` (primitives). Nothing shows on screen from this alone — there was no hover-detection mechanism in this phase. Phase 9 (`docs/concepts/interact.md`) later gave every chart type real picking (`Picker`, Prompt 147) and a full pointer-driven interaction surface, but never built a dedicated centralized tooltip-display class — the `interact/Tooltip.js` this paragraph once expected under a "Prompt 151" slot was renumbered out of the actual `prompts.md` sequence and never landed. A caller wires the actual DOM display by hand off `chart.on('hover', ...)` (Prompt 156), as `examples/20-interaction/main.js` (Prompt 157) demonstrates — see `docs/concepts/interact.md`'s own "What's genuinely out of scope for Phase 9" section.
+
+## `chart.stream(dataStream)` (Prompt 161)
+
+```js
+import { DataStream } from 'graph3d';
+
+chart.data(initialRows, (d) => d.id).render();
+chart.stream(DataStream.fromWebSocket('wss://example.com/ticks', (raw) => [JSON.parse(raw)]));
+```
+
+`stream()` binds a live `DataStream` (`docs/concepts/stream.md`, Prompt 160) to an already-`render()`ed chart: it pulls the stream's `{added, updated, removed}` chunks and, for each, folds them into the currently bound data (`chart/streamField.js`'s `applyStreamChunk`, a pure array merge keyed the same way as `data(arr, keyFn)`) and drives the result through the exact same `data(nextData, keyFn)` + `update()` call a manual caller would make — one join, one code path (CLAUDE.md §1.1 DRY), not a second enter/update/exit implementation. `chart/` never imports `stream/` directly (`stream/` sits above `chart/` in CLAUDE.md §1.4's layer order); `dataStream` is accepted duck-typed (any async iterable of chunks), same pattern as `exitAnimation()`'s `options.system`.
+
+**Backpressure: at most one chunk is ever pending.** If another arrives while the previous one is still being folded/applied, it overwrites (drops) the one waiting rather than queuing unboundedly — a chart mid-stream shows the *latest* state, not a guaranteed-complete history of every chunk that ever arrived. The apply loop yields a full macrotask (not just a microtask) between chunks specifically so a burst of already-available chunks can drain through the pull loop first, coalescing onto that one pending slot before the applier wakes up to look — a microtask-only yield loses that race almost every time (the pull loop's own `await iterator.next()` continuation tends to resolve first), which would make the "drop oldest" contract silently inert under real load.
+
+Calling `stream()` again replaces the previous binding, disposing its `dataStream` first (if it exposes `.dispose()`); `destroy()` does the same. A dataStream that rejects (e.g. a WebSocket error) is caught and `console.error`-logged rather than becoming an unhandled promise rejection — there's no dedicated stream-error event surface in this phase.
+
+## `chart.enableLOD(options)` / `chart.disableLOD()` (Prompt 163)
+
+```js
+chart.data(hugeSeries, (d) => d.id).render();
+chart.enableLOD({
+  camera: scene.camera.three,
+  levels: [
+    { maxDistance: 20, maxPoints: 5000 },
+    { maxDistance: 100, maxPoints: 500 },
+  ],
+});
+```
+
+Every frame (`core/Graph3DLoop`), checks `camera`'s distance to the chart's `scene` and, when it crosses into a different `levels` bucket, re-decimates the dataset that was bound at the time `enableLOD()` was called down to that bucket's `maxPoints` — via `compose/transform`'s existing `transform.decimate` (the same uniform-stride sampling `.use(transform.decimate(n))` already does, CLAUDE.md §1.1 DRY, no second decimation algorithm) — and re-binds it through the normal `data() + update()` join, same one-path principle as `stream()`. The initial level applies immediately, before the first frame. `levels` don't need to be pre-sorted; the closest (smallest `maxDistance`) bucket the current distance still fits under wins, and once distance exceeds every threshold the farthest (most aggressive) level applies.
+
+Same self-contained shape as `stream()`, for the same reason: `chart/` never imports `stream/` (it sits above `chart/` in CLAUDE.md §1.4's layer order), so `camera` is accepted duck-typed (anything exposing `.position.distanceTo`). `stream/LOD.js`'s `LOD` class (`docs/concepts/stream.md`) runs the identical distance-bucketing algorithm as a standalone engine for driving LOD on non-`GraphChart` targets — the two implementations don't share code for the same reason `stream()` doesn't import `DataStream`.
+
+`disableLOD()` stops the per-frame check (`destroy()` does the same) but doesn't restore the full dataset — call `chart.data(originalRows).update()` for that. Calling `enableLOD()` again replaces the previous binding against a freshly re-captured snapshot of whatever's currently bound.
+
+## `chart.compact()` / `chart.window(size)` (Prompt 168)
+
+Two independent memory-management tools for long-running/streaming charts, meant to be driven by `stream/memoryPressure()` (`docs/concepts/stream.md`) — `chart/` never polls memory itself; nothing here is automatic.
+
+```js
+import { memoryPressure } from 'graph3d';
+
+chart.window(500); // cap: only the 500 most-recently-bound datums stay visible
+chart.stream(DataStream.fromWebSocket(url, parse));
+
+setInterval(() => {
+  const pressure = memoryPressure();
+  if (pressure !== null && pressure > 0.8) chart.compact();
+}, 5000);
+```
+
+- **`compact()`** one-way merges this chart's currently-static, individually-addressable `GraphMesh` instances (the below-`INSTANCING_THRESHOLD` `render()` path) into a single `GraphInstancedObject` — collapsing N draw calls/geometries/materials into one. It reads each mesh's *live* position/scale/color (whatever `.attr()`/`.style()` handlers wrote, not just what `render()` originally computed), so nothing currently visible changes. **Irreversible**: there's no path back to individually-addressable meshes short of a fresh chart + `render()`; calling it again on an already-instanced backend (or an empty one) is a no-op. Compacting while a `.transition()`-driven write is still mid-flight against these meshes disposes the meshes it's writing to — call it once things have settled, e.g. the scrolled-past tail of a `window()`-capped stream that's stopped changing.
+- **`window(size)`** caps `data()`'s array to the `size` most-recently-bound datums: once it's exceeded, the oldest (frontmost) entries are trimmed *before* `.filter()`/`.use()`/`.sort()` in `#prepareData()`'s pipeline, so `update()`'s existing join treats them as ordinary exits — no second removal path exists here (CLAUDE.md §1.1 DRY). They dissolve out exactly like any other departing datum: the built-in shrink-and-fade default, a registered `on('exit', fn)`, or `exitAnimation()`, whichever is configured. Meant for a `stream()`-driven chart whose `data()` array keeps growing — caps memory/instance count at a fixed ceiling regardless of how long the stream has been running.
+
+`memoryPressure()` (`stream/`, Prompt 168) is the suggested trigger for both — a heuristic `[0, 1]` ratio off the non-standard, Chromium-only `performance.memory` API (`null` where it's unavailable). See `docs/concepts/stream.md` for its own docs.

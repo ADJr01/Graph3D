@@ -40,3 +40,19 @@ void main() {
 
 /** The full vertex shader — varyings + main(), concatenated for direct use as `vertexShader`. */
 export const WORLD_SPACE_VERTEX_SHADER = WORLD_SPACE_VARYINGS + WORLD_SPACE_VERTEX_MAIN;
+
+/**
+ * Minimal "instancing-aware clip-space position" body — the position-only
+ * counterpart to `WORLD_SPACE_VERTEX_MAIN` above, for presets that don't
+ * need normals/view-direction (`dataDriven`, `freshness`, `dataStream`).
+ * Extracted once the third preset needed the identical four lines
+ * (CLAUDE.md §1.1 DRY two-strike rule).
+ */
+export const INSTANCED_CLIP_POSITION = `
+  #ifdef USE_INSTANCING
+    vec4 worldPosition = modelMatrix * instanceMatrix * vec4(position, 1.0);
+  #else
+    vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+  #endif
+  gl_Position = projectionMatrix * viewMatrix * worldPosition;
+`;

@@ -1,3 +1,5 @@
+import { registerWorkerTask } from './worker/workerBlob.js';
+
 /**
  * How long an idle worker stays alive before being terminated.
  * The Prompt 16 bootstrap takes ~2ms to spin up, so 30 s is a generous keep-warm window.
@@ -190,6 +192,37 @@ export class WorkerPool {
       // All workers busy at capacity — enqueue; resolve/reject stored here, NOT in #pending.
       this.#queue.push({ taskId, taskName, payload, transferList, resolve, reject });
     });
+  }
+
+  /**
+   * Registers a user-defined task (Prompt 169) so `exec(taskName, payload)`
+   * can dispatch to it — a thin delegate to `worker/workerBlob.js`'s own
+   * `registerWorkerTask` (CLAUDE.md §1.1 DRY: no second registration/
+   * serialization mechanism lives here). `Graph3D.workers` is the intended
+   * entry point (`graph3d.workers.register(taskName, fn)`), but this works
+   * on any `WorkerPool` instance directly too.
+   *
+   * `registerWorkerTask` writes to a *module-level* registry consulted only
+   * by `createWorkerFactory()`'s own workers — it takes effect for every
+   * pool built that way (not just this one), and, per its own doc, only for
+   * workers spawned *after* the call (already-running workers don't
+   * retroactively receive it). A pool built with a custom `workerFactory`
+   * that doesn't come from `createWorkerFactory()` won't see any effect at
+   * all from this method — see this class's own constructor doc for that
+   * alternate construction path.
+   * @param {string} name Task name, passed as `exec()`'s first argument.
+   * @param {function(*): (*|Promise<*>)} fn Self-contained — no closures over
+   *   outer scope; it's serialized via `fn.toString()` and reconstructed
+   *   inside the worker.
+   * @returns {this}
+   * @throws {TypeError} If `name` isn't a non-empty string, or `fn` isn't a function.
+   * @example
+   * graph3d.workers.register('kmeans', ({ data, k }) => { /* pure computation *\/ });
+   * const clusters = await graph3d.workers.exec('kmeans', { data: points, k: 5 });
+   */
+  register(name, fn) {
+    registerWorkerTask(name, fn);
+    return this;
   }
 
   /**

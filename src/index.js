@@ -49,3 +49,4 @@ export { GraphObjectMaterial, material, SDFText, texture, effects } from './mate
 export { PostFX, ParticleSystem } from './postfx/index.js';
 export { GraphChart, BarChart, LineChart, ScatterChart, AreaChart, SurfaceChart, HeatmapChart, NetworkChart, TreeChart, PackChart, PieChart, VolumeChart } from './chart/index.js';
 export { Picker, StateMachine, PointerRouter, Brush, Lasso, link, KeyboardNav, FocusFollower } from './interact/index.js';
+export { DataStream, Aggregator, LOD, OriginShift, GPGPU, JoinDiff, memoryPressure, middleware } from './stream/index.js';

@@ -175,6 +175,12 @@ describe('Graph3D.workers (lazy pool)', () => {
     g.dispose();
     expect(() => g.workers).toThrow(/disposed/);
   });
+
+  it('workers.register(taskName, fn) (Prompt 169) registers a user-defined task without throwing', () => {
+    const g = new Graph3D({ canvas: makeCanvas() });
+    expect(() => g.workers.register('customTask', (p) => p)).not.toThrow();
+    expect(g.workers.register('anotherTask', (p) => p)).toBe(g.workers);
+  });
 });
 
 // ── Lazy PostFX ───────────────────────────────────────────────────────────────

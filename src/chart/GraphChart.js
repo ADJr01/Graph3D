@@ -1,10 +1,13 @@
-import { accessor, Selection, diffData } from '../compose/index.js';
+import { accessor, Selection, diffData, transform } from '../compose/index.js';
 import { material, effects } from '../material/index.js';
 import { resolve as resolveEasing } from '../anim/index.js';
-import { GraphObjectFactory } from '../object/index.js';
+import { GraphObjectFactory, GraphInstancedObject } from '../object/index.js';
+import { loop } from '../core/Graph3DLoop.js';
 import { applyAxisScaleDomain, resolveAxisAccessor } from './axisField.js';
 import { resolveChartMaterial } from './materialField.js';
 import { applyLegend } from './legendField.js';
+import { applyStreamChunk } from './streamField.js';
+import { assertLODLevels, pickLODLevel } from './lodField.js';
 
 // Real material factories only — `material` also carries two unrelated
 // utilities (addPlanarReflection, setPaletteForAttribute) that aren't presets
@@ -172,6 +175,31 @@ export class GraphChart {
   #draggable = false;
   /** @type {boolean} Whether `Picker` (Prompt 156) hit-tests this chart at all. */
   #pickingEnabled = true;
+
+  /**
+   * The `DataStream` currently bound via `stream()`, if any — kept only so
+   * `#stopStream()` can `dispose()` it (closes its socket/stops its timer)
+   * when replaced by a later `stream()` call or when this chart is
+   * `destroy()`ed. `chart/` never imports `stream/` (it sits *above* `chart/`
+   * in CLAUDE.md §1.4's layer order) — `dataStream` is accepted duck-typed,
+   * same pattern as `exitAnimation()`'s `options.system`.
+   * @type {{dispose?: Function}|null}
+   */
+  #streamDataStream = null;
+
+  /** @type {(() => void)|null} Set by `stream()`; calling it ends that binding's pump loop. */
+  #streamStop = null;
+
+  /**
+   * The active `enableLOD()` binding, if any: the per-frame `core/
+   * Graph3DLoop` callback it registered plus the last applied level's
+   * `maxPoints` (so unchanged-level frames skip re-decimating/re-joining).
+   * @type {{tick: Function, currentMaxPoints: (number|null)}|null}
+   */
+  #lod = null;
+
+  /** @type {number|null} FIFO cap set by `window(size)` (Prompt 168). `null` means unbounded. */
+  #windowSize = null;
 
   /**
    * @param {object} scene The raw `THREE.Scene` this chart will attach to.
@@ -655,6 +683,290 @@ export class GraphChart {
   }
 
   /**
+   * Binds a live `DataStream` (Prompt 160) to this chart: pulls its chunks
+   * and, for each, folds `{added, updated, removed}` into the currently
+   * bound data (`chart/streamField.js`'s `applyStreamChunk`) and drives it
+   * through the exact same `data(nextData, keyFn) + update()` call a manual
+   * caller would make — one join, one code path (CLAUDE.md §1.1 DRY), not a
+   * second enter/update/exit implementation living here.
+   *
+   * Backpressure: at most one chunk is ever "pending" — if another arrives
+   * while the previous one is still being folded/applied, it overwrites
+   * (drops) the one waiting rather than queuing unboundedly. A chart mid-
+   * stream shows the *latest* state, not a complete history of every chunk
+   * that ever arrived; under sustained overload, some intermediate chunks
+   * are never applied at all.
+   *
+   * Calling `stream()` again replaces the previous binding (disposing its
+   * `dataStream` first, if it exposes `.dispose()`); `destroy()` does the same.
+   * @param {AsyncIterable<{added: Array, updated: Array, removed: Array}>} dataStream
+   *   A `DataStream` instance, or any async iterable of chunks — duck-typed
+   *   (`chart/` cannot import `stream/`, which sits above it in the layer order).
+   * @returns {this}
+   * @throws {TypeError} If `dataStream` isn't async-iterable.
+   * @throws {Error} If `render()` hasn't been called yet.
+   * @example
+   * chart.data(initialRows, (d) => d.id).render();
+   * chart.stream(DataStream.fromWebSocket(url, (raw) => [JSON.parse(raw)]));
+   */
+  stream(dataStream) {
+    this.#assertNotDisposed('stream');
+    if (!dataStream || typeof dataStream[Symbol.asyncIterator] !== 'function') {
+      throw new TypeError(`GraphChart.stream: dataStream must be async-iterable (e.g. a DataStream), received ${JSON.stringify(dataStream)}.`);
+    }
+    if (!this.#rendered) {
+      throw new Error('GraphChart.stream: call render() before stream().');
+    }
+
+    this.#stopStream();
+    this.#streamDataStream = dataStream;
+
+    let pendingChunk = null;
+    let applying = false;
+    let stopped = false;
+
+    const applyPending = async () => {
+      applying = true;
+      while (pendingChunk !== null && !stopped) {
+        const chunk = pendingChunk;
+        pendingChunk = null;
+        const keyFn = this.#pendingKeyFn ?? ((d) => d);
+        this.data(applyStreamChunk(this.data(), chunk, keyFn), keyFn);
+        this.update();
+        // A macrotask yield (not just a microtask) lets an entire burst of
+        // already-available chunks drain through the pump loop below first,
+        // each overwriting pendingChunk, so only the latest survives to be
+        // applied next — a microtask-only yield loses that race, since the
+        // pump loop's own `await iterator.next()` continuation is also just
+        // one microtask away and tends to resolve after this one resumes.
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+      applying = false;
+    };
+
+    (async () => {
+      try {
+        for await (const chunk of dataStream) {
+          if (stopped) break;
+          pendingChunk = chunk; // backpressure: overwrites (drops) whatever chunk was already waiting
+          if (!applying) applyPending();
+        }
+      } catch (error) {
+        // CLAUDE.md §1.5: no swallowed promises — the pump loop has no
+        // caller to reject back to (it's fire-and-forget from stream()
+        // returning `this`), so a broken dataStream (e.g. a WebSocket error)
+        // is surfaced here rather than becoming an unhandled rejection.
+        console.error('GraphChart.stream: dataStream error, stream stopped.', error);
+      }
+    })();
+
+    this.#streamStop = () => {
+      stopped = true;
+    };
+    return this;
+  }
+
+  /**
+   * Enables camera-distance-driven level-of-detail (Prompt 163): every frame
+   * (`core/Graph3DLoop`), checks `camera`'s distance to this chart's `scene`
+   * and, when it crosses into a different `levels` bucket, re-decimates the
+   * dataset bound at the time `enableLOD()` was called down to that bucket's
+   * `maxPoints` — via `compose/transform`'s existing `transform.decimate`
+   * (the same uniform-stride sampling `.use(transform.decimate(n))` already
+   * does, CLAUDE.md §1.1 DRY, no second decimation algorithm here) — and
+   * re-binds it through the normal `data() + update()` join (one path, not a
+   * second rendering pipeline). Applies the initial level immediately, before
+   * the first frame.
+   *
+   * Self-contained: `chart/` never imports `stream/` (it sits above `chart/`
+   * in CLAUDE.md §1.4's layer order) — `camera` is accepted duck-typed (any
+   * object exposing `.position.distanceTo`), the same pattern `stream()`
+   * uses for its `dataStream` parameter. `stream/LOD.js` exposes the
+   * identical distance-bucketing algorithm as a standalone class for driving
+   * LOD on non-`GraphChart` targets; the two don't share an implementation
+   * for the same reason `stream()` doesn't import `DataStream`.
+   *
+   * Calling `enableLOD()` again replaces the previous binding (against a
+   * freshly re-captured dataset); `disableLOD()`/`destroy()` stop it.
+   * @param {{levels: {maxDistance: number, maxPoints: number}[], camera: {position: {distanceTo: (v: object) => number}}}} options
+   * @returns {this}
+   * @throws {TypeError} If `levels` isn't a non-empty array of `{maxDistance, maxPoints}`, or `camera` doesn't expose `position.distanceTo`.
+   * @throws {Error} If `render()` hasn't been called yet.
+   * @example
+   * chart.data(hugeSeries, (d) => d.id).render();
+   * chart.enableLOD({
+   *   camera: scene.camera.three,
+   *   levels: [
+   *     { maxDistance: 20, maxPoints: 5000 },
+   *     { maxDistance: 100, maxPoints: 500 },
+   *   ],
+   * });
+   */
+  enableLOD({ levels, camera } = {}) {
+    this.#assertNotDisposed('enableLOD');
+    if (!this.#rendered) {
+      throw new Error('GraphChart.enableLOD: call render() before enableLOD().');
+    }
+    assertLODLevels(levels);
+    if (!camera || !camera.position || typeof camera.position.distanceTo !== 'function') {
+      throw new TypeError(`GraphChart.enableLOD: camera must expose position.distanceTo, received ${JSON.stringify(camera)}.`);
+    }
+
+    this.#stopLOD();
+    const sortedLevels = levels.slice().sort((a, b) => a.maxDistance - b.maxDistance);
+    const fullData = this.data();
+    const keyFn = this.#pendingKeyFn ?? ((d) => d);
+    const state = { tick: null, currentMaxPoints: null };
+
+    state.tick = () => {
+      const distance = camera.position.distanceTo(this.#scene.position);
+      const level = pickLODLevel(sortedLevels, distance);
+      if (level.maxPoints === state.currentMaxPoints) return;
+      state.currentMaxPoints = level.maxPoints;
+      this.data(transform.decimate(level.maxPoints)(fullData), keyFn);
+      this.update();
+    };
+    this.#lod = state;
+    loop.add(state.tick);
+    state.tick();
+    return this;
+  }
+
+  /**
+   * Disables an `enableLOD()` binding, if any — stops the per-frame distance
+   * check. Does not restore the full (pre-decimation) dataset; call
+   * `chart.data(originalRows).update()` for that. No-op if LOD isn't active.
+   * @returns {this}
+   * @example chart.disableLOD();
+   */
+  disableLOD() {
+    this.#assertNotDisposed('disableLOD');
+    this.#stopLOD();
+    return this;
+  }
+
+  /**
+   * One-way merge (Prompt 168) of this chart's currently-static,
+   * individually-addressable `GraphMesh` instances (the below-
+   * `INSTANCING_THRESHOLD` `render()` path) into a single
+   * `GraphInstancedObject` — collapsing N draw calls/geometries/materials
+   * into one, at the cost of losing per-mesh addressability for the merged
+   * set. Reads each mesh's *live* position/scale/color (whatever `.attr()`/
+   * `.style()` handlers may have written, not just what `render()`
+   * originally computed) so nothing currently visible changes.
+   *
+   * Meant to be called once a chart's data has settled ("gone static") —
+   * e.g. the scrolled-past portion of a `window()`-capped stream, or any
+   * large `GraphMesh[]`-backed chart nobody is animating anymore — as a
+   * direct response to a `memoryPressure()` reading (`stream/`) crossing a
+   * caller-chosen threshold: fewer live `THREE.Mesh`/`Geometry`/`Material`
+   * instances means less JS heap and GPU driver overhead. Not automatic —
+   * `chart/` never polls memory pressure itself; the caller decides when.
+   *
+   * **One-way**: irreversible for this chart instance — there is no path
+   * back to individually-addressable meshes short of a fresh chart +
+   * `render()`. A no-op if the backend is already instanced (nothing left
+   * to merge) or if nothing is currently bound. Compacting while a
+   * `.transition()`-driven write is still mid-flight against these meshes
+   * disposes the meshes it's writing to — call once things have settled.
+   * @returns {this}
+   * @throws {Error} If `render()` hasn't been called yet.
+   * @example
+   * chart.data(staleHistoricalRows, (d) => d.id).render();
+   * // ...later, once this data has stopped changing:
+   * chart.compact();
+   */
+  compact() {
+    this.#assertNotDisposed('compact');
+    if (!this.#rendered) {
+      throw new Error('GraphChart.compact: call render() before compact().');
+    }
+    const backend = this.#backendSelection.backend;
+    if (backend.type === 'instanced' || backend.meshes.length === 0) {
+      return this;
+    }
+
+    const meshes = backend.meshes;
+    const count = meshes.length;
+    const positions = new Float32Array(count * 3);
+    const scales = new Float32Array(count * 3);
+    const hasColor = typeof meshes[0].material.color?.r === 'number';
+    const colors = hasColor ? new Float32Array(count * 3) : null;
+    const data = new Array(count);
+
+    for (let i = 0; i < count; i++) {
+      const mesh = meshes[i];
+      const o = i * 3;
+      positions[o] = mesh.three.position.x;
+      positions[o + 1] = mesh.three.position.y;
+      positions[o + 2] = mesh.three.position.z;
+      scales[o] = mesh.three.scale.x;
+      scales[o + 1] = mesh.three.scale.y;
+      scales[o + 2] = mesh.three.scale.z;
+      if (hasColor) {
+        colors[o] = mesh.material.color.r;
+        colors[o + 1] = mesh.material.color.g;
+        colors[o + 2] = mesh.material.color.b;
+      }
+      data[i] = mesh.getUserData('datum');
+    }
+
+    const merged = new GraphInstancedObject({
+      scene: this.#scene,
+      name: 'chart',
+      geometry: meshes[0].three.geometry.clone(),
+      material: this.#resolveMaterial(),
+      count,
+    });
+    merged.setAllPositions(positions).setAllScales(scales);
+    if (hasColor) merged.setAllColors(colors);
+    merged.commitMatrix();
+    for (let i = 0; i < count; i++) merged.setInstanceUserData(i, data[i]);
+
+    for (const mesh of meshes) mesh.dispose();
+
+    this.#backendSelection = new Selection({
+      type: 'instanced',
+      object: merged,
+      indices: Uint32Array.from({ length: count }, (_, i) => i),
+    });
+    return this;
+  }
+
+  /**
+   * Gets or sets a FIFO cap (Prompt 168) on how many of the most-recently-
+   * bound datums stay visible: once `data()`'s array exceeds `size`, the
+   * oldest (frontmost) entries are trimmed before every `render()`/
+   * `update()` — `#prepareData()`'s first step, ahead of `.filter()`/
+   * `.use()`/`.sort()` — so `update()`'s existing join treats them as exits
+   * and dissolves them out exactly like any other departing datum
+   * (CLAUDE.md §1.1 DRY: no second exit/removal path lives here — `window()`
+   * only shrinks what `update()` sees as "current"; the built-in
+   * shrink-and-fade dissolve, or a registered `on('exit', fn)`/
+   * `exitAnimation()`, handles the rest exactly as it always does).
+   *
+   * Meant for `stream()`-driven charts whose `data()` array keeps growing —
+   * caps memory/instance count at a fixed ceiling regardless of how long
+   * the stream has been running, instead of every chunk making the chart
+   * (and its underlying `GraphInstancedObject` capacity) grow forever.
+   * @param {number} [size] A positive integer. Omit to read the current cap (`null` if unset).
+   * @returns {number|null|this}
+   * @throws {TypeError} If `size` is given and isn't a positive integer.
+   * @example
+   * chart.data(initialRows, (d) => d.id).window(500).render();
+   * chart.stream(DataStream.fromWebSocket(url, parse)); // oldest rows dissolve out past 500
+   */
+  window(size) {
+    this.#assertNotDisposed('window');
+    if (size === undefined) return this.#windowSize;
+    if (!Number.isInteger(size) || size < 1) {
+      throw new TypeError(`GraphChart.window: size must be a positive integer, received ${JSON.stringify(size)}.`);
+    }
+    this.#windowSize = size;
+    return this;
+  }
+
+  /**
    * Converts a list of this chart's currently-selected datums (e.g. from
    * `PointerRouter.selectedEntries()`/`KeyboardNav`) into portable join keys
    * — the same `keyFn` passed to the last `data(arr, keyFn)` call (or the
@@ -975,16 +1287,23 @@ export class GraphChart {
   }
 
   /**
-   * Applies `filter`, then every `.use()` middleware in registration order,
-   * then `sort` (each step skipped if unset) to the last array passed to
-   * `data()` — shared by `render()` and `update()` (CLAUDE.md §1.1 DRY
-   * two-strike rule). Middleware runs between filter and sort so it can
-   * both shrink/reshape the filtered set (`decimate`, `aggregate`) and still
-   * have its output re-ordered by a separately-configured `.sort()`.
+   * Applies the `window(size)` FIFO trim, then `filter`, then every `.use()`
+   * middleware in registration order, then `sort` (each step skipped if
+   * unset) to the last array passed to `data()` — shared by `render()` and
+   * `update()` (CLAUDE.md §1.1 DRY two-strike rule). The window trim runs
+   * first so it caps membership by raw arrival order (`data()`'s array
+   * order — the tail is newest for a `stream()`-driven chart, since
+   * `applyStreamChunk` appends), before `.filter()`/`.sort()` reshape what's
+   * shown *within* that capped set. Middleware runs between filter and sort
+   * so it can both shrink/reshape the filtered set (`decimate`, `aggregate`)
+   * and still have its output re-ordered by a separately-configured `.sort()`.
    * @returns {Array}
    */
   #prepareData() {
     let data = this.#pendingData;
+    if (this.#windowSize !== null && data.length > this.#windowSize) {
+      data = data.slice(-this.#windowSize);
+    }
     if (this.#filterFn) data = data.filter(this.#filterFn);
     for (const middlewareFn of this.#middlewares) data = middlewareFn(data);
     if (this.#sortFn) data = data.slice().sort(this.#sortFn);
@@ -1079,6 +1398,8 @@ export class GraphChart {
   destroy() {
     if (this.#destroyed) return;
     this.#destroyed = true;
+    this.#stopStream();
+    this.#stopLOD();
     for (const transition of this.#activeTransitions) transition.stop();
     this.#activeTransitions.clear();
     for (const exiting of this.#pendingExits) exiting.dispose();
@@ -1091,6 +1412,20 @@ export class GraphChart {
       while (container.firstChild) container.removeChild(container.firstChild);
       this.#legendConfig = null;
     }
+  }
+
+  /** Ends the active `stream()` binding's pump loop and disposes its `DataStream`, if any. Idempotent. */
+  #stopStream() {
+    if (this.#streamStop) this.#streamStop();
+    this.#streamStop = null;
+    this.#streamDataStream?.dispose?.();
+    this.#streamDataStream = null;
+  }
+
+  /** Unregisters the active `enableLOD()` per-frame check, if any. Idempotent. */
+  #stopLOD() {
+    if (this.#lod) loop.remove(this.#lod.tick);
+    this.#lod = null;
   }
 
   /** @param {string} method @throws {Error} */

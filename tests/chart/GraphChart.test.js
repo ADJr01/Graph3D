@@ -867,6 +867,519 @@ describe('GraphChart', () => {
     });
   });
 
+  describe('stream(dataStream) (Prompt 161)', () => {
+    // A minimal push-based async-iterable, mirroring stream/DataStream.js's
+    // fromWebSocket() shape closely enough to exercise stream()'s pump loop:
+    // push() resolves an already-waiting next() immediately, or buffers.
+    function makePushStream() {
+      const waiters = [];
+      const buffered = [];
+      return {
+        push(chunk) {
+          if (waiters.length > 0) waiters.shift()({ value: chunk, done: false });
+          else buffered.push(chunk);
+        },
+        dispose: vi.fn(),
+        [Symbol.asyncIterator]() {
+          return {
+            next: () => {
+              if (buffered.length > 0) return Promise.resolve({ value: buffered.shift(), done: false });
+              return new Promise((resolve) => waiters.push(resolve));
+            },
+          };
+        },
+      };
+    }
+
+    async function flush(hops = 20) {
+      for (let i = 0; i < hops; i++) await Promise.resolve();
+    }
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      // A stream-driven update() can trigger the default dissolve transition
+      // (removed entries), which schedules onto the shared anim/loop
+      // singleton via requestAnimationFrame — stub it (never ticked here) so
+      // that registration doesn't leak a real RAF callback past this test
+      // into later describe blocks (mirrors update()'s own RAF stub above).
+      vi.stubGlobal('requestAnimationFrame', vi.fn(() => 1));
+      vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    });
+
+    it('throws TypeError for a non-async-iterable dataStream', () => {
+      const chart = new GraphChart(makeScene(), generator.bar());
+      expect(() => chart.stream(null)).toThrow(TypeError);
+      expect(() => chart.stream({})).toThrow(TypeError);
+    });
+
+    it('throws if render() was never called', () => {
+      const chart = new GraphChart(makeScene(), generator.bar());
+      expect(() => chart.stream(makePushStream())).toThrow(Error);
+    });
+
+    it('applies an added chunk through the same data()+update() path as a manual call', async () => {
+      const scene = makeScene();
+      const chart = new GraphChart(scene, generator.bar());
+      chart.y((d) => d.value);
+      chart.data([{ id: 1, value: 1 }], (d) => d.id);
+      chart.render();
+
+      const source = makePushStream();
+      chart.stream(source);
+      source.push({ added: [{ id: 2, value: 2 }], updated: [], removed: [] });
+      await flush();
+
+      expect(chart.data()).toEqual([{ id: 1, value: 1 }, { id: 2, value: 2 }]);
+      expect(scene.children.length).toBe(2);
+    });
+
+    it('applies updated and removed chunks, keyed the same way as data(arr, keyFn)', async () => {
+      const scene = makeScene();
+      const chart = new GraphChart(scene, generator.bar());
+      chart.y((d) => d.value);
+      chart.data([{ id: 1, value: 1 }, { id: 2, value: 2 }], (d) => d.id);
+      chart.render();
+
+      const source = makePushStream();
+      chart.stream(source);
+      source.push({ added: [], updated: [{ id: 1, value: 100 }], removed: [{ id: 2 }] });
+      await flush();
+
+      // The removed member's default dissolve transition needs a RAF tick to
+      // finish (covered by update()'s own tests above) — only the join
+      // result itself is this test's concern.
+      expect(chart.data()).toEqual([{ id: 1, value: 100 }]);
+      // destroy() stops that still-pending dissolve transition, so it
+      // doesn't leak a real RAF registration against the shared anim/loop
+      // singleton into a later test file's describe block.
+      chart.destroy();
+    });
+
+    it('replacing the binding with a second stream() call disposes the first dataStream', () => {
+      const chart = new GraphChart(makeScene(), generator.bar());
+      chart.y((d) => d.value);
+      chart.data([{ id: 0, value: 0 }], (d) => d.id);
+      chart.render();
+
+      const first = makePushStream();
+      const second = makePushStream();
+      chart.stream(first);
+      chart.stream(second);
+
+      expect(first.dispose).toHaveBeenCalledTimes(1);
+    });
+
+    it('destroy() disposes the active dataStream', () => {
+      const chart = new GraphChart(makeScene(), generator.bar());
+      chart.y((d) => d.value);
+      chart.data([{ id: 0, value: 0 }], (d) => d.id);
+      chart.render();
+
+      const source = makePushStream();
+      chart.stream(source);
+      chart.destroy();
+
+      expect(source.dispose).toHaveBeenCalledTimes(1);
+    });
+
+    it('backpressure: a burst of chunks that arrive faster than they can be applied only applies the latest', async () => {
+      const scene = makeScene();
+      const chart = new GraphChart(scene, generator.bar());
+      chart.y((d) => d.value);
+      chart.data([{ id: 1, value: 1 }], (d) => d.id);
+      chart.render();
+
+      const source = makePushStream();
+      chart.stream(source);
+
+      // Chunk 2 fully applies and parks on its post-apply macrotask yield.
+      source.push({ added: [{ id: 2, value: 2 }], updated: [], removed: [] });
+      await flush();
+      expect(chart.data().map((d) => d.id)).toEqual([1, 2]);
+
+      // Chunks 3/4/5 arrive back-to-back while the applier is parked — the
+      // pump loop drains all three into the single pending slot, each
+      // overwriting the last, before the applier ever wakes up to look.
+      source.push({ added: [{ id: 3, value: 3 }], updated: [], removed: [] });
+      source.push({ added: [{ id: 4, value: 4 }], updated: [], removed: [] });
+      source.push({ added: [{ id: 5, value: 5 }], updated: [], removed: [] });
+      await flush();
+
+      await vi.advanceTimersByTimeAsync(0); // wakes the parked applier
+      await flush();
+      await vi.advanceTimersByTimeAsync(0); // its own post-apply yield settles
+      await flush();
+
+      const ids = chart.data().map((d) => d.id);
+      expect(ids).toEqual([1, 2, 5]); // only the latest of the dropped burst survived
+    });
+  });
+
+  describe('enableLOD(options) / disableLOD() (Prompt 163)', () => {
+    let rafCallback = null;
+    let rafIdCounter = 1;
+
+    function tick(now = 0) {
+      expect(rafCallback, 'tick() called but no RAF was scheduled').not.toBeNull();
+      const cb = rafCallback;
+      rafCallback = null;
+      cb(now);
+    }
+
+    function makeCamera(initialDistance) {
+      let distance = initialDistance;
+      return {
+        position: { distanceTo: () => distance },
+        setDistance: (d) => {
+          distance = d;
+        },
+      };
+    }
+
+    const rows = Array.from({ length: 10 }, (_, i) => ({ id: i, value: i }));
+
+    beforeEach(() => {
+      rafCallback = null;
+      rafIdCounter = 1;
+      vi.stubGlobal(
+        'requestAnimationFrame',
+        vi.fn((cb) => {
+          rafCallback = cb;
+          return rafIdCounter++;
+        }),
+      );
+      vi.stubGlobal('cancelAnimationFrame', vi.fn(() => { rafCallback = null; }));
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      vi.restoreAllMocks();
+    });
+
+    it('throws TypeError for an invalid levels array or a camera without position.distanceTo', () => {
+      const chart = new GraphChart(makeScene(), generator.bar());
+      chart.data(rows, (d) => d.id);
+      chart.y((d) => d.value);
+      chart.render();
+      expect(() => chart.enableLOD({ levels: [], camera: makeCamera(5) })).toThrow(TypeError);
+      expect(() => chart.enableLOD({ levels: [{ maxDistance: 10, maxPoints: 3 }], camera: {} })).toThrow(TypeError);
+      chart.destroy();
+    });
+
+    it('throws if render() was never called', () => {
+      const chart = new GraphChart(makeScene(), generator.bar());
+      expect(() => chart.enableLOD({ levels: [{ maxDistance: 10, maxPoints: 3 }], camera: makeCamera(5) })).toThrow(Error);
+    });
+
+    it('applies the initial level immediately, decimating the currently bound data', () => {
+      const chart = new GraphChart(makeScene(), generator.bar());
+      chart.data(rows, (d) => d.id);
+      chart.y((d) => d.value);
+      chart.render();
+
+      chart.enableLOD({
+        camera: makeCamera(5),
+        levels: [{ maxDistance: 10, maxPoints: 3 }],
+      });
+
+      expect(chart.data()).toHaveLength(3);
+      chart.destroy();
+    });
+
+    it('re-decimates and calls update() when a camera-distance change crosses into a farther level', () => {
+      const chart = new GraphChart(makeScene(), generator.bar());
+      chart.data(rows, (d) => d.id);
+      chart.y((d) => d.value);
+      chart.render();
+      const camera = makeCamera(5);
+
+      chart.enableLOD({
+        camera,
+        levels: [
+          { maxDistance: 10, maxPoints: 10 },
+          { maxDistance: 100, maxPoints: 3 },
+        ],
+      });
+      expect(chart.data()).toHaveLength(10);
+
+      camera.setDistance(50);
+      tick();
+
+      expect(chart.data()).toHaveLength(3);
+      chart.destroy();
+    });
+
+    it('is a no-op (no re-join) when the camera stays within the same level bucket', () => {
+      const chart = new GraphChart(makeScene(), generator.bar());
+      chart.data(rows, (d) => d.id);
+      chart.y((d) => d.value);
+      chart.render();
+      const camera = makeCamera(5);
+
+      chart.enableLOD({
+        camera,
+        levels: [
+          { maxDistance: 10, maxPoints: 10 },
+          { maxDistance: 100, maxPoints: 3 },
+        ],
+      });
+      const updateSpy = vi.spyOn(chart, 'update');
+
+      camera.setDistance(6); // still within the first (10) bucket
+      tick();
+
+      expect(updateSpy).not.toHaveBeenCalled();
+      chart.destroy();
+    });
+
+    it('disableLOD() stops the per-frame check', () => {
+      const chart = new GraphChart(makeScene(), generator.bar());
+      chart.data(rows, (d) => d.id);
+      chart.y((d) => d.value);
+      chart.render();
+      const camera = makeCamera(5);
+
+      chart.enableLOD({
+        camera,
+        levels: [
+          { maxDistance: 10, maxPoints: 10 },
+          { maxDistance: 100, maxPoints: 3 },
+        ],
+      });
+      chart.disableLOD();
+
+      camera.setDistance(50);
+      expect(rafCallback).toBeNull(); // nothing left to tick — the callback was unregistered
+      expect(chart.data()).toHaveLength(10);
+      chart.destroy();
+    });
+
+    it('destroy() also stops the per-frame check', () => {
+      const chart = new GraphChart(makeScene(), generator.bar());
+      chart.data(rows, (d) => d.id);
+      chart.y((d) => d.value);
+      chart.render();
+      chart.enableLOD({ camera: makeCamera(5), levels: [{ maxDistance: 10, maxPoints: 3 }] });
+
+      chart.destroy();
+
+      expect(rafCallback).toBeNull();
+    });
+
+    it('calling enableLOD() again re-snapshots the full dataset from the current bind', () => {
+      const chart = new GraphChart(makeScene(), generator.bar());
+      chart.data(rows, (d) => d.id);
+      chart.y((d) => d.value);
+      chart.render();
+
+      chart.enableLOD({ camera: makeCamera(5), levels: [{ maxDistance: 10, maxPoints: 3 }] });
+      expect(chart.data()).toHaveLength(3);
+
+      const moreRows = Array.from({ length: 20 }, (_, i) => ({ id: i, value: i }));
+      chart.data(moreRows, (d) => d.id);
+      chart.update();
+      chart.enableLOD({ camera: makeCamera(5), levels: [{ maxDistance: 10, maxPoints: 5 }] });
+
+      expect(chart.data()).toHaveLength(5);
+      chart.destroy();
+    });
+  });
+
+  describe('compact() (Prompt 168)', () => {
+    it('throws if render() was never called', () => {
+      const chart = new GraphChart(makeScene(), generator.bar());
+      expect(() => chart.compact()).toThrow(Error);
+    });
+
+    it('is a no-op when the backend is already instanced (at/above INSTANCING_THRESHOLD)', () => {
+      const scene = makeScene();
+      const chart = new GraphChart(scene, generator.bar());
+      const rows = Array.from({ length: 60 }, (_, i) => i);
+      chart.data(rows);
+      chart.render();
+      const instancedMesh = scene.children[0];
+
+      expect(chart.compact()).toBe(chart);
+
+      expect(scene.children[0]).toBe(instancedMesh);
+      expect(scene.children.length).toBe(1);
+    });
+
+    it('merges a GraphMesh[] backend into a single GraphInstancedObject, preserving live position/scale', () => {
+      const scene = makeScene();
+      const chart = new GraphChart(scene, generator.bar());
+      chart.data([3, 5, 2]);
+      chart.render();
+      const meshes = scene.children.slice();
+      const livePositions = meshes.map((m) => m.position.toArray());
+      const liveScales = meshes.map((m) => m.scale.toArray());
+
+      expect(chart.compact()).toBe(chart);
+
+      expect(scene.children.length).toBe(1);
+      expect(scene.children[0]).toBeInstanceOf(THREE.InstancedMesh);
+      const merged = scene.children[0];
+      const matrix = new THREE.Matrix4();
+      const position = new THREE.Vector3();
+      const quaternion = new THREE.Quaternion();
+      const scaleOut = new THREE.Vector3();
+      for (let i = 0; i < 3; i++) {
+        merged.getMatrixAt(i, matrix);
+        matrix.decompose(position, quaternion, scaleOut);
+        expect(position.toArray()).toEqual(livePositions[i]);
+        expect(scaleOut.toArray().map((v) => Math.fround(v))).toEqual(liveScales[i].map((v) => Math.fround(v)));
+      }
+    });
+
+    it('preserves each mesh\'s live (possibly handler-overridden) color via instanceColor', () => {
+      const scene = makeScene();
+      const chart = new GraphChart(scene, generator.bar());
+      chart.data([3, 5, 2]);
+      chart.render();
+      chart.selection().attr('color', (d, i) => (i === 1 ? '#00ff00' : '#ff0000'));
+
+      chart.compact();
+
+      const merged = scene.children[0];
+      expect(merged.instanceColor).not.toBeNull();
+      const readBack = (i) => new THREE.Color().fromBufferAttribute(merged.instanceColor, i);
+      expect(readBack(0).getHexString()).toBe('ff0000');
+      expect(readBack(1).getHexString()).toBe('00ff00');
+      expect(readBack(2).getHexString()).toBe('ff0000');
+    });
+
+    it('preserves selection().data() and disposes the original meshes', () => {
+      const scene = makeScene();
+      const chart = new GraphChart(scene, generator.bar());
+      chart.data([3, 5, 2], (d) => d);
+      chart.render();
+      const originalMeshes = scene.children.slice();
+
+      chart.compact();
+
+      expect(chart.selection().data()).toEqual([3, 5, 2]);
+      expect(chart.selection().size()).toBe(3);
+      for (const mesh of originalMeshes) {
+        expect(scene.children.includes(mesh)).toBe(false);
+      }
+    });
+
+    it('is irreversible — a second compact() call is a no-op on the now-instanced backend', () => {
+      const scene = makeScene();
+      const chart = new GraphChart(scene, generator.bar());
+      chart.data([1, 2]);
+      chart.render();
+
+      chart.compact();
+      const merged = scene.children[0];
+      chart.compact();
+
+      expect(scene.children[0]).toBe(merged);
+      expect(scene.children.length).toBe(1);
+    });
+  });
+
+  describe('window(size) (Prompt 168)', () => {
+    let rafCallback = null;
+    let rafIdCounter = 1;
+
+    function tick(now) {
+      expect(rafCallback, 'tick() called but no RAF was scheduled').not.toBeNull();
+      const cb = rafCallback;
+      rafCallback = null;
+      cb(now);
+    }
+
+    beforeEach(() => {
+      rafCallback = null;
+      rafIdCounter = 1;
+      vi.stubGlobal(
+        'requestAnimationFrame',
+        vi.fn((cb) => {
+          rafCallback = cb;
+          return rafIdCounter++;
+        }),
+      );
+      vi.stubGlobal('cancelAnimationFrame', vi.fn(() => { rafCallback = null; }));
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      vi.restoreAllMocks();
+    });
+
+    it('getter form returns null when unset, and the configured size once set', () => {
+      const chart = new GraphChart(makeScene(), generator.bar());
+      expect(chart.window()).toBeNull();
+      expect(chart.window(5)).toBe(chart);
+      expect(chart.window()).toBe(5);
+    });
+
+    it('throws TypeError for a non-positive-integer size', () => {
+      const chart = new GraphChart(makeScene(), generator.bar());
+      expect(() => chart.window(0)).toThrow(TypeError);
+      expect(() => chart.window(-1)).toThrow(TypeError);
+      expect(() => chart.window(1.5)).toThrow(TypeError);
+      expect(() => chart.window('5')).toThrow(TypeError);
+    });
+
+    it('caps the initial render() to the last size entries', () => {
+      const chart = new GraphChart(makeScene(), generator.bar());
+      chart.window(2);
+      chart.data([1, 2, 3, 4, 5], (d) => d);
+
+      chart.render();
+
+      expect(chart.selection().data()).toEqual([4, 5]);
+    });
+
+    it('trims oldest entries past the cap on update(), dissolving them out via the normal exit path', () => {
+      const scene = makeScene();
+      const chart = new GraphChart(scene, generator.bar());
+      chart.window(3);
+      chart.data([1, 2, 3], (d) => d);
+      chart.render();
+      expect(scene.children.length).toBe(3);
+
+      chart.data([1, 2, 3, 4], (d) => d); // pushes past the cap of 3 — "1" should be trimmed
+      chart.update();
+
+      expect(chart.selection().data()).toEqual([2, 3, 4]);
+      tick(0);
+      tick(400); // dissolve transition completes (default duration 250ms)
+      expect(scene.children.length).toBe(3);
+    });
+
+    it('a registered onExit handler still fires for window-trimmed entries (same exit path as any other exit)', () => {
+      const chart = new GraphChart(makeScene(), generator.bar());
+      chart.window(2);
+      chart.data([1, 2], (d) => d);
+      chart.render();
+
+      const onExit = vi.fn();
+      chart.onExit(onExit);
+      chart.data([1, 2, 3], (d) => d);
+      chart.update();
+
+      expect(onExit).toHaveBeenCalledTimes(1);
+      expect(chart.selection().data()).toEqual([2, 3]);
+    });
+
+    it('is a no-op when data length stays within the cap', () => {
+      const chart = new GraphChart(makeScene(), generator.bar());
+      chart.window(10);
+      chart.data([1, 2, 3], (d) => d);
+
+      chart.render();
+
+      expect(chart.selection().data()).toEqual([1, 2, 3]);
+    });
+  });
+
   describe('destroy() (Prompt 131)', () => {
     let rafCallback = null;
     let rafIdCounter = 1;
@@ -992,6 +1505,7 @@ describe('GraphChart', () => {
       expect(() => chart.selection()).toThrow(pattern);
       expect(() => chart.render()).toThrow(pattern);
       expect(() => chart.update()).toThrow(pattern);
+      expect(() => chart.stream(null)).toThrow(pattern);
       expect(() => chart.exportSelection([])).toThrow(pattern);
       expect(() => chart.importSelection([])).toThrow(pattern);
     });

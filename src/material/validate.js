@@ -32,3 +32,17 @@ export function assertFiniteNumber(callerName, name, value) {
     );
   }
 }
+
+/**
+ * @param {string} callerName - e.g. `'material.dataDriven'`.
+ * @param {*} palette
+ * @throws {TypeError} If `palette` is not a palette function with a precomputed `.colors` array.
+ */
+export function assertPaletteFunction(callerName, palette) {
+  if (typeof palette !== 'function' || !Array.isArray(palette.colors) || palette.colors.length === 0) {
+    throw new TypeError(
+      `${callerName}: palette must be a compose/palette function with a precomputed .colors ` +
+        `array (e.g. palette.viridis), received ${JSON.stringify(palette)}.`,
+    );
+  }
+}

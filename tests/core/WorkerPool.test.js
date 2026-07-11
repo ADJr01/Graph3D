@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { WorkerPool } from '../../src/core/WorkerPool.js';
+import { createWorkerFactory } from '../../src/core/worker/workerBlob.js';
 
 // ── Mock Worker ───────────────────────────────────────────────────────────────
 
@@ -166,6 +167,55 @@ describe('exec — validation', () => {
     const pool = makePool();
     pool.dispose();
     await expect(pool.exec('sort', {})).rejects.toThrow(/disposed/);
+  });
+});
+
+// ── register (Prompt 169) ────────────────────────────────────────────────────
+
+describe('register', () => {
+  // register() delegates to worker/workerBlob.js's own registerWorkerTask,
+  // whose real effect is only observable through createWorkerFactory() —
+  // mirrors tests/core/worker/workerBlob.test.js's own FakeWorker/URL stub setup.
+  class FakeWorker {
+    constructor(url) {
+      this.url = url;
+      this.messages = [];
+    }
+    postMessage(data) { this.messages.push(data); }
+    terminate() {}
+  }
+
+  const origCreateObjectURL = URL.createObjectURL;
+  beforeEach(() => {
+    URL.createObjectURL = vi.fn(() => 'blob:test-workerpool-register');
+    vi.stubGlobal('Worker', FakeWorker);
+  });
+  afterEach(() => {
+    URL.createObjectURL = origCreateObjectURL;
+    vi.unstubAllGlobals();
+  });
+
+  it('returns this for chaining', () => {
+    const pool = makePool();
+    expect(pool.register('chainable', (p) => p)).toBe(pool);
+    pool.dispose();
+  });
+
+  it('propagates registerWorkerTask\'s own validation errors', () => {
+    const pool = makePool();
+    expect(() => pool.register('', () => {})).toThrow(TypeError);
+    expect(() => pool.register('bad', 'not a function')).toThrow(TypeError);
+    pool.dispose();
+  });
+
+  it('a registered task reaches workers created by createWorkerFactory() as a { type: register } message', () => {
+    const pool = makePool();
+    pool.register('poolRegisteredTask', (p) => p.data.reverse());
+
+    const worker = createWorkerFactory()();
+    const regs = worker.messages.filter((m) => m.type === 'register');
+    expect(regs.some((m) => m.name === 'poolRegisteredTask')).toBe(true);
+    pool.dispose();
   });
 });
 

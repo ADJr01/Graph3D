@@ -199,6 +199,15 @@ const filtered = await g.workers.exec('myFilter', { data: bigArray, threshold: 1
 
 `registerWorkerTask` must be called before the first `exec` that uses the task name. The function body is serialized as a string and reconstructed inside the worker bootstrap.
 
+**`g.workers.register(taskName, fn)` (Prompt 169)** is the same thing through `Graph3D`'s own `workers` getter — a thin delegate to `registerWorkerTask` (CLAUDE.md §1.1 DRY, no second registration mechanism), for callers who'd rather reach everything worker-related off one instance instead of a separate top-level import:
+
+```js
+g.workers.register('myFilter', ({ data, threshold }) => data.filter((v) => v > threshold));
+const filtered = await g.workers.exec('myFilter', { data: bigArray, threshold: 100 });
+```
+
+Returns the pool itself (`this`) for chaining. Since `registerWorkerTask` writes to a registry `createWorkerFactory()`'s own workers consult, `register()` works on any `WorkerPool` — not just `g.workers` — as long as it was built with `createWorkerFactory()` (the only worker source this library ships); a pool built with a fully custom `workerFactory` (see this class's own constructor doc) won't see any effect from it.
+
 ---
 
 ## Disposal Contract

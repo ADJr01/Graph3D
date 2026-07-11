@@ -6,11 +6,12 @@ const EXPECTED_PRESET_NAMES = [
   'standard', 'physical', 'basic', 'lambert', 'phong', 'toon', 'matcap',
   'holographic', 'crystal', 'glass', 'frostedGlass', 'neon', 'pulse',
   'glow', 'velvet', 'liquidMercury', 'chrome', 'gold', 'copper', 'pearl',
-  'obsidian', 'dataDriven', 'volumeRaymarch', 'addPlanarReflection', 'setPaletteForAttribute',
+  'obsidian', 'dataDriven', 'freshness', 'dataStream', 'volumeRaymarch',
+  'addPlanarReflection', 'setPaletteForAttribute',
 ];
 
 describe('material namespace', () => {
-  it('exposes exactly every Prompt 101-106/111/139 preset factory as a function', () => {
+  it('exposes exactly every Prompt 101-106/111/139/166 preset factory as a function', () => {
     expect(Object.keys(material).sort()).toEqual([...EXPECTED_PRESET_NAMES].sort());
     for (const name of EXPECTED_PRESET_NAMES) {
       expect(typeof material[name]).toBe('function');

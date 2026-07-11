@@ -1,7 +1,8 @@
 import * as THREE from 'three';
-import { assertPlainOptions } from '../validate.js';
+import { assertPlainOptions, assertPaletteFunction } from '../validate.js';
 import { wrapDisposeWithCleanup } from './lifecycle.js';
 import { paletteTexture as buildPaletteTexture } from '../texture/procedural.js';
+import { INSTANCED_CLIP_POSITION } from './shaderChunks.js';
 
 const GLSL_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
@@ -51,12 +52,7 @@ export function dataDriven(options) {
     ...rest
   } = options;
 
-  if (typeof palette !== 'function' || !Array.isArray(palette.colors) || palette.colors.length === 0) {
-    throw new TypeError(
-      'material.dataDriven: palette must be a compose/palette function with a precomputed .colors ' +
-        'array (e.g. palette.viridis), received ' + JSON.stringify(palette) + '.',
-    );
-  }
+  assertPaletteFunction('material.dataDriven', palette);
   if (typeof valueAttribute !== 'string' || !GLSL_IDENTIFIER.test(valueAttribute)) {
     throw new TypeError(
       `material.dataDriven: valueAttribute must be a valid GLSL identifier, received ${JSON.stringify(valueAttribute)}.`,
@@ -102,13 +98,7 @@ void main() {
   #ifdef USE_INSTANCING_COLOR
     vInstanceColor = instanceColor;
   #endif
-
-  #ifdef USE_INSTANCING
-    vec4 worldPosition = modelMatrix * instanceMatrix * vec4(position, 1.0);
-  #else
-    vec4 worldPosition = modelMatrix * vec4(position, 1.0);
-  #endif
-  gl_Position = projectionMatrix * viewMatrix * worldPosition;
+${INSTANCED_CLIP_POSITION}
 }
 `;
 

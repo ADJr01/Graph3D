@@ -96,6 +96,21 @@ material.setPaletteForAttribute(bars, 'value', palette.viridis);
 
 One call instead of hand-assembling `GraphObjectMaterial` + `dataDriven`. Note the actual signature is `setPaletteForAttribute(object, attrName, palette, options)`, not `object.material.setPaletteForAttribute(...)` — `GraphInstancedObject.material` can never gain new methods (see above), so the object is the first argument instead.
 
+### Streaming-aware freshness (Prompt 166, Phase 10)
+
+Two more custom-shader presets that both read a per-instance `age` attribute — a `performance.now()` millisecond timestamp the *caller* stamps when a datum enters or updates (e.g. `selection.attr('age', () => performance.now())` inside a `chart.stream()` consumer, `docs/concepts/stream.md`). Neither preset writes `age` itself — same "attribute already written elsewhere" contract as `dataDriven`'s `valueAttribute`. Both keep a `uNow` uniform current every frame off the shared render loop (`core/Graph3DLoop`) to compare against it.
+
+```js
+points.defineAttribute('age', 1);
+selection.attr('age', () => performance.now()); // stamp on every enter/update join
+
+material.freshness(800, { color: '#39ff14' });                          // pulse-then-settle on arrival
+material.dataStream({ trailLength: 2000, palette: palette.plasma });    // comet-trail fade + auto-prune
+```
+
+- **`freshness(decayMs, options)`** fades `color` from full intensity down to `baseOpacity` (default `0.15`) over `decayMs` milliseconds — newly-arrived/updated instances flash and settle instead of popping in indistinguishably from data that's been sitting there a while.
+- **`dataStream({ trailLength, palette })`** samples `palette` from full color at `age=0` down to the palette's far end as an instance approaches `trailLength` ms old, then `discard`s the fragment entirely once it's older — a self-pruning comet trail, with no per-frame opacity bookkeeping required from the caller.
+
 ### Planar reflections (Prompt 111)
 
 ```js
