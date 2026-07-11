@@ -118,16 +118,32 @@ export class WorkerPool {
     this.#maxSize = size ?? Math.max(2, concurrency - 1);
   }
 
-  /** Maximum number of concurrent workers this pool will maintain. */
+  /**
+   * Maximum number of concurrent workers this pool will maintain.
+   *
+   * @returns {number}
+   */
   get size() { return this.#maxSize; }
 
-  /** Idle timeout in milliseconds before a worker is terminated. */
+  /**
+   * Idle timeout in milliseconds before a worker is terminated.
+   *
+   * @returns {number}
+   */
   get idleTimeoutMs() { return this.#idleTimeoutMs; }
 
-  /** Number of tasks currently executing on workers. */
+  /**
+   * Number of tasks currently executing on workers.
+   *
+   * @returns {number}
+   */
   get pendingCount() { return this.#pending.size; }
 
-  /** Number of tasks waiting for a free worker. */
+  /**
+   * Number of tasks waiting for a free worker.
+   *
+   * @returns {number}
+   */
   get queueLength() { return this.#queue.length; }
 
   /**

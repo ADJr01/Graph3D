@@ -299,6 +299,7 @@ export class SDFText {
    * the same cached texture (loaded once, see `loadAtlas`), so disposing it
    * per-instance would break every other still-alive `SDFText`.
    * Idempotent.
+   * @returns {void}
    * @example text.dispose();
    */
   dispose() {

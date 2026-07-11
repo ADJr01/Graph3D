@@ -19,6 +19,11 @@ export class Aggregator {
   #pool;
   #disposed = false;
 
+  /**
+   * Creates its own lazily-used `WorkerPool` for `run()`.
+   *
+   * @example new Aggregator();
+   */
   constructor() {
     this.#pool = new WorkerPool({ workerFactory: createWorkerFactory() });
   }

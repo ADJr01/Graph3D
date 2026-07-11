@@ -111,6 +111,7 @@ export class AreaChart extends GraphChart {
    * First call materializes the wall; every later call routes to `update()`.
    * @returns {this}
    * @throws {Error} If `data(arr)` was never called before this render.
+   * @see GraphChart#render
    */
   render() {
     this.#assertNotDestroyed('render');
@@ -127,6 +128,7 @@ export class AreaChart extends GraphChart {
    * Recomputes the wall from the latest `data()` and replaces the live mesh.
    * @returns {this}
    * @throws {Error} If `render()` hasn't successfully run yet.
+   * @see GraphChart#update
    */
   update() {
     this.#assertNotDestroyed('update');
@@ -142,6 +144,7 @@ export class AreaChart extends GraphChart {
    * handler-clearing and marking the shared inherited setters as destroyed.
    * Idempotent.
    * @returns {void}
+   * @see GraphChart#destroy
    */
   destroy() {
     if (this.#destroyed) return;

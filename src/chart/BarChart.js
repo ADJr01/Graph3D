@@ -161,6 +161,7 @@ export class BarChart extends GraphChart {
    * (Prompt 141) afterward either way.
    * @returns {this}
    * @throws {Error} If `data(arr)` was never called before this render.
+   * @see GraphChart#render
    */
   render() {
     super.render();
@@ -173,6 +174,7 @@ export class BarChart extends GraphChart {
    * every Prompt 127/141 style field across the (possibly changed) live selection.
    * @returns {this}
    * @throws {Error} If `render()` hasn't successfully run yet.
+   * @see GraphChart#update
    */
   update() {
     super.update();

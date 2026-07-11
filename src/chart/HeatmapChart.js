@@ -93,6 +93,7 @@ export class HeatmapChart extends GraphChart {
    * palette fallback and `.opacity()` afterward either way.
    * @returns {this}
    * @throws {Error} If `data(arr)` was never called before this render.
+   * @see GraphChart#render
    */
   render() {
     super.render();
@@ -105,6 +106,7 @@ export class HeatmapChart extends GraphChart {
    * `.color()`/`.opacity()` across the (possibly changed) live selection.
    * @returns {this}
    * @throws {Error} If `render()` hasn't successfully run yet.
+   * @see GraphChart#update
    */
   update() {
     super.update();

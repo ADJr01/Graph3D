@@ -367,6 +367,7 @@ export class VolumeChart extends GraphChart {
    * `update()`.
    * @returns {this}
    * @throws {Error} If `values(fn)` was never called before this render.
+   * @see GraphChart#render
    */
   render() {
     this.#assertNotDestroyed('render');
@@ -384,6 +385,7 @@ export class VolumeChart extends GraphChart {
    * `.resolution()` and rebuilds the volume cube to match.
    * @returns {this}
    * @throws {Error} If `render()` hasn't successfully run yet.
+   * @see GraphChart#update
    */
   update() {
     this.#assertNotDestroyed('update');
@@ -399,6 +401,7 @@ export class VolumeChart extends GraphChart {
    * `dispose()` frees its density/palette textures), then defers to
    * `GraphChart.destroy()`. Idempotent.
    * @returns {void}
+   * @see GraphChart#destroy
    */
   destroy() {
     if (this.#destroyed) return;

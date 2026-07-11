@@ -124,6 +124,7 @@ export class LineChart extends GraphChart {
    * routes to `update()`.
    * @returns {this}
    * @throws {Error} If `data(arr)` was never called before this render.
+   * @see GraphChart#render
    */
   render() {
     this.#assertNotDestroyed('render');
@@ -144,6 +145,7 @@ export class LineChart extends GraphChart {
    * `GraphLine`.
    * @returns {this}
    * @throws {Error} If `render()` hasn't successfully run yet.
+   * @see GraphChart#update
    */
   update() {
     this.#assertNotDestroyed('update');
@@ -176,6 +178,7 @@ export class LineChart extends GraphChart {
    * for handler-clearing and marking the shared inherited setters
    * (`x()`/`y()`/`z()`/`filter()`/...) as destroyed. Idempotent.
    * @returns {void}
+   * @see GraphChart#destroy
    */
   destroy() {
     if (this.#destroyed) return;

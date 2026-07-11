@@ -224,15 +224,17 @@ Layers are ordered bottom-to-top. A layer may only import from layers **below** 
 
 ---
 
-### Phase 10 — Streaming & Scale
+### Phase 10 — Streaming & Scale — **DONE**
 **Scope:** `src/stream/`  
-**Prompts:** 166–190  
+**Prompts:** 166–190 (actually delivered as Prompts 160–172 — `prompts.md` is the real sequencing authority per CLAUDE.md §10; see `docs/concepts/scale.md` and `docs/concepts/stream.md`)  
 **Exit criteria:**
-- [ ] `DataStream` accepts `AsyncIterable<Chunk>` and pipes into live chart updates
-- [ ] LOD (level-of-detail) decimation triggered when instance count exceeds configurable threshold
-- [ ] GPGPU aggregation computes spatial histograms and bin statistics on the GPU
-- [ ] Origin-shifting maintains float32 precision for coordinates > 1 km from origin
-- [ ] Worker tasks registered for: sort, decimate, aggregate, spatial-bin
+- [x] `DataStream` accepts `AsyncIterable<Chunk>` and pipes into live chart updates — `DataStream` (Prompt 160) + `chart.stream()` (Prompt 161).
+- [x] LOD (level-of-detail) decimation triggered when instance count exceeds configurable threshold — delivered as **camera-distance**-bucketed decimation (`levels: [{maxDistance, maxPoints}, ...]`), not a raw instance-count trigger: distance-to-camera is what actually determines what needs full detail, and it composes with, rather than duplicates, `chart.data().length` itself as the count being decimated *to*. `LOD` (Prompt 163, standalone) + `chart.enableLOD()` (same prompt, `GraphChart` sugar).
+- [x] GPGPU aggregation computes spatial histograms and bin statistics on the GPU — split into two more useful, independently-consumed pieces rather than one literal GPU histogram/bin-stats engine: `Aggregator` (Prompt 162, CPU/worker-offloaded grouped reduction — sum/mean/max/min/count/percentile) covers "bin statistics"; `GPGPU` (Prompt 165) ended up as GPU-accelerated many-body **force** computation (`layout.force`'s `'charge'` force, offloaded past 5,000 nodes) rather than spatial histograms — the concrete consumer that emerged (force-directed `NetworkChart` layouts at real scale) needed that, not GPU-side binning; no code in this codebase currently computes a spatial histogram on the GPU.
+- [x] Origin-shifting maintains float32 precision for coordinates > 1 km from origin — `OriginShift` (Prompt 164), default `threshold: 1000` matches "> 1 km" exactly.
+- [x] Worker tasks registered for: sort, decimate, aggregate, spatial-bin — `'sort'`/`'decimate'`/`'aggregate'` (Prompt 162) exist as literally-named built-in tasks (`src/core/worker/tasks.js`); there's no separately-named `'spatial-bin'` task — `'aggregate'`'s `groupKey` covers that use case (group by a precomputed spatial-bin key) without a second, near-duplicate task (CLAUDE.md §1.1 DRY). `g.workers.register()` (Prompt 169) additionally lets a caller register their own named tasks onto the same pool.
+
+Also delivered, beyond the original exit criteria: `JoinDiff` (Prompt 167, worker-offloaded join diff above 10,000 rows), `chart.compact()`/`chart.window()` + `memoryPressure()` (Prompt 168, memory bounding for long-running streams), two capstone examples (`examples/22-million-points/`, `examples/23-live-trading/`, Prompt 170), and `bench/stress-million.bench.js` + `tests/integration/phase10.test.js` (Prompt 171) — which surfaced two real, currently-unfixed defects (an `O(n²)` octree degenerate-leaf case, and picking silently breaking once a chart's mesh is moved off-origin) documented in full in `skipping_list.md`'s Phase 10 section and summarized in `docs/concepts/scale.md`'s own closing section, rather than fixed under a testing/docs prompt's scope (CLAUDE.md §7 decision tree). 196 files / 3096 tests passing; lint clean; `madge --circular src/` clean.
 
 ---
 

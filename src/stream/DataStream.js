@@ -48,9 +48,13 @@ export class DataStream {
   #disposed = false;
 
   /**
+   * Prefer the static factories (`from`/`fromArray`/`fromInterval`/`fromWebSocket`)
+   * over calling this directly.
+   *
    * @param {AsyncIterable} source
    * @param {() => void} [onDispose] - Releases any resource the source owns (socket, timer).
    * @throws {TypeError} If `source` isn't async-iterable.
+   * @example new DataStream(myAsyncIterable, () => socket.close());
    */
   constructor(source, onDispose = null) {
     if (!source || typeof source[Symbol.asyncIterator] !== 'function') {
@@ -202,7 +206,17 @@ export class DataStream {
     return new DataStream(iterable, () => socket.close());
   }
 
-  /** @returns {AsyncIterator<{added: Array, updated: Array, removed: Array}>} */
+  /**
+   * Iterates the stream's chunks, normalizing each one to `{added, updated, removed}`
+   * regardless of the shape the underlying source yields.
+   *
+   * @returns {AsyncIterator<{added: Array, updated: Array, removed: Array}>}
+   * @throws {Error} If the stream has been disposed.
+   * @example
+   * for await (const { added } of stream) {
+   *   chart.data(added, (d) => d.id).render();
+   * }
+   */
   [Symbol.asyncIterator]() {
     this.#assertNotDisposed();
     const iterator = this.#source[Symbol.asyncIterator]();

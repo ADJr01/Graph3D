@@ -220,6 +220,7 @@ export class ParticleSystem {
    * @param {function(ParticleSystem, Object): void} factory
    * @throws {TypeError} If `name` is not a non-empty string, or `factory` is
    *   not a function.
+   * @returns {void}
    * @example ParticleSystem.registerPreset('dust', (system, opts) => system.emit({...}));
    */
   static registerPreset(name, factory) {
@@ -452,6 +453,8 @@ export class ParticleSystem {
    * never schedules its own `requestAnimationFrame`, per CLAUDE.md §2).
    * @param {number} deltaSeconds
    * @throws {Error} If disposed.
+   * @returns {void}
+   * @example g.loop.add((dt) => system.update(dt));
    */
   update(deltaSeconds) {
     this.#assertNotDisposed('update');
@@ -485,6 +488,7 @@ export class ParticleSystem {
   /**
    * Releases the geometry, material, and (GPU path) render targets/textures.
    * Idempotent — safe to call twice.
+   * @returns {void}
    * @example rain.dispose();
    */
   dispose() {

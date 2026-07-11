@@ -66,6 +66,7 @@ export class GraphLine extends GraphObject {
    * (`linewidth`/`resolution`/`dashed` are `LineMaterial`-specific).
    * @returns {LineMaterial}
    * @throws {Error} If called after `dispose()`.
+   * @example line.material.color.set('crimson');
    */
   get material() {
     this.#assertNotDisposed('material');

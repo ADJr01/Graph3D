@@ -78,10 +78,18 @@ export class FrameBudget extends EventTarget {
     this.#windowSize = windowSize;
   }
 
-  /** The configured per-frame budget in milliseconds. */
+  /**
+   * The configured per-frame budget in milliseconds.
+   *
+   * @returns {number}
+   */
   get budgetMs() { return this.#budgetMs; }
 
-  /** The number of consecutive slow frames required to emit. */
+  /**
+   * The number of consecutive slow frames required to emit.
+   *
+   * @returns {number}
+   */
   get windowSize() { return this.#windowSize; }
 
   /**

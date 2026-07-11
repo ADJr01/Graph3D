@@ -24,6 +24,12 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Type check (src vs types/index.d.ts drift)
+        run: npm run typecheck
+
+      - name: Type tests (tsd)
+        run: npm run test:types
+
       - name: Test
         run: npm test
 

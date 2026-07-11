@@ -21,6 +21,7 @@ function toFn(valueOrFn) {
  *   the interaction range. `theta` (default `0.9`) is the Barnes-Hut
  *   accuracy threshold.
  * @returns {(nodes: object[], alpha: number) => void}
+ * @example sim.force('charge', layout.force.charge(-30));
  */
 export function forceCharge(strength = -30, { distanceMin = DEFAULT_CHARGE_DISTANCE_MIN, distanceMax = Infinity, theta = DEFAULT_THETA } = {}) {
   const distanceMinSq = distanceMin * distanceMin;
@@ -54,6 +55,7 @@ export function forceCharge(strength = -30, { distanceMin = DEFAULT_CHARGE_DISTA
  *   d3-force's `1 / min(linkCountOf(source), linkCountOf(target))`, so
  *   highly-connected nodes don't get dragged around by every single link.
  * @returns {(nodes: object[], alpha: number) => void}
+ * @example sim.force('link', layout.force.link(links, { distance: 40 }));
  */
 export function forceLink(links = [], { distance = 30, strength } = {}) {
   const distanceFn = toFn(distance);
@@ -102,6 +104,7 @@ export function forceLink(links = [], { distance = 30, strength } = {}) {
  * @param {number} [x] @param {number} [y] @param {number} [z] Target centroid. Default origin.
  * @param {number} [strength] Default `1`.
  * @returns {(nodes: object[], alpha: number) => void}
+ * @example sim.force('center', layout.force.center());
  */
 export function forceCenter(x = 0, y = 0, z = 0, strength = 1) {
   return function centerForce(nodes, alpha) {
@@ -175,6 +178,7 @@ export function forceCollide(radius = 1, strength = 1) {
  * @param {(node: object) => *} keyFn Resolves each node's cluster identity.
  * @param {number} [strength] Default `0.3`.
  * @returns {(nodes: object[], alpha: number) => void}
+ * @example sim.force('cluster', layout.force.cluster((d) => d.group));
  */
 export function forceCluster(keyFn, strength = 0.3) {
   return function clusterForce(nodes, alpha) {
@@ -212,6 +216,7 @@ export function forceCluster(keyFn, strength = 0.3) {
  * @param {number} [x] @param {number} [y] @param {number} [z] Sphere center. Default origin.
  * @param {number} [strength] Default `0.1`.
  * @returns {(nodes: object[], alpha: number) => void}
+ * @example sim.force('radial', layout.force.radial(100));
  */
 export function forceRadial(radius, x = 0, y = 0, z = 0, strength = 0.1) {
   const radiusFn = toFn(radius);

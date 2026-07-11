@@ -67,7 +67,13 @@ export const effects = {
     return [...registry.values()].map((preset) => ({ name: preset.name, options: preset.schema }));
   },
 
-  /** @param {string} name @returns {boolean} */
+  /**
+   * Whether `name` is a registered effect preset.
+   *
+   * @param {string} name
+   * @returns {boolean}
+   * @example effects.has('glow'); // true
+   */
   has(name) {
     return registry.has(name);
   },

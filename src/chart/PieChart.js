@@ -338,6 +338,7 @@ export class PieChart extends GraphChart {
    * routes to `update()`.
    * @returns {this}
    * @throws {Error} If `data(arr)` was never called before this render.
+   * @see GraphChart#render
    */
   render() {
     this.#assertNotDestroyed('render');
@@ -356,6 +357,7 @@ export class PieChart extends GraphChart {
    * Previously-exploded datums (by reference) stay exploded.
    * @returns {this}
    * @throws {Error} If `render()` hasn't successfully run yet.
+   * @see GraphChart#update
    */
   update() {
     this.#assertNotDestroyed('update');
@@ -370,6 +372,7 @@ export class PieChart extends GraphChart {
    * Disposes every slice mesh, then defers to `GraphChart.destroy()`.
    * Idempotent.
    * @returns {void}
+   * @see GraphChart#destroy
    */
   destroy() {
     if (this.#destroyed) return;

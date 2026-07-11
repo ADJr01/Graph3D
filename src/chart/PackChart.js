@@ -215,6 +215,7 @@ export class PackChart extends GraphChart {
    * `update()`.
    * @returns {this}
    * @throws {Error} If `data(datum)` was never called before this render.
+   * @see GraphChart#render
    */
   render() {
     this.#assertNotDestroyed('render');
@@ -233,6 +234,7 @@ export class PackChart extends GraphChart {
    * backend to match the current node count.
    * @returns {this}
    * @throws {Error} If `render()` hasn't successfully run yet.
+   * @see GraphChart#update
    */
   update() {
     this.#assertNotDestroyed('update');
@@ -247,6 +249,7 @@ export class PackChart extends GraphChart {
    * Disposes every node render object, then defers to `GraphChart.destroy()`.
    * Idempotent.
    * @returns {void}
+   * @see GraphChart#destroy
    */
   destroy() {
     if (this.#destroyed) return;

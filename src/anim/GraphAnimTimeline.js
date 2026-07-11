@@ -339,7 +339,12 @@ export class GraphAnimTimeline {
     }
   }
 
-  /** Clears all tracks and callbacks. Not a GPU/DOM/RAF resource, so this is hygiene rather than the formal disposal contract (CLAUDE.md §3). */
+  /**
+   * Clears all tracks and callbacks. Not a GPU/DOM/RAF resource, so this is hygiene rather than the formal disposal contract (CLAUDE.md §3).
+   *
+   * @returns {void}
+   * @example timeline.dispose();
+   */
   dispose() {
     this.#tracks = [];
     this.#updateCallbacks = [];

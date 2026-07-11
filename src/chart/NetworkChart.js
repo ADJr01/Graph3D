@@ -248,6 +248,7 @@ export class NetworkChart extends GraphChart {
    * simulation; every later call routes to `update()`.
    * @returns {this}
    * @throws {Error} If `data(arr)` was never called before this render.
+   * @see GraphChart#render
    */
   render() {
     this.#assertNotDestroyed('render');
@@ -266,6 +267,7 @@ export class NetworkChart extends GraphChart {
    * rebuilds the node/edge render backend to match the current counts.
    * @returns {this}
    * @throws {Error} If `render()` hasn't successfully run yet.
+   * @see GraphChart#update
    */
   update() {
     this.#assertNotDestroyed('update');
@@ -301,6 +303,7 @@ export class NetworkChart extends GraphChart {
    * Disposes every node/edge render object, then defers to
    * `GraphChart.destroy()`. Idempotent.
    * @returns {void}
+   * @see GraphChart#destroy
    */
   destroy() {
     if (this.#destroyed) return;

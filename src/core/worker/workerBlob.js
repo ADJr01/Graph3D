@@ -39,7 +39,8 @@ const pendingRegistrations = new Map();
  *
  * @param {string} name - Task name passed to `WorkerPool.exec(name, payload)`.
  * @param {function(*): * | Promise<*>} fn - Task implementation. Receives `payload`.
- * @throws {TypeError}
+ * @throws {TypeError} If `name` is not a non-empty string.
+ * @throws {TypeError} If `fn` is not a function.
  * @example
  * registerWorkerTask('kmeans', ({ data, k }) => { /* pure computation *\/ });
  * const pool = new WorkerPool({ workerFactory: createWorkerFactory() });

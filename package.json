@@ -4,6 +4,7 @@
   "type": "module",
   "description": "A developer-first 3D data visualization framework that treats charts as fully inspectable, fully controllable Three.js scenes — not black-box widgets.",
   "main": "src/index.js",
+  "types": "types/index.d.ts",
   "sideEffects": false,
   "keywords": [
     "3d",
@@ -21,7 +22,10 @@
     "build": "rollup -c",
     "lint": "eslint src",
     "format": "prettier --write src",
-    "bench": "node bench/harness.js"
+    "typecheck": "tsc --noEmit",
+    "test:types": "tsd",
+    "bench": "node bench/harness.js",
+    "bench:stress": "node bench/stress-million.bench.js"
   },
   "peerDependencies": {
     "three": ">=0.150.0"
@@ -29,12 +33,15 @@
   "devDependencies": {
     "@rollup/plugin-node-resolve": "^16.0.3",
     "@rollup/plugin-terser": "^1.0.0",
+    "@types/three": "^0.185.1",
     "@vitest/coverage-v8": "^4.1.9",
     "eslint": "^10.6.0",
     "jsdom": "^29.1.1",
     "prettier": "^3.9.3",
     "rollup": "^4.62.2",
     "three": "^0.185.0",
+    "tsd": "^0.33.0",
+    "typescript": "^7.0.2",
     "vite": "^8.1.0",
     "vitest": "^4.1.9"
   }

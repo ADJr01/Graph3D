@@ -53,6 +53,17 @@ export function force() {
 
   const sim = {};
 
+  /**
+   * Gets or sets the simulation's node array. Setting seeds missing
+   * `x`/`y`/`z` with a small random scatter (`INITIAL_SPREAD`) and zeroes
+   * `vx`/`vy`/`vz`/acceleration, so a fresh `nodes()` call is always safe to
+   * `tick()` immediately.
+   * @param {object[]} [nextNodes]
+   * @returns {object[]|object} The current node array if called with no
+   *   arguments; `sim` itself (chainable) if called with `nextNodes`.
+   * @throws {TypeError} If `nextNodes` is not an array.
+   * @example sim.nodes([{ id: 'a' }, { id: 'b' }]);
+   */
   sim.nodes = function (nextNodes) {
     if (arguments.length === 0) return nodes;
     if (!Array.isArray(nextNodes)) {
@@ -73,6 +84,15 @@ export function force() {
     return sim;
   };
 
+  /**
+   * Gets, sets, or removes a named force. Pass `null` as `forceInstance` to
+   * remove a previously-set force.
+   * @param {string} name
+   * @param {Function|null} [forceInstance]
+   * @returns {Function|object} The current force instance if called with only
+   *   `name`; `sim` itself (chainable) if `forceInstance` is passed.
+   * @example sim.force('charge', layout.force.charge(-30));
+   */
   sim.force = function (name, forceInstance) {
     if (arguments.length === 1) return forces.get(name);
     if (forceInstance === null) {
@@ -83,26 +103,64 @@ export function force() {
     return sim;
   };
 
+  /**
+   * Gets or sets the simulation's current "temperature" — decays toward
+   * `alphaTarget` every `tick()`; `active()` returns `false` once it drops
+   * to `alphaMin`.
+   * @param {number} [value]
+   * @returns {number|object} The current value if called with no arguments;
+   *   `sim` itself (chainable) if `value` is passed.
+   * @example sim.alpha(1);
+   */
   sim.alpha = function (value) {
     if (arguments.length === 0) return alpha;
     alpha = value;
     return sim;
   };
+  /**
+   * Gets or sets the `alpha` threshold below which `tick()` auto-pauses.
+   * @param {number} [value]
+   * @returns {number|object} The current value if called with no arguments;
+   *   `sim` itself (chainable) if `value` is passed.
+   * @example sim.alphaMin(0.001);
+   */
   sim.alphaMin = function (value) {
     if (arguments.length === 0) return alphaMin;
     alphaMin = value;
     return sim;
   };
+  /**
+   * Gets or sets the per-tick multiplier `alpha` decays toward `alphaTarget` by.
+   * @param {number} [value]
+   * @returns {number|object} The current value if called with no arguments;
+   *   `sim` itself (chainable) if `value` is passed.
+   * @example sim.alphaDecay(0.02);
+   */
   sim.alphaDecay = function (value) {
     if (arguments.length === 0) return alphaDecay;
     alphaDecay = value;
     return sim;
   };
+  /**
+   * Gets or sets the resting `alpha` value the simulation decays toward —
+   * a non-zero target keeps the simulation "warm" (e.g. during a drag).
+   * @param {number} [value]
+   * @returns {number|object} The current value if called with no arguments;
+   *   `sim` itself (chainable) if `value` is passed.
+   * @example sim.alphaTarget(0.3); // keep warm while dragging
+   */
   sim.alphaTarget = function (value) {
     if (arguments.length === 0) return alphaTarget;
     alphaTarget = value;
     return sim;
   };
+  /**
+   * Gets or sets the fraction of velocity retained each tick (`1 - friction`).
+   * @param {number} [value]
+   * @returns {number|object} The current value if called with no arguments;
+   *   `sim` itself (chainable) if `value` is passed.
+   * @example sim.velocityDecay(0.4);
+   */
   sim.velocityDecay = function (value) {
     if (arguments.length === 0) return velocityDecay;
     velocityDecay = value;

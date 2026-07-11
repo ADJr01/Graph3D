@@ -1,24 +1,45 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="33557d05-3974-4e5d-9972-8791b8163414" name="Changes" comment="Phase 9 Complete">
+    <list default="true" id="33557d05-3974-4e5d-9972-8791b8163414" name="Changes" comment="Phase 10 on process">
+      <change beforePath="$PROJECT_DIR$/.github/workflows/ci.yml" beforeDir="false" afterPath="$PROJECT_DIR$/.github/workflows/ci.yml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/concepts/chart.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/concepts/chart.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/concepts/core.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/concepts/core.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/concepts/material.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/concepts/material.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/BUILD_PLAN.md" beforeDir="false" afterPath="$PROJECT_DIR$/BUILD_PLAN.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/concepts/stream.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/concepts/stream.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/package-lock.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/skipping_list.md" beforeDir="false" afterPath="$PROJECT_DIR$/skipping_list.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/anim/CameraTour.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/anim/CameraTour.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/anim/GraphAnimTimeline.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/anim/GraphAnimTimeline.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/chart/AreaChart.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/chart/AreaChart.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/chart/BarChart.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/chart/BarChart.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/chart/GraphChart.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/chart/GraphChart.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/chart/HeatmapChart.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/chart/HeatmapChart.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/chart/LineChart.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/chart/LineChart.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/chart/NetworkChart.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/chart/NetworkChart.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/chart/PackChart.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/chart/PackChart.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/chart/PieChart.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/chart/PieChart.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/chart/ScatterChart.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/chart/ScatterChart.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/chart/SurfaceChart.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/chart/SurfaceChart.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/chart/TreeChart.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/chart/TreeChart.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/chart/VolumeChart.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/chart/VolumeChart.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/compose/layout/force/forces.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/layout/force/forces.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/compose/layout/force/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/layout/force/index.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/compose/palette/categorical.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/palette/categorical.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/compose/palette/diverging.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/palette/diverging.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/compose/palette/sequentialSingleHue.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/palette/sequentialSingleHue.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/core/FrameBudget.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/FrameBudget.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/core/Graph3DLoop.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/Graph3DLoop.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/core/WorkerPool.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/WorkerPool.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/core/worker/tasks.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/worker/tasks.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/index.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/material/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/material/index.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/material/presets/dataDriven.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/material/presets/dataDriven.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/material/presets/shaderChunks.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/material/presets/shaderChunks.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/material/validate.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/material/validate.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/chart/GraphChart.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/chart/GraphChart.test.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/core/Graph3D.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/core/Graph3D.test.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/core/WorkerPool.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/core/WorkerPool.test.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/core/worker/tasks.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/core/worker/tasks.test.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/material/index.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/material/index.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/core/worker/workerBlob.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/worker/workerBlob.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/material/GraphObjectMaterial.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/material/GraphObjectMaterial.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/material/effects/registry.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/material/effects/registry.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/material/text/SDFText.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/material/text/SDFText.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/object/GraphLine.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/object/GraphLine.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/postfx/PostFX.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/postfx/PostFX.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/postfx/particles/ParticleSystem.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/postfx/particles/ParticleSystem.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/stream/Aggregator.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/stream/Aggregator.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/stream/DataStream.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/stream/DataStream.js" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -97,7 +118,7 @@
       <workItem from="1783614608273" duration="3887000" />
       <workItem from="1783658853786" duration="611000" />
       <workItem from="1783660433298" duration="14586000" />
-      <workItem from="1783746142508" duration="9802000" />
+      <workItem from="1783746142508" duration="27096000" />
     </task>
     <task id="LOCAL-00001" summary="graph3D created">
       <option name="closed" value="true" />
@@ -163,7 +184,15 @@
       <option name="project" value="LOCAL" />
       <updated>1783707254528</updated>
     </task>
-    <option name="localTasksCounter" value="9" />
+    <task id="LOCAL-00009" summary="Phase 10 on process">
+      <option name="closed" value="true" />
+      <created>1783756301739</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
+      <option name="project" value="LOCAL" />
+      <updated>1783756301739</updated>
+    </task>
+    <option name="localTasksCounter" value="10" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -177,6 +206,7 @@
     <MESSAGE value="Phase 7 On Process" />
     <MESSAGE value="Phase 8 continuing" />
     <MESSAGE value="Phase 9 Complete" />
-    <option name="LAST_COMMIT_MESSAGE" value="Phase 9 Complete" />
+    <MESSAGE value="Phase 10 on process" />
+    <option name="LAST_COMMIT_MESSAGE" value="Phase 10 on process" />
   </component>
 </project>

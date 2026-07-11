@@ -31,7 +31,11 @@ export class Graph3DLoop {
     document.addEventListener('visibilitychange', this.#onVisibilityChange);
   }
 
-  /** True while the loop is intended to be active (even if temporarily suspended by tab hide). */
+  /**
+   * True while the loop is intended to be active (even if temporarily suspended by tab hide).
+   *
+   * @returns {boolean}
+   */
   get isRunning() {
     return this.#running;
   }
@@ -57,6 +61,10 @@ export class Graph3DLoop {
    * Unregister a frame callback. Auto-stops the loop when the last callback is removed.
    *
    * @param {function} callback - Must be the same reference passed to `add`.
+   * @example
+   * const tick = (delta) => { mesh.rotation.y += delta; };
+   * loop.add(tick);
+   * loop.remove(tick);
    */
   remove(callback) {
     this.#callbacks.delete(callback);
@@ -66,6 +74,8 @@ export class Graph3DLoop {
   /**
    * Manually start the loop. No-op if already running.
    * Respects tab visibility — RAF is deferred if the tab is hidden.
+   *
+   * @example loop.start();
    */
   start() {
     if (this.#running) return;
@@ -76,6 +86,8 @@ export class Graph3DLoop {
   /**
    * Manually stop the loop. No-op if already stopped.
    * Resets the last-time reference so the next `start` gets delta=0 on its first tick.
+   *
+   * @example loop.stop();
    */
   stop() {
     if (!this.#running) return;
@@ -87,6 +99,8 @@ export class Graph3DLoop {
   /**
    * Release all resources: cancels the RAF, clears all callbacks, removes the
    * visibility listener. Safe to call multiple times.
+   *
+   * @example loop.dispose();
    */
   dispose() {
     this.stop();

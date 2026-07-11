@@ -243,6 +243,7 @@ export class CameraTour {
    * @param {THREE.Camera} camera
    * @param {{center?: number[], radius?: number, height?: number, duration?: number, segments?: number, easing?: (string|((t:number)=>number))}} [options]
    * @returns {CameraTour}
+   * @throws {TypeError} If `segments` is not an integer >= 3.
    * @example CameraTour.orbit(camera, { center: [0, 0, 0], radius: 15, duration: 8000 });
    */
   static orbit(camera, { center = [0, 0, 0], radius = 10, height = 5, duration = 8000, segments = 8, easing = 'linear' } = {}) {

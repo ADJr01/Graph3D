@@ -134,6 +134,7 @@ export class PostFX {
    * @param {PostFXPassDefinition} definition
    * @throws {TypeError} If `name` is not a non-empty string, `definition.create`
    *   is not a function, or `definition.order` is not a finite number.
+   * @returns {void}
    * @example PostFX.registerPass('vignette', { order: 90, create: () => new VignettePass() });
    */
   static registerPass(name, definition) {
@@ -165,6 +166,7 @@ export class PostFX {
    *   the options `enable()` should be called with for that pass.
    * @throws {TypeError} If `name` is not a non-empty string, or `passOpts` is
    *   not a plain object.
+   * @returns {void}
    * @example PostFX.registerPreset('minimal', { fxaa: {} });
    */
   static registerPreset(name, passOpts) {
@@ -382,6 +384,7 @@ export class PostFX {
    * @param {import('three').Scene} scene
    * @param {import('three').Camera} camera
    * @throws {Error} If disposed.
+   * @returns {void}
    * @example fx.setSceneCamera(scene.three, scene.camera.three);
    */
   setSceneCamera(scene, camera) {
@@ -397,6 +400,7 @@ export class PostFX {
    * @param {number} width
    * @param {number} height
    * @throws {Error} If disposed.
+   * @returns {void}
    * @example fx.setSize(window.innerWidth, window.innerHeight);
    */
   setSize(width, height) {
@@ -409,6 +413,7 @@ export class PostFX {
    *
    * @param {number} [deltaSeconds]
    * @throws {Error} If disposed.
+   * @returns {void}
    * @example fx.render(deltaSeconds);
    */
   render(deltaSeconds) {
@@ -419,6 +424,7 @@ export class PostFX {
   /**
    * Release every active pass and the composer's render targets.
    * Idempotent — safe to call twice.
+   * @returns {void}
    * @example fx.dispose();
    */
   dispose() {

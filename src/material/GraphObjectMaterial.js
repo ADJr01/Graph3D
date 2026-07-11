@@ -320,6 +320,7 @@ export class GraphObjectMaterial {
    * listener). Does not dispose the wrapped material — the target
    * (`GraphMesh`/`GraphInstancedObject`) owns and disposes that itself.
    * Idempotent.
+   * @returns {void}
    * @example wrapper.dispose();
    */
   dispose() {

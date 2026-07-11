@@ -1,4 +1,4 @@
-# Stream — Phase 10 (in progress)
+# Stream — Phase 10 (complete)
 
 Stream is Layer 10 of Graph3D.js — live/large data sources. `DataStream` (Prompt 160) is the first piece: it wraps any source of incoming data — a plain async generator, a chunked replay of a static array, a polling interval, a WebSocket — behind one uniform shape so everything downstream has a single consumption path instead of one per source type (CLAUDE.md §1.1 DRY). `chart.stream(dataStream)` (Prompt 161, `docs/concepts/chart.md`) is that first downstream consumer: it pulls a `DataStream`'s chunks straight into a chart's normal `data()` + `update()` join.
 
@@ -147,3 +147,7 @@ if (pressure !== null && pressure > 0.8) chart.compact();
 ```
 
 Reads `performance.memory` (`usedJSHeapSize / jsHeapSizeLimit`) — a non-standard, Chromium-only API and the closest thing the web platform exposes to "how close is this page to its heap ceiling." Returns `null` (not a guessed number) wherever it's unavailable: Firefox, Safari, any non-Chromium engine, or an environment with no `performance` global at all — callers should treat `null` as "unknown," not "no pressure." Pair it with `chart.compact()`/`chart.window(size)` (`docs/concepts/chart.md`) yourself, at whatever threshold and polling cadence fits the application.
+
+---
+
+`docs/concepts/scale.md` walks through combining every class on this page (plus `chart.stream()`/`enableLOD()`/`compact()`/`window()` from `docs/concepts/chart.md`, and `g.workers.register()` from `docs/concepts/core.md`) into an actual "get to a million datums" recipe, worked examples included — read this page for any one piece's own contract, that one for how they fit together in order.

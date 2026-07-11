@@ -278,8 +278,8 @@ export class GraphChart {
 
   /**
    * Gets or sets the y-axis accessor and optional scale.
-   * @param {*} [accessorOrScale]
-   * @param {object} [scaleObj]
+   * @param {*} [accessorOrScale] A constant, `(datum, index) => value` accessor, or a scale (scales are callable).
+   * @param {object} [scaleObj] A `compose/scale` instance mapping accessor output to world-space range.
    * @returns {{accessor: Function, scale: object|null}|this}
    * @throws {TypeError} If `accessorOrScale` is given and is neither a constant, function, nor string.
    * @example chart.y((d) => d.value, scale.linear().domain([0, 100]).range([0, 10]));
@@ -290,8 +290,8 @@ export class GraphChart {
 
   /**
    * Gets or sets the z-axis accessor and optional scale.
-   * @param {*} [accessorOrScale]
-   * @param {object} [scaleObj]
+   * @param {*} [accessorOrScale] A constant, `(datum, index) => value` accessor, or a scale (scales are callable).
+   * @param {object} [scaleObj] A `compose/scale` instance mapping accessor output to world-space range.
    * @returns {{accessor: Function, scale: object|null}|this}
    * @throws {TypeError} If `accessorOrScale` is given and is neither a constant, function, nor string.
    * @example chart.z((d) => d.depth);
@@ -526,7 +526,7 @@ export class GraphChart {
 
   /**
    * Gets or sets a predicate filtering data before rendering.
-   * @param {(datum: *, index: number) => boolean} [predicateFn]
+   * @param {(datum: *, index: number) => boolean} [predicateFn] Returns `true` to keep a datum.
    * @returns {((datum:*, index:number) => boolean)|null|this}
    * @throws {TypeError} If `predicateFn` is given and isn't a function.
    * @example chart.filter((d) => d.value > 0);
@@ -543,7 +543,7 @@ export class GraphChart {
 
   /**
    * Gets or sets a comparator ordering data before rendering.
-   * @param {(a: *, b: *) => number} [compareFn]
+   * @param {(a: *, b: *) => number} [compareFn] Standard `Array.prototype.sort` comparator.
    * @returns {((a:*, b:*) => number)|null|this}
    * @throws {TypeError} If `compareFn` is given and isn't a function.
    * @example chart.sort((a, b) => a.value - b.value);
@@ -566,7 +566,7 @@ export class GraphChart {
    * (`transform.smooth`/`decimate`/`aggregate`/`normalize`/`sort`) provides
    * ready-made ones, but any function of that shape works. Composable — call
    * `.use()` multiple times to chain several transforms.
-   * @param {(data: Array) => Array} middlewareFn
+   * @param {(data: Array) => Array} middlewareFn Transforms the array and returns the replacement.
    * @returns {this}
    * @throws {TypeError} If `middlewareFn` isn't a function.
    * @example chart.data(rawSamples).use(transform.smooth(5)).use(transform.decimate(200));
@@ -1036,8 +1036,8 @@ export class GraphChart {
    * `handler(payload)`). Both share this one entry point (matching D3's own
    * unified `.on()`) but are stored and dispatched separately internally —
    * see `INTERACTION_EVENTS`'s own comment for why.
-   * @param {'enter'|'update'|'exit'|'hover'|'select'|'deselect'|'brushStart'|'brushEnd'|'lassoStart'|'lassoEnd'|'dragStart'|'dragEnd'|'focus'} event
-   * @param {(...args: *) => void} handler
+   * @param {'enter'|'update'|'exit'|'hover'|'select'|'deselect'|'brushStart'|'brushEnd'|'lassoStart'|'lassoEnd'|'dragStart'|'dragEnd'|'focus'} event Event name to listen for.
+   * @param {(...args: *) => void} handler Called with the event's payload (a `Selection` for lifecycle events, an interaction payload object otherwise).
    * @returns {this}
    * @throws {TypeError} If `event` isn't recognized, or `handler` isn't a function.
    * @example chart.on('exit', (selection) => selection.transition().duration(400).attr('opacity', 0).remove());
@@ -1068,8 +1068,8 @@ export class GraphChart {
    * detect a pointer/keyboard event. Deliberately rejects `'enter'`/
    * `'update'`/`'exit'` — those are only ever dispatched internally by
    * `update()`'s own data-join, never through this generic path.
-   * @param {'hover'|'select'|'deselect'|'brushStart'|'brushEnd'|'lassoStart'|'lassoEnd'|'dragStart'|'dragEnd'|'focus'} event
-   * @param {*} payload
+   * @param {'hover'|'select'|'deselect'|'brushStart'|'brushEnd'|'lassoStart'|'lassoEnd'|'dragStart'|'dragEnd'|'focus'} event Interaction event name to fire.
+   * @param {*} payload Passed as-is to every registered handler.
    * @returns {this}
    * @throws {TypeError} If `event` isn't a recognized interaction event.
    * @example chart.dispatch('select', { chart, datum, mesh, instanceIndex, worldPoint, domEvent });
@@ -1091,7 +1091,7 @@ export class GraphChart {
 
   /**
    * Sugar for `on('enter', fn)`.
-   * @param {(selection: Selection) => void} fn
+   * @param {(selection: Selection) => void} fn Called with the newly entered `Selection`.
    * @returns {this}
    * @example chart.onEnter((entered) => entered.attr('scale.y', 0.01));
    */
@@ -1101,7 +1101,7 @@ export class GraphChart {
 
   /**
    * Sugar for `on('update', fn)`.
-   * @param {(selection: Selection) => void} fn
+   * @param {(selection: Selection) => void} fn Called with the updated `Selection`.
    * @returns {this}
    * @example chart.onUpdate((updated) => updated.attr('position.y', (d) => d.value));
    */
@@ -1111,7 +1111,7 @@ export class GraphChart {
 
   /**
    * Sugar for `on('exit', fn)`.
-   * @param {(selection: Selection) => void} fn
+   * @param {(selection: Selection) => void} fn Called with the exiting `Selection`.
    * @returns {this}
    * @example chart.onExit((exited) => exited.transition().duration(400).attr('opacity', 0).remove());
    */

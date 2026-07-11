@@ -144,6 +144,7 @@ export class SurfaceChart extends GraphChart {
    * overlay); every later call routes to `update()`.
    * @returns {this}
    * @throws {TypeError} If `.values()` hasn't been set, or is a grid smaller than 2x2.
+   * @see GraphChart#render
    */
   render() {
     this.#assertNotDestroyed('render');
@@ -158,6 +159,7 @@ export class SurfaceChart extends GraphChart {
    * mesh/lines.
    * @returns {this}
    * @throws {Error} If `render()` hasn't successfully run yet.
+   * @see GraphChart#update
    */
   update() {
     this.#assertNotDestroyed('update');
@@ -172,6 +174,7 @@ export class SurfaceChart extends GraphChart {
    * Disposes the live surface mesh and any contour lines, then defers to
    * `GraphChart.destroy()`. Idempotent.
    * @returns {void}
+   * @see GraphChart#destroy
    */
   destroy() {
     if (this.#destroyed) return;
