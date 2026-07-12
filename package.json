@@ -24,6 +24,7 @@
     "format": "prettier --write src",
     "typecheck": "tsc --noEmit",
     "test:types": "tsd",
+    "bundle:budget": "node scripts/bundle-budget.js",
     "bench": "node bench/harness.js",
     "bench:stress": "node bench/stress-million.bench.js"
   },
@@ -39,6 +40,7 @@
     "jsdom": "^29.1.1",
     "prettier": "^3.9.3",
     "rollup": "^4.62.2",
+    "rollup-plugin-visualizer": "^7.0.1",
     "three": "^0.185.0",
     "tsd": "^0.33.0",
     "typescript": "^7.0.2",

@@ -36,22 +36,8 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Bundle size check
-        run: |
-          node -e "
-          const {statSync}=require('fs');
-          const LIMIT=100*1024;
-          const files=['dist/graph3d.esm.js','dist/graph3d.esm.min.js','dist/graph3d.umd.js'];
-          let fail=false;
-          for(const f of files){
-            const {size}=statSync(f);
-            const kb=(size/1024).toFixed(1);
-            const over=f.endsWith('.min.js')&&size>LIMIT;
-            if(over)fail=true;
-            console.log((over?'FAIL':'PASS')+' '+f+': '+kb+' KB');
-          }
-          if(fail){console.error('Minified bundle exceeds '+LIMIT/1024+' KB limit');process.exit(1);}
-          "
+      - name: Bundle budget (full ESM min+gz, bar-chart-only tree-shake)
+        run: npm run bundle:budget
 
       - name: Benchmark
         run: npm run bench

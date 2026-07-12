@@ -121,7 +121,17 @@ await scene.shadows.enable('csm'); // 4-cascade CSM, registers a per-frame updat
 
 ```js
 await scene.environment.setHDR('studio-1k'); // built-in preset name, or a URL
+await scene.environment.setHDR('/assets/my-sunset.exr'); // custom HDRI, .hdr or .exr
+
+// Letting an end user supply their own HDRI file:
+fileInput.addEventListener('change', async () => {
+  const url = URL.createObjectURL(fileInput.files[0]);
+  await scene.environment.setHDR(url);
+  URL.revokeObjectURL(url);
+});
 ```
+
+The loader is chosen by file extension — `.hdr` → `RGBELoader`, `.exr` → `EXRLoader`, anything else is rejected by both loaders (this call is for HDR equirects specifically; use `setSkybox` for LDR panoramas).
 
 Built-in presets: `studio-1k`, `cinema-night`, `daylight`. HDR textures are **ref-counted across every `GraphSceneEnvironment` instance sharing the same URL** — the file is fetched and PMREM-processed exactly once no matter how many scenes reference it, and the underlying textures are disposed only when the last referencing instance releases them (via `dispose()`, `clear()`, or loading a different HDR):
 
@@ -142,7 +152,7 @@ The two `volumetric-*` presets fall back to `FogExp2` and emit a `console.warn` 
 
 ### Skybox
 
-`setSkybox()` accepts either 6 cube-face URLs or a single equirectangular image (`.hdr` routed through `RGBELoader`, everything else through `TextureLoader`). Skybox textures are **not** ref-counted — the caller owns their lifecycle.
+`setSkybox()` accepts either 6 cube-face URLs or a single equirectangular image (`.hdr` routed through `RGBELoader`, `.exr` through `EXRLoader`, everything else through `TextureLoader`). Skybox textures are **not** ref-counted — the caller owns their lifecycle.
 
 ---
 

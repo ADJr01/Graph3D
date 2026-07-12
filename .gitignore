@@ -3,3 +3,12 @@ dist/
 .vite/
 coverage/
 *.log
+
+# Local dev-only test assets
+HDRI/
+
+# Claude/dev-strategy planning files — internal roadmap, not part of the shipped library
+.claude/
+prompts.md
+skipping_list.md
+BUILD_PLAN.md

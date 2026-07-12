@@ -156,6 +156,22 @@ async function handleHDR(name) {
   }
 }
 
+document.getElementById('customHdrInput').addEventListener('change', async (event) => {
+  const file = event.target.files[0];
+  if (!file || !scene.environment) return;
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    setStatus('');
+    // Object URLs have no extension — the '#name.ext' suffix is how
+    // GraphSceneEnvironment picks RGBELoader vs EXRLoader (see its JSDoc).
+    await scene.environment.setHDR(`${objectUrl}#${file.name}`);
+  } catch (error) {
+    reportError(`setHDR(custom file '${file.name}') failed`, error);
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+});
+
 function handleFog(name) {
   if (!scene.environment) return;
   try {

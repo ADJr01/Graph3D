@@ -40,16 +40,49 @@ const VOLUMETRIC_PRESETS = new Set(['volumetric-low', 'volumetric-cinematic']);
 const hdrCache = new Map();
 
 /**
- * Load an HDR file, generate a PMREM env texture, and return both textures.
+ * Extract a lowercase file extension for loader dispatch. `blob:` object
+ * URLs from an `<input type="file">` picker carry no extension, so a
+ * fragment is checked first — a caller can hint the real filename via
+ * `URL.createObjectURL(file) + '#' + file.name`. The fragment is never sent
+ * over the wire, so this doesn't change what gets fetched.
+ * @param {string} url
+ * @returns {string}
+ */
+function _equirectExtension(url) {
+  const hint = url.includes('#') ? url.split('#').pop() : url.split('?')[0];
+  return hint.toLowerCase().split('.').pop();
+}
+
+/**
+ * Load an equirectangular image file, selecting the loader by file extension:
+ * `.hdr` → `RGBELoader`, `.exr` → `EXRLoader`, anything else → `THREE.TextureLoader`
+ * (LDR formats: jpg/png/webp). All three loaders share the same
+ * `load(url, onLoad, onProgress, onError)` signature, so callers don't need
+ * to branch again once the file is loaded.
+ * @param {string} url
+ * @returns {Promise<THREE.Texture>}
+ */
+async function _loadEquirectFile(url) {
+  const ext = _equirectExtension(url);
+  if (ext === 'hdr') {
+    const { RGBELoader } = await import('three/examples/jsm/loaders/RGBELoader.js');
+    return new Promise((resolve, reject) => new RGBELoader().load(url, resolve, undefined, reject));
+  }
+  if (ext === 'exr') {
+    const { EXRLoader } = await import('three/examples/jsm/loaders/EXRLoader.js');
+    return new Promise((resolve, reject) => new EXRLoader().load(url, resolve, undefined, reject));
+  }
+  return new Promise((resolve, reject) => new THREE.TextureLoader().load(url, resolve, undefined, reject));
+}
+
+/**
+ * Load an HDR/EXR file, generate a PMREM env texture, and return both textures.
  * @param {string} url
  * @param {THREE.WebGLRenderer} renderer
  * @returns {Promise<{ envTexture: THREE.Texture, bgTexture: THREE.Texture }>}
  */
 async function _loadHDR(url, renderer) {
-  const { RGBELoader } = await import('three/examples/jsm/loaders/RGBELoader.js');
-  const bgTexture = await new Promise((resolve, reject) => {
-    new RGBELoader().load(url, resolve, undefined, reject);
-  });
+  const bgTexture = await _loadEquirectFile(url);
   bgTexture.mapping = THREE.EquirectangularReflectionMapping;
 
   const pmrem = new THREE.PMREMGenerator(renderer);
@@ -108,6 +141,10 @@ function releaseHDR(url) {
 
 /**
  * Manages the environment (HDR lighting, background, fog) of a THREE.Scene.
+ *
+ * `setHDR`/`setSkybox` accept `.hdr` and `.exr` files — including an object
+ * URL from a `<input type="file">` picker, for a developer letting an end
+ * user supply their own HDRI.
  *
  * HDR textures loaded via `setHDR` are ref-counted across all instances:
  * the same URL loads once and the textures are disposed only when the last
@@ -187,12 +224,18 @@ export class GraphSceneEnvironment {
   // ── HDR ────────────────────────────────────────────────────────────────────
 
   /**
-   * Load an HDR file and apply it as the scene environment map (for PBR reflections)
-   * and optionally as the scene background.
+   * Load an HDR or EXR file and apply it as the scene environment map (for PBR
+   * reflections) and optionally as the scene background.
    *
-   * Accepts a URL string or a built-in preset name (`'studio-1k'`, `'cinema-night'`,
-   * `'daylight'`). Textures are ref-counted across instances sharing the same URL —
-   * the file is fetched and processed only once.
+   * Accepts a URL string (`.hdr` or `.exr`, own asset or remote) or a
+   * built-in preset name (`'studio-1k'`, `'cinema-night'`, `'daylight'`).
+   * Textures are ref-counted across instances sharing the same URL — the file
+   * is fetched and processed only once.
+   *
+   * For a user-supplied HDRI (e.g. an `<input type="file">` picker), pass
+   * `URL.createObjectURL(file) + '#' + file.name` — object URLs carry no
+   * extension on their own, and the `#name.ext` suffix is how the loader is
+   * selected (see `_equirectExtension`).
    *
    * The previous HDR's ref is only released once the new one has finished loading,
    * so a rejected load (bad URL, missing file) leaves the previously-applied HDR
@@ -208,6 +251,7 @@ export class GraphSceneEnvironment {
    * @throws {Error} If called after `dispose()`.
    * @example await env.setHDR('studio-1k');
    * @example await env.setHDR('/textures/custom.hdr', { asBackground: false });
+   * @example await env.setHDR(URL.createObjectURL(file) + '#' + file.name); // user-picked file
    */
   async setHDR(url, { asBackground = true } = {}) {
     this.#assertNotDisposed('setHDR');
@@ -331,8 +375,8 @@ export class GraphSceneEnvironment {
    * Set the scene background to a cube skybox or an equirectangular image.
    *
    * - Array of 6 URL strings → loaded as a `THREE.CubeTexture` (±X, ±Y, ±Z order).
-   * - Single URL string → loaded as an equirectangular texture. Use `.hdr` for
-   *   HDR equirects; other extensions are loaded via `THREE.TextureLoader`.
+   * - Single URL string → loaded as an equirectangular texture. Use `.hdr` or
+   *   `.exr` for HDR equirects; other extensions are loaded via `THREE.TextureLoader`.
    *
    * The textures set here are **not** ref-counted; the caller is responsible for
    * disposing them if needed. Does not affect `scene.environment`.
@@ -419,23 +463,13 @@ export class GraphSceneEnvironment {
   // ── Private ────────────────────────────────────────────────────────────────
 
   /**
-   * Load an equirectangular texture, using RGBELoader for .hdr files and
-   * TextureLoader for everything else.
+   * Load an equirectangular texture. See `_loadEquirectFile` for the
+   * extension-based loader dispatch (.hdr / .exr / LDR image formats).
    * @param {string} url
    * @returns {Promise<THREE.Texture>}
    */
   async #loadEquirect(url) {
-    if (url.toLowerCase().endsWith('.hdr')) {
-      const { RGBELoader } = await import('three/examples/jsm/loaders/RGBELoader.js');
-      const texture = await new Promise((resolve, reject) => {
-        new RGBELoader().load(url, resolve, undefined, reject);
-      });
-      texture.mapping = THREE.EquirectangularReflectionMapping;
-      return texture;
-    }
-    const texture = await new Promise((resolve, reject) => {
-      new THREE.TextureLoader().load(url, resolve, undefined, reject);
-    });
+    const texture = await _loadEquirectFile(url);
     texture.mapping = THREE.EquirectangularReflectionMapping;
     return texture;
   }

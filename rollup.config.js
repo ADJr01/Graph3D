@@ -1,9 +1,11 @@
 import resolve from '@rollup/plugin-node-resolve';
 import terser from '@rollup/plugin-terser';
+import { visualizer } from 'rollup-plugin-visualizer';
 import { buildWorkerBlob, workerBlobPlugin } from './scripts/workerBlobPlugin.js';
+import { isThreeImport } from './scripts/rollupExternal.js';
 
 const INPUT = 'src/index.js';
-const EXTERNAL = ['three'];
+const EXTERNAL = isThreeImport;
 
 export default async function () {
   const blob = await buildWorkerBlob();
@@ -17,7 +19,14 @@ export default async function () {
       plugins: [blobPlugin, resolve()],
       output: [
         { file: 'dist/graph3d.esm.js', format: 'es' },
-        { file: 'dist/graph3d.esm.min.js', format: 'es', plugins: [terser()] },
+        {
+          file: 'dist/graph3d.esm.min.js',
+          format: 'es',
+          plugins: [
+            terser(),
+            visualizer({ filename: 'dist/stats.html', gzipSize: true, template: 'treemap' }),
+          ],
+        },
       ],
     },
     // UMD — for <script> tags, global Graph3D

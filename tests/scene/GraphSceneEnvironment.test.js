@@ -12,6 +12,14 @@ vi.mock('three/examples/jsm/loaders/RGBELoader.js', () => ({
   }),
 }));
 
+vi.mock('three/examples/jsm/loaders/EXRLoader.js', () => ({
+  EXRLoader: vi.fn(function MockEXRLoader() {
+    this.load = vi.fn((_url, onLoad) => {
+      onLoad({ isTexture: true, mapping: null, dispose: vi.fn() });
+    });
+  }),
+}));
+
 vi.mock('three', async (importOriginal) => {
   const actual = await importOriginal();
   return {
@@ -37,6 +45,7 @@ vi.mock('three', async (importOriginal) => {
 });
 
 const { RGBELoader } = await import('three/examples/jsm/loaders/RGBELoader.js');
+const { EXRLoader } = await import('three/examples/jsm/loaders/EXRLoader.js');
 
 function makeRenderer() {
   return { domElement: { tagName: 'CANVAS' }, shadowMap: { enabled: false } };
@@ -127,6 +136,30 @@ describe('GraphSceneEnvironment.setHDR()', () => {
     await env.setHDR('studio-1k');
     const loaderInstance = RGBELoader.mock.instances.at(-1);
     expect(loaderInstance.load.mock.calls[0][0]).toContain('studio-1k.hdr');
+  });
+
+  it('calls EXRLoader.load for a .exr URL', async () => {
+    await env.setHDR('/test.exr');
+    expect(EXRLoader).toHaveBeenCalledOnce();
+    expect(RGBELoader).not.toHaveBeenCalled();
+    const loaderInstance = EXRLoader.mock.instances.at(-1);
+    expect(loaderInstance.load).toHaveBeenCalledWith('/test.exr', expect.any(Function), undefined, expect.any(Function));
+  });
+
+  it('sets scene.environment to the PMREM texture for a .exr source', async () => {
+    await env.setHDR('/test.exr');
+    expect(scene.environment).toBeDefined();
+    expect(scene.environment.isPMREM).toBe(true);
+  });
+
+  it('dispatches by the #name.ext fragment when the URL path has no extension (object URLs)', async () => {
+    await env.setHDR('blob:http://localhost/1234-uuid#sunset.exr');
+    expect(EXRLoader).toHaveBeenCalledOnce();
+    expect(RGBELoader).not.toHaveBeenCalled();
+    const loaderInstance = EXRLoader.mock.instances.at(-1);
+    // The full URL (fragment included) is what's handed to the loader —
+    // browsers strip the fragment themselves when resolving the blob.
+    expect(loaderInstance.load.mock.calls[0][0]).toBe('blob:http://localhost/1234-uuid#sunset.exr');
   });
 
   it('returns this', async () => {
@@ -468,6 +501,13 @@ describe('GraphSceneEnvironment.setSkybox()', () => {
   it('loads an equirect skybox from an .hdr URL via RGBELoader', async () => {
     await env.setSkybox('/sky.hdr');
     expect(RGBELoader).toHaveBeenCalledOnce();
+    expect(scene.background).toBeDefined();
+  });
+
+  it('loads an equirect skybox from an .exr URL via EXRLoader', async () => {
+    await env.setSkybox('/sky.exr');
+    expect(EXRLoader).toHaveBeenCalledOnce();
+    expect(RGBELoader).not.toHaveBeenCalled();
     expect(scene.background).toBeDefined();
   });
 
