@@ -157,3 +157,37 @@ describe('Octree subdivision', () => {
     expect(hits).toEqual(['straddler']);
   });
 });
+
+// ── dumpBounds (Prompt 178) ──────────────────────────────────────────────────
+
+describe('Octree.dumpBounds', () => {
+  it('returns a single leaf node covering the root bounds when empty', () => {
+    const octree = makeOctree();
+    const nodes = octree.dumpBounds();
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0]).toMatchObject({ depth: 0, itemCount: 0, isLeaf: true });
+  });
+
+  it('reflects item counts and marks internal nodes non-leaf after a split', () => {
+    const octree = makeOctree({ maxItemsPerNode: 1 });
+    octree.insert('a', new THREE.Vector3(-5, -5, -5));
+    octree.insert('b', new THREE.Vector3(5, 5, 5));
+
+    const nodes = octree.dumpBounds();
+    const root = nodes.find((n) => n.depth === 0);
+    expect(root.isLeaf).toBe(false);
+    expect(root.itemCount).toBe(0);
+
+    const leaves = nodes.filter((n) => n.isLeaf);
+    expect(leaves).toHaveLength(8);
+    expect(leaves.filter((n) => n.itemCount === 1)).toHaveLength(2);
+    expect(leaves.filter((n) => n.itemCount === 0)).toHaveLength(6);
+  });
+
+  it('returns cloned bounds, not the live internal Box3', () => {
+    const octree = makeOctree();
+    const bounds = octree.dumpBounds()[0].bounds;
+    bounds.min.set(-999, -999, -999);
+    expect(octree.dumpBounds()[0].bounds.min.x).toBe(-10);
+  });
+});

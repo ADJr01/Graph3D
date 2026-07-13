@@ -26,7 +26,11 @@
     "test:types": "tsd",
     "bundle:budget": "node scripts/bundle-budget.js",
     "bench": "node bench/harness.js",
-    "bench:stress": "node bench/stress-million.bench.js"
+    "bench:stress": "node bench/stress-million.bench.js",
+    "docs:api": "node scripts/docs-api.js",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
   },
   "peerDependencies": {
     "three": ">=0.150.0"
@@ -37,6 +41,7 @@
     "@types/three": "^0.185.1",
     "@vitest/coverage-v8": "^4.1.9",
     "eslint": "^10.6.0",
+    "jsdoc-to-markdown": "^9.1.3",
     "jsdom": "^29.1.1",
     "prettier": "^3.9.3",
     "rollup": "^4.62.2",
@@ -45,6 +50,7 @@
     "tsd": "^0.33.0",
     "typescript": "^7.0.2",
     "vite": "^8.1.0",
+    "vitepress": "^1.6.4",
     "vitest": "^4.1.9"
   }
 }

@@ -76,6 +76,8 @@ function probeGl(gl, webgl2) {
  * decisions about which rendering code paths are safe to use.
  *
  * No Three.js dependency — safe to instantiate before the renderer exists.
+ * SSR-safe: outside a browser (no `document`) this returns `NULL_CAPABILITIES`
+ * immediately without touching the DOM.
  *
  * @example
  * const probe = new CapabilityProbe();
@@ -95,6 +97,13 @@ export class CapabilityProbe {
    *   Pass the renderer's canvas to avoid allocating a second WebGL context.
    */
   constructor(canvas) {
+    // SSR-safe: no browser means no WebGL, full stop — this is an expected,
+    // normal state server-side (not a degraded-capability warning case).
+    if (typeof document === 'undefined') {
+      this.capabilities = NULL_CAPABILITIES;
+      return;
+    }
+
     const ownCanvas = canvas == null;
     if (ownCanvas) canvas = document.createElement('canvas');
 

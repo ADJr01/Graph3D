@@ -1,5 +1,6 @@
 import { StateMachine } from './StateMachine.js';
 import { dispatchToChart } from './eventEmitter.js';
+import { createVisuallyHiddenElement } from '../core/visuallyHidden.js';
 
 /**
  * Default per-datum description for the ARIA live region: a `"key: value"`
@@ -23,24 +24,13 @@ function defaultDescribe(datum) {
 
 /**
  * Builds the visually-hidden (but screen-reader-visible) `aria-live="polite"`
- * `<div>` `KeyboardNav` announces into — the standard "sr-only" pattern
- * (absolutely positioned, 1×1px, clipped, non-scrolling) rather than
- * `display:none`/`visibility:hidden`, either of which would also hide it from
- * assistive tech and defeat the entire point.
+ * `<div>` `KeyboardNav` announces into, appended to `document.body`.
  * @returns {HTMLElement}
  */
 function createLiveRegion() {
-  const element = document.createElement('div');
+  const element = createVisuallyHiddenElement();
   element.setAttribute('aria-live', 'polite');
   element.setAttribute('aria-atomic', 'true');
-  Object.assign(element.style, {
-    position: 'absolute',
-    width: '1px',
-    height: '1px',
-    overflow: 'hidden',
-    clip: 'rect(0 0 0 0)',
-    whiteSpace: 'nowrap',
-  });
   document.body.appendChild(element);
   return element;
 }

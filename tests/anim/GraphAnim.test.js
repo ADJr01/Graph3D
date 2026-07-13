@@ -250,3 +250,24 @@ describe('tween() (Prompt 95)', () => {
     expect(onUpdate).toHaveBeenCalledWith(10);
   });
 });
+
+// ── timelines (Prompt 178) ───────────────────────────────────────────────────
+
+describe('timelines', () => {
+  it('is empty when no timeline is registered', () => {
+    expect(engine.timelines).toEqual([]);
+  });
+
+  it('lists every registered timeline', () => {
+    const a = engine.timeline({ x: 0 });
+    const b = engine.timeline({ y: 0 });
+    expect(engine.timelines).toEqual([a, b]);
+  });
+
+  it('returns a snapshot array, not a live view', () => {
+    engine.timeline({ x: 0 });
+    const snapshot = engine.timelines;
+    engine.timeline({ y: 0 });
+    expect(snapshot.length).toBe(1);
+  });
+});

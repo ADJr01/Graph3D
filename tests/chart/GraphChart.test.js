@@ -11,6 +11,10 @@ function makeGenerator() {
   return { compute: vi.fn((data) => ({ positions: new Float32Array(0), data })) };
 }
 
+function makeMockRenderer() {
+  return { render: vi.fn(), domElement: { toDataURL: vi.fn(() => 'data:image/png;base64,MOCK') } };
+}
+
 describe('GraphChart', () => {
   describe('constructor', () => {
     it('throws if scene is falsy', () => {
@@ -238,6 +242,112 @@ describe('GraphChart', () => {
     });
   });
 
+  describe('setAriaLabel(label, options) / setLongDescription(text, options) (Prompt 180)', () => {
+    function makeContainer() {
+      const parent = document.createElement('div');
+      const container = document.createElement('canvas');
+      parent.appendChild(container);
+      return container;
+    }
+
+    it('throws TypeError for a non-string label', () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      expect(() => chart.setAriaLabel(42, { container: makeContainer() })).toThrow(TypeError);
+      expect(() => chart.setAriaLabel('', { container: makeContainer() })).toThrow(TypeError);
+    });
+
+    it('throws TypeError for a non-string description', () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      expect(() => chart.setLongDescription(42, { container: makeContainer() })).toThrow(TypeError);
+    });
+
+    it('throws TypeError when no container is available yet', () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      expect(() => chart.setAriaLabel('Revenue')).toThrow(TypeError);
+    });
+
+    it('creates a hidden div right after container, containing the label', () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      const container = makeContainer();
+
+      expect(chart.setAriaLabel('Revenue by quarter', { container })).toBe(chart);
+
+      const div = container.nextSibling;
+      expect(div).not.toBeNull();
+      expect(div.textContent).toContain('Revenue by quarter');
+      expect(div.style.position).toBe('absolute'); // visually-hidden, not display:none
+    });
+
+    it('setLongDescription() reuses the div setAriaLabel() already created, without a container', () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      const container = makeContainer();
+      chart.setAriaLabel('Revenue by quarter', { container });
+
+      chart.setLongDescription('Steady growth each quarter.');
+
+      const div = container.nextSibling;
+      expect(div.textContent).toBe('Revenue by quarter. Steady growth each quarter.');
+    });
+
+    it('auto-generates the description from data when setLongDescription() was never called', () => {
+      const chart = new GraphChart(makeScene(), generator.bar());
+      const container = makeContainer();
+      chart.setAriaLabel('Revenue', { container });
+      chart.data([10, 20, 30]);
+
+      chart.render();
+
+      const div = container.nextSibling;
+      expect(div.textContent).toBe('Revenue. 3 data points, values ranging from 10 to 30.');
+    });
+
+    it('an explicit setLongDescription() overrides the auto-generated one across render()/update()', () => {
+      // Same-length replacement data (positional join) — a shorter array
+      // would also trigger a real exit, which schedules a SelectionTransition
+      // against the shared anim/loop singletons (see the update() describe
+      // block's own note above) — out of scope for what this test checks.
+      const chart = new GraphChart(makeScene(), generator.bar());
+      const container = makeContainer();
+      chart.setAriaLabel('Revenue', { container });
+      chart.setLongDescription('A fixed summary.');
+      chart.data([10, 20, 30]);
+      chart.render();
+
+      chart.data([1, 2, 3]);
+      chart.update();
+
+      const div = container.nextSibling;
+      expect(div.textContent).toBe('Revenue. A fixed summary.');
+    });
+
+    it('the auto-generated description refreshes on update() when no explicit description is set', () => {
+      const chart = new GraphChart(makeScene(), generator.bar());
+      const container = makeContainer();
+      chart.data([10, 20, 30]);
+      chart.render();
+      chart.setAriaLabel('Revenue', { container });
+
+      chart.data([1, 2, 3]);
+      chart.update();
+
+      const div = container.nextSibling;
+      expect(div.textContent).toBe('Revenue. 3 data points, values ranging from 1 to 3.');
+    });
+
+    it('removes the hidden div on destroy()', () => {
+      const chart = new GraphChart(makeScene(), generator.bar());
+      const container = makeContainer();
+      const parent = container.parentElement;
+      chart.data([1, 2]);
+      chart.render();
+      chart.setAriaLabel('Revenue', { container });
+
+      chart.destroy();
+
+      expect(parent.children.length).toBe(1); // only the container remains
+    });
+  });
+
   describe('hoverEffect(presetName, options) / selectEffect(presetName, options)', () => {
     it('default to null', () => {
       const chart = new GraphChart(makeScene(), makeGenerator());
@@ -399,6 +509,43 @@ describe('GraphChart', () => {
     });
   });
 
+  describe('data() dev warning (Prompt 179): setData before attach', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('warns on the next microtask when render() never follows data()', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      new GraphChart(makeScene(), generator.bar()).data([1, 2]);
+
+      await Promise.resolve();
+
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('render() was never called'));
+    });
+
+    it('does not warn for the ordinary data(rows); render() idiom (still synchronous)', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const chart = new GraphChart(makeScene(), generator.bar());
+      chart.data([1, 2]);
+      chart.render();
+
+      await Promise.resolve();
+
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it('does not warn if the chart was destroyed before the microtask fires', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const chart = new GraphChart(makeScene(), generator.bar());
+      chart.data([1, 2]);
+      chart.destroy();
+
+      await Promise.resolve();
+
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+  });
+
   describe('pickingEnabled(value) (Prompt 156)', () => {
     it('defaults to true', () => {
       const chart = new GraphChart(makeScene(), makeGenerator());
@@ -481,6 +628,56 @@ describe('GraphChart', () => {
       const chart = new GraphChart(makeScene(), makeGenerator());
       expect(() => chart.exportSelection([])).toThrow(/data\(arr\)/);
       expect(() => chart.importSelection([])).toThrow(/data\(arr\)/);
+    });
+  });
+
+  describe('exportPNG(options) / exportSVG(options) (Prompt 181)', () => {
+    it('exportPNG renders the chart scene through the given renderer/camera and returns a PNG data URL', () => {
+      const scene = makeScene();
+      const chart = new GraphChart(scene, makeGenerator());
+      const renderer = makeMockRenderer();
+      const camera = new THREE.PerspectiveCamera();
+
+      const dataUrl = chart.exportPNG({ renderer, camera });
+
+      expect(renderer.render).toHaveBeenCalledWith(scene, camera);
+      expect(renderer.domElement.toDataURL).toHaveBeenCalledWith('image/png');
+      expect(dataUrl).toBe('data:image/png;base64,MOCK');
+    });
+
+    it('exportPNG throws TypeError when renderer is missing or not a WebGLRenderer', () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      const camera = new THREE.PerspectiveCamera();
+      expect(() => chart.exportPNG({ camera })).toThrow(TypeError);
+      expect(() => chart.exportPNG({ renderer: {}, camera })).toThrow(TypeError);
+    });
+
+    it('exportPNG throws TypeError when camera is missing', () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      expect(() => chart.exportPNG({ renderer: makeMockRenderer() })).toThrow(TypeError);
+    });
+
+    it('exportSVG renders through SVGRenderer and resolves with serialized SVG markup', async () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      const camera = new THREE.PerspectiveCamera();
+
+      const svg = await chart.exportSVG({ camera, width: 400, height: 300 });
+
+      expect(svg).toContain('<svg');
+      expect(svg).toContain('width="400"');
+      expect(svg).toContain('height="300"');
+    });
+
+    it('exportSVG rejects with TypeError when camera is missing', async () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      await expect(chart.exportSVG({ width: 100, height: 100 })).rejects.toThrow(TypeError);
+    });
+
+    it('exportSVG rejects with TypeError for non-positive width/height', async () => {
+      const chart = new GraphChart(makeScene(), makeGenerator());
+      const camera = new THREE.PerspectiveCamera();
+      await expect(chart.exportSVG({ camera, width: 0, height: 100 })).rejects.toThrow(TypeError);
+      await expect(chart.exportSVG({ camera, width: 100, height: -5 })).rejects.toThrow(TypeError);
     });
   });
 
@@ -1419,6 +1616,45 @@ describe('GraphChart', () => {
       }).not.toThrow();
     });
 
+    it('Prompt 179: warns (does not throw) when destroy() is called a second time', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const chart = new GraphChart(makeScene(), generator.bar());
+      chart.data([1, 2]);
+      chart.render();
+      chart.destroy();
+      warnSpy.mockClear();
+
+      chart.destroy();
+
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('already been destroyed'));
+    });
+
+    it('Prompt 179: warns when destroying a chart with transitions still in flight', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const scene = makeScene();
+      const chart = new GraphChart(scene, generator.bar());
+      chart.data([1, 2]);
+      chart.transition(1000);
+      chart.render();
+      chart.data([3, 4]);
+      chart.update(); // starts a SelectionTransition, tracked in #activeTransitions
+
+      chart.destroy();
+
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('transition(s) still in flight'));
+    });
+
+    it('Prompt 179: does not warn when destroying a chart with no active transitions', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const chart = new GraphChart(makeScene(), generator.bar());
+      chart.data([1, 2]);
+      chart.render();
+
+      chart.destroy();
+
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
     it('clears a configured legend container', () => {
       const scene = makeScene();
       const chart = new GraphChart(scene, generator.bar());
@@ -1488,6 +1724,8 @@ describe('GraphChart', () => {
       expect(() => chart.material('standard')).toThrow(pattern);
       expect(() => chart.legend({ container: document.createElement('div') })).toThrow(pattern);
       expect(() => chart.tooltip(() => {})).toThrow(pattern);
+      expect(() => chart.setAriaLabel('label', { container: document.createElement('div') })).toThrow(pattern);
+      expect(() => chart.setLongDescription('description', { container: document.createElement('div') })).toThrow(pattern);
       expect(() => chart.hoverEffect('glow')).toThrow(pattern);
       expect(() => chart.selectEffect('glow')).toThrow(pattern);
       expect(() => chart.filter(() => true)).toThrow(pattern);
@@ -1508,6 +1746,18 @@ describe('GraphChart', () => {
       expect(() => chart.stream(null)).toThrow(pattern);
       expect(() => chart.exportSelection([])).toThrow(pattern);
       expect(() => chart.importSelection([])).toThrow(pattern);
+      expect(() => chart.exportPNG({ renderer: makeMockRenderer(), camera: {} })).toThrow(pattern);
+    });
+
+    it('exportSVG rejects after destroy with a descriptive error', async () => {
+      const chart = new GraphChart(makeScene(), generator.bar());
+      chart.data([1, 2]);
+      chart.render();
+      chart.destroy();
+
+      await expect(chart.exportSVG({ camera: {}, width: 100, height: 100 })).rejects.toThrow(
+        /GraphChart\.exportSVG: this chart has been destroyed/,
+      );
     });
 
     it('stops an in-flight update() transition instead of letting it keep writing', () => {

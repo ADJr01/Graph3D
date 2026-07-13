@@ -3,6 +3,7 @@ import { GraphObject } from './GraphObject.js';
 // Imports core/GraphDisposal.js directly, not '../scene/index.js' — see
 // GraphObject.js's identical note on why object/ must not import that barrel.
 import { disposeMaterial } from '../core/GraphDisposal.js';
+import { devWarn } from '../core/devWarnings.js';
 
 /**
  * Mutation API for a single mesh — the low-instance-count path
@@ -384,7 +385,10 @@ export class GraphMesh extends GraphObject {
    * @example mesh.dispose();
    */
   dispose() {
-    if (this.#disposed) return;
+    if (this.#disposed) {
+      devWarn(`GraphMesh.dispose: mesh '${this.name}' has already been disposed — this call is a no-op.`);
+      return;
+    }
     this.#disposed = true;
     this.#mesh.geometry.dispose();
     disposeMaterial(this.#mesh.material);

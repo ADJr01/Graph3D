@@ -4,6 +4,7 @@ import { GraphObject } from './GraphObject.js';
 // GraphObject.js's identical note on why object/ must not import that barrel.
 import { disposeMaterial } from '../core/GraphDisposal.js';
 import { loop } from '../core/Graph3DLoop.js';
+import { devWarn } from '../core/devWarnings.js';
 import { Octree } from './Octree.js';
 // Sanctioned exception (CLAUDE.md §1.4, object/ row) — see setAllPositions/
 // setAllScales/setAllColors below (Prompt 92): resolving a named easing curve
@@ -246,6 +247,18 @@ export class GraphInstancedObject extends GraphObject {
   /** @returns {true} */
   get isInstanced() {
     return true;
+  }
+
+  /**
+   * Escape hatch to the internal spatial index — mirrors `GraphObject`'s own
+   * `get three()`. Exists for `Graph3D.devtools.octreeDebugOverlay` (Prompt
+   * 178) to visualize node bounds; queries/picking should keep using
+   * `pick()`/`pickDetailed()` rather than reaching in here directly.
+   * @returns {Octree}
+   * @example bars.octree.dumpBounds();
+   */
+  get octree() {
+    return this.#octree;
   }
 
   // ── Bulk state ─────────────────────────────────────────────────────────────
@@ -1025,7 +1038,10 @@ export class GraphInstancedObject extends GraphObject {
    * @example bars.dispose();
    */
   dispose() {
-    if (this.#disposed) return;
+    if (this.#disposed) {
+      devWarn(`GraphInstancedObject.dispose: '${this.name}' has already been disposed — this call is a no-op.`);
+      return;
+    }
     this.#disposed = true;
     // Unregister from the shared RAF loop first — otherwise the next frame
     // would invoke a callback closing over a now-disposed mesh.

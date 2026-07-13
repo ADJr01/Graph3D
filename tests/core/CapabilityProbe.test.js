@@ -232,6 +232,30 @@ describe('CapabilityProbe', () => {
     });
   });
 
+  describe('SSR-safe mode (Prompt 177)', () => {
+    afterEach(() => { vi.unstubAllGlobals(); });
+
+    it('does not throw when document is unavailable', () => {
+      vi.stubGlobal('document', undefined);
+      expect(() => new CapabilityProbe()).not.toThrow();
+    });
+
+    it('returns all-disabled capabilities without touching canvas', () => {
+      vi.stubGlobal('document', undefined);
+      const probe = new CapabilityProbe();
+      expect(probe.capabilities.webgl2).toBe(false);
+      expect(probe.capabilities.vendor).toBe('unavailable');
+    });
+
+    it('does not warn — SSR is an expected state, not a degraded fallback', () => {
+      const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      vi.stubGlobal('document', undefined);
+      new CapabilityProbe();
+      expect(spy).not.toHaveBeenCalled();
+      spy.mockRestore();
+    });
+  });
+
   describe('no-canvas constructor path', () => {
     it('creates its own canvas via document.createElement', () => {
       const gl2 = makeGl2();

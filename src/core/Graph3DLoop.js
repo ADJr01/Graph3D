@@ -28,7 +28,11 @@ export class Graph3DLoop {
         this.#scheduleRaf();
       }
     };
-    document.addEventListener('visibilitychange', this.#onVisibilityChange);
+    // SSR-safe: this class is instantiated as a module-level singleton (see
+    // `loop` below), so importing the library server-side must not throw.
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', this.#onVisibilityChange);
+    }
   }
 
   /**
@@ -80,7 +84,7 @@ export class Graph3DLoop {
   start() {
     if (this.#running) return;
     this.#running = true;
-    if (!document.hidden) this.#scheduleRaf();
+    if (typeof document === 'undefined' || !document.hidden) this.#scheduleRaf();
   }
 
   /**
@@ -105,11 +109,16 @@ export class Graph3DLoop {
   dispose() {
     this.stop();
     this.#callbacks.clear();
-    document.removeEventListener('visibilitychange', this.#onVisibilityChange);
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', this.#onVisibilityChange);
+    }
   }
 
   #scheduleRaf() {
     if (this.#rafId !== null) return;
+    // No requestAnimationFrame outside a browser (SSR) — registered callbacks
+    // simply never tick; there is nothing to render server-side anyway.
+    if (typeof requestAnimationFrame === 'undefined') return;
     this.#rafId = requestAnimationFrame(this.#tick);
   }
 

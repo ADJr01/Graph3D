@@ -209,6 +209,19 @@ export class Octree {
     );
   }
 
+  /**
+   * Flat dump of every node in the tree — depth, bounds, and leaf item
+   * count — for debug visualization only (`Graph3D.devtools.octreeDebugOverlay`,
+   * Prompt 178). Not read by any query path.
+   * @returns {{bounds: THREE.Box3, depth: number, itemCount: number, isLeaf: boolean}[]}
+   * @example octree.dumpBounds().filter((node) => node.isLeaf && node.itemCount > 0);
+   */
+  dumpBounds() {
+    const result = [];
+    this.#collectBounds(this.#root, 0, result);
+    return result;
+  }
+
   // ── Private ────────────────────────────────────────────────────────────────
 
   /**
@@ -234,6 +247,15 @@ export class Octree {
     node.items = [];
     for (const item of items) {
       this.#insertInto(this.#childFor(node, item.position), item, depth + 1);
+    }
+  }
+
+  /** @param {OctreeNode} node @param {number} depth @param {Array} result */
+  #collectBounds(node, depth, result) {
+    const isLeaf = node.children === null;
+    result.push({ bounds: node.bounds.clone(), depth, itemCount: isLeaf ? node.items.length : 0, isLeaf });
+    if (!isLeaf) {
+      for (const child of node.children) this.#collectBounds(child, depth + 1, result);
     }
   }
 

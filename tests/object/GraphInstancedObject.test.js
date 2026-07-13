@@ -155,6 +155,20 @@ describe('GraphInstancedObject.isInstanced', () => {
   });
 });
 
+describe('GraphInstancedObject.octree (Prompt 178)', () => {
+  it('exposes the internal spatial index for debug visualization', () => {
+    const obj = makeInstanced();
+    expect(typeof obj.octree.dumpBounds).toBe('function');
+  });
+
+  it('reflects positioned instances', () => {
+    const obj = makeInstanced({ count: 2 });
+    obj.setInstancePosition(0, 1, 2, 3);
+    const leaves = obj.octree.dumpBounds().filter((n) => n.isLeaf && n.itemCount > 0);
+    expect(leaves.length).toBeGreaterThan(0);
+  });
+});
+
 // ── setInstanceCount ───────────────────────────────────────────────────────────
 
 describe('GraphInstancedObject.setInstanceCount', () => {
@@ -1129,6 +1143,18 @@ describe('GraphInstancedObject disposal', () => {
 
     expect(scene.children).not.toContain(obj.three);
     expect(() => obj.dispose()).not.toThrow();
+  });
+
+  it('Prompt 179: warns (does not throw) on a second dispose() call', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const obj = makeInstanced();
+    obj.dispose();
+    warnSpy.mockClear();
+
+    obj.dispose();
+
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('already been disposed'));
+    warnSpy.mockRestore();
   });
 
   it('all public methods throw after dispose', () => {

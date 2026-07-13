@@ -201,6 +201,21 @@ export class Graph3DRenderer {
   }
 
   /**
+   * Draw one frame: `scene` through `camera` into this renderer's canvas.
+   * `Graph3D`'s tick calls this every frame; also available directly as an
+   * escape hatch for manual/off-loop rendering.
+   *
+   * @param {THREE.Scene} scene
+   * @param {THREE.Camera} camera
+   * @throws {Error} If disposed or context-lost.
+   * @example renderer.render(scene.three, scene.camera.three);
+   */
+  render(scene, camera) {
+    this._assertAlive('render');
+    this.three.render(scene, camera);
+  }
+
+  /**
    * Swap the tone mapping operator at runtime.
    *
    * @param {keyof TONE_MAPPING} name - One of: None, Linear, Reinhard, Cineon, ACESFilmic, AgX, Neutral.
@@ -226,4 +241,52 @@ export class Graph3DRenderer {
     this.three.dispose();
     this._deadReason = 'disposed';
   }
+}
+
+/**
+ * SSR-safe stand-in for `Graph3DRenderer`, used by `Graph3D` when constructed
+ * outside a browser (no `window`). Never touches `THREE.WebGLRenderer` or a
+ * canvas, so importing and constructing `Graph3D` — and building scenes and
+ * charts on it — works during server-side rendering. `.three` is `null`,
+ * which `GraphScene` already treats as "no renderer available" and skips
+ * environment/shadows/clipping accordingly (the same path a bare `graph3d`
+ * stub without a renderer takes in tests).
+ *
+ * Only `render()`, the one method that needs a real GPU context, throws —
+ * clearly explaining why, so a render call left unguarded during SSR fails
+ * loudly instead of doing nothing.
+ *
+ * @example
+ * // Constructed automatically — not intended to be used directly:
+ * const g = new Graph3D({}); // no canvas, no window → SSR mode
+ * g.renderer instanceof SSRGraph3DRenderer; // true
+ */
+export class SSRGraph3DRenderer {
+  /** @type {null} No `THREE.WebGLRenderer` exists server-side. */
+  three = null;
+
+  /** @example renderer.setSize(1920, 1080); — no-op server-side */
+  setSize() {}
+
+  /** @example renderer.setPixelRatio(2); — no-op server-side */
+  setPixelRatio() {}
+
+  /** @example renderer.setToneMapping('AgX'); — no-op server-side */
+  setToneMapping() {}
+
+  /**
+   * @throws {Error} Always — WebGL rendering requires a browser environment.
+   */
+  render() {
+    throw new Error(
+      'Graph3DRenderer.render: WebGL rendering requires a browser environment. ' +
+        'This Graph3D instance was constructed server-side (SSR) — scene setup, ' +
+        'chart configuration, and data binding all work normally, but actual pixel ' +
+        'rendering only runs client-side. Guard render-triggering calls with a ' +
+        "typeof window !== 'undefined' check, or defer them to a client-only mount.",
+    );
+  }
+
+  /** @example renderer.dispose(); — no-op server-side */
+  dispose() {}
 }

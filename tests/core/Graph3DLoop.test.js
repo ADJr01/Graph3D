@@ -266,6 +266,32 @@ describe('visibilitychange', () => {
   });
 });
 
+// ── SSR-safe mode (Prompt 177) ───────────────────────────────────────────────
+
+describe('SSR-safe mode', () => {
+  it('constructs without throwing when document is unavailable', () => {
+    vi.stubGlobal('document', undefined);
+    expect(() => new Graph3DLoop()).not.toThrow();
+  });
+
+  it('add() does not throw when requestAnimationFrame is unavailable', () => {
+    vi.stubGlobal('requestAnimationFrame', undefined);
+    expect(() => subject.add(vi.fn())).not.toThrow();
+  });
+
+  it('add() reports isRunning true even though no RAF was scheduled', () => {
+    vi.stubGlobal('requestAnimationFrame', undefined);
+    subject.add(vi.fn());
+    expect(subject.isRunning).toBe(true);
+  });
+
+  it('dispose() does not throw when document is unavailable', () => {
+    subject.add(vi.fn());
+    vi.stubGlobal('document', undefined);
+    expect(() => subject.dispose()).not.toThrow();
+  });
+});
+
 // ── dispose ───────────────────────────────────────────────────────────────────
 
 describe('dispose', () => {

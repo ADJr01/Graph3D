@@ -87,6 +87,114 @@ If neither WebGL2 nor WebGL1 is available (e.g. in jsdom during tests), `Capabil
 
 ---
 
+## SSR-Safe Mode
+
+Importing `graph3d.js` and constructing a `Graph3D` instance never throws server-side (no `window`) — only actually rendering a frame does, with a clear error.
+
+```js
+// Works in Node/SSR (e.g. Next.js getServerSideProps) exactly as in a browser:
+import { Graph3D } from 'graph3d.js';
+
+const g = new Graph3D({}); // canvas omitted — detected automatically, no window means SSR
+g.setActiveScene(g.createScene('main'));
+g.chart('bar').data(values, (d) => d.id); // scene/chart construction, scales, data binding — all fine
+
+g.renderer.render(scene, camera); // throws: "requires a browser environment"
+```
+
+### What works vs. what throws
+
+| Server-side | Client-side only |
+|---|---|
+| `new Graph3D({})` (no canvas required) | `g.renderer.render(scene, camera)` |
+| `g.createScene()`, `g.setActiveScene()` | Anything the RAF loop drives automatically — it simply never ticks server-side (no `requestAnimationFrame`) |
+| `g.chart(typeName).data(...)`, scales, layouts, generators | |
+| `g.dispose()` | |
+
+### How it's detected
+
+`typeof window === 'undefined'` is checked once, in `Graph3D`'s constructor — matching the same idiom already used for `pixelRatio`'s browser default. When true:
+
+- `canvas` becomes optional (a browser construction with no canvas still throws as before).
+- `Graph3D` uses `SSRGraph3DRenderer` instead of `Graph3DRenderer`. Its `.three` is `null`, which `GraphScene` already treats as "no renderer available" (the same renderer-optional path a bare test stub takes) — so environment/shadows/clipping are skipped automatically, with zero SSR-specific code in `GraphScene` itself.
+- `CapabilityProbe` (checked independently, via `typeof document === 'undefined'`) returns `NULL_CAPABILITIES` without touching the DOM.
+- `Graph3DLoop`'s module-level singleton (constructed at import time) guards its `document`/`requestAnimationFrame` calls so merely importing the library never throws.
+
+Only `SSRGraph3DRenderer.render()` — the one operation that genuinely needs a GPU context — throws, with a message explaining why and how to guard it (`typeof window !== 'undefined'` check, or defer to a client-only mount).
+
+---
+
+## Dev Tools
+
+`Graph3D.devtools` is a dev-only debugging surface: scene-graph dumps, active
+timeline listings, GPU memory snapshots, and disposable debug overlays for
+picking, camera frustums, octrees, and selections. It is created lazily on
+first access and throws in production.
+
+```js
+const g = new Graph3D({ canvas });
+g.setActiveScene(g.createScene('main'));
+
+g.devtools.dumpSceneGraph(); // logs + returns a nested tree of the active scene
+g.devtools.listActiveTimelines(); // logs + returns every registered anim timeline
+g.devtools.memorySnapshot(); // { geometries, textures, calls, triangles, points, lines }
+
+const frustum = g.devtools.frustumDebugOverlay(); // THREE.CameraHelper, added to the scene
+const octree = g.devtools.octreeDebugOverlay(chart.selection().backend.object); // populated leaf boxes
+const highlight = g.devtools.selectionDebugOverlay(chart.selection().filter((d) => d.value > 90));
+// remove any overlay when done: g.activeScene.three.remove(frustum);
+```
+
+| Method | Returns | Needs |
+|---|---|---|
+| `dumpSceneGraph(scene?)` | Nested `{name, type, uuid, visible, children}` tree | An active scene, or one passed explicitly |
+| `listActiveTimelines()` | `{isPlaying, time, duration}[]` | Nothing — reads the shared `anim` engine |
+| `memorySnapshot()` | `{geometries, textures, calls, triangles, points, lines}` | A browser renderer (throws under SSR) |
+| `pickingDebugOverlay(hit)` | A marker mesh at `hit.worldPoint`, or `null` | The object `Picker.pickAt()` returned |
+| `frustumDebugOverlay(camera?)` | A `THREE.CameraHelper` | An active scene |
+| `octreeDebugOverlay(instancedObject)` | A `THREE.Group` of leaf-node boxes | A `GraphInstancedObject` |
+| `selectionDebugOverlay(selection)` | A `THREE.Group` of member markers | A `Selection` |
+
+### Why it's stripped from production
+
+`Graph3D.devtools` throws once when `process.env.NODE_ENV === 'production'` —
+the same unminified check React and D3 ship. It does nothing on its own;
+it relies on the *consuming* app's bundler (Vite's `define`, webpack's
+`DefinePlugin`) replacing that expression with the literal `"production"`, at
+which point the bundler's own minifier dead-code-eliminates every `if`
+branch and `g.devtools...` call site guarded behind it. This library ships
+one build either way — there's no separate dev/production bundle to choose
+between.
+
+---
+
+## Dev Warnings
+
+Five common mistakes emit a `console.warn` — never a thrown error, since
+none of them are wrong enough to stop execution — through the same
+production-gated `devWarn()` helper `Graph3D.devtools` uses (`core/devWarnings.js`,
+a `core/` leaf utility any layer imports directly, the same precedent as
+`core/GraphDisposal.js`/`core/Graph3DLoop.js`). Every message is tagged
+`[Graph3D dev warning]` for easy console filtering.
+
+| Trigger | When it fires |
+|---|---|
+| `chart.data(rows)` without a following `render()` | One microtask after `data()`, if `render()` still hasn't run — the ordinary synchronous `chart.data(rows); chart.render();` idiom never trips it |
+| `wrapper.applyShader(shaderMaterial)` with declared uniforms, no following `bindUniforms()` | One microtask after `applyShader()`, if `bindUniforms()` still hasn't been called — same deferred-check shape as the `data()` warning |
+| A second `dispose()`/`destroy()` call | `Graph3D`, `GraphScene`, `GraphChart`, `GraphMesh`, `GraphInstancedObject` — the disposal contract's own idempotency guard now warns instead of silently no-opping |
+| `chart.destroy()` while transitions are still running | Logged once per `destroy()` call, with the count stopped early |
+| `selection.attr(path, ...)` with an unrecognized `path` close to a real one | Handled as a clearer **thrown** `Error` (`Did you mean 'color'?`), not a warning — see below |
+
+`Selection.attr()`'s case is a thrown error, not a warning, because the
+underlying write was already going to throw either way (a truly undefined
+custom attribute name, or "meshes have no per-instance attributes") — the
+fix only makes that existing error easier to act on. An edit-distance match
+against a *legitimately pre-defined* custom attribute (e.g. someone really
+did name one `colour`) is left alone; only names the object has never seen
+before get the suggestion.
+
+---
+
 ## Frame Budget
 
 `FrameBudget` is a per-instance observability primitive that watches for sustained frame-rate drops. It is not a throttle or a scheduler — it only observes and reports.
@@ -236,3 +344,51 @@ if (import.meta.hot) {
   import.meta.hot.dispose(() => Graph3D.disposeAll());
 }
 ```
+
+---
+
+## Export & Persistence (Prompt 181)
+
+**`g.exportScene(options)`** exports the active scene's full `THREE.Scene`
+graph as glTF, via Three.js's `GLTFExporter` addon (lazy-loaded from
+`three/examples/jsm/exporters/GLTFExporter.js` on first call — the same
+never-bundled-unless-used convention as `GraphSceneCamera.enableOrbitControls`
+and `GraphObjectLoader`'s model loaders):
+
+```js
+const blob = await g.exportScene();          // Blob, 'model/gltf-binary' (.glb)
+const url = URL.createObjectURL(blob);
+
+const json = await g.exportScene({ binary: false }); // raw glTF JSON object
+```
+
+Throws if no active scene exists (`setActiveScene()` first) or after `dispose()`.
+
+**`g.serialize()` / `Graph3D.deserialize(json, options)`** capture and restore
+scene/camera *composition* — deliberately not chart configuration, bound
+data, or accessor functions, since those are code (closures), which has no
+JSON representation:
+
+```js
+localStorage.setItem('view', JSON.stringify(g.serialize()));
+
+// later, or in a different tab:
+const json = JSON.parse(localStorage.getItem('view'));
+const g2 = await Graph3D.deserialize(json, { canvas });
+// scenes, per-scene applied theme, and each camera's preset/position/
+// look-at target/fov are restored — charts are not: re-create them and
+// call .data() again.
+```
+
+A snapshot is a plain JSON-safe object: `{ version, theme, hdr, activeScene,
+scenes: [{ name, theme, camera: { preset, position, target, fov } }] }`.
+`deserialize()` applies each scene's theme *before* its explicit camera
+state — `applyTheme()` resets the camera to the theme's own default preset
+(`GraphSceneThemes.js`'s `cameraPreset`) as one of its side effects, so the
+snapshot's actual serialized camera position/target/fov must be re-applied
+afterward to win out over that reset, otherwise a themed scene would
+silently come back looking at the theme's default framing instead of
+wherever the camera actually was at `serialize()` time.
+
+`Graph3D.deserialize()` still requires `canvas` in `options` in a browser —
+a JSON snapshot can't carry a DOM element — and never restores it itself.

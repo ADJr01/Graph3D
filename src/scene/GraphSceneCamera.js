@@ -125,6 +125,15 @@ export class GraphSceneCamera {
     return this.#preset;
   }
 
+  /**
+   * The last world-space point passed to `lookAt()` (or the active preset's
+   * default target). A fresh clone — mutating it has no effect on the camera.
+   * @returns {THREE.Vector3}
+   */
+  get target() {
+    return this.#lookAtTarget.clone();
+  }
+
   // ── Preset & camera control ────────────────────────────────────────────────
 
   /**

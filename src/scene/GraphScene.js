@@ -7,6 +7,7 @@ import { GraphSceneClipping } from './GraphSceneClipping.js';
 import { THEMES, VALID_THEMES, buildTheme } from './GraphSceneThemes.js';
 import { getSceneObjectsByName } from './GraphSceneRegistry.js';
 import { disposeMaterial, disposeObjectTree } from '../core/GraphDisposal.js';
+import { devWarn } from '../core/devWarnings.js';
 // scene/ importing from compose/selection is a sanctioned exception (CLAUDE.md
 // §1.4's scene/ row) — Selection is the join-ready read/write handle
 // selectAll() below hands out, wrapping selectByName's existing matches.
@@ -552,7 +553,10 @@ export class GraphScene {
    * @example scene.dispose();
    */
   dispose() {
-    if (this.#disposed) return;
+    if (this.#disposed) {
+      devWarn(`GraphScene.dispose: scene '${this.#name}' has already been disposed — this call is a no-op.`);
+      return;
+    }
     this.#disposed = true;
 
     this.#camera.dispose();

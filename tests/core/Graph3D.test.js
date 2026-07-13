@@ -19,6 +19,17 @@ vi.mock('../../src/core/Graph3DRenderer.js', () => ({
         clippingPlanes: [],
       };
     }
+    render(scene, camera) {
+      this.three.render(scene, camera);
+    }
+  },
+  SSRGraph3DRenderer: class {
+    three = null;
+    setSize = vi.fn();
+    dispose = vi.fn();
+    render = vi.fn(() => {
+      throw new Error('Graph3DRenderer.render: WebGL rendering requires a browser environment.');
+    });
   },
 }));
 
@@ -76,6 +87,7 @@ afterEach(() => {
   // Dispose any stray instances so the singleton registry stays clean between tests.
   registry.disposeAll();
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
   // Restore all vi.spyOn wrappers so spy chains don't accumulate across tests.
   vi.restoreAllMocks();
 });
@@ -121,6 +133,48 @@ describe('Graph3D constructor', () => {
     expect(g.theme).toBe('studio-dark');
     expect(g.autoResize).toBe(false);
     expect(g.respectReducedMotion).toBe(false);
+  });
+});
+
+// ── SSR-safe mode (Prompt 177) ───────────────────────────────────────────────
+
+describe('Graph3D SSR-safe mode', () => {
+  it('constructs without a canvas when window is unavailable', () => {
+    vi.stubGlobal('window', undefined);
+    expect(() => new Graph3D({})).not.toThrow();
+  });
+
+  it('still requires canvas in a browser environment (window defined)', () => {
+    expect(() => new Graph3D({})).toThrow(/canvas is required/);
+  });
+
+  it('uses SSRGraph3DRenderer when window is unavailable', async () => {
+    const { SSRGraph3DRenderer } = await import('../../src/core/Graph3DRenderer.js');
+    vi.stubGlobal('window', undefined);
+    const g = new Graph3D({});
+    expect(g.renderer).toBeInstanceOf(SSRGraph3DRenderer);
+  });
+
+  it('scene and chart construction work normally server-side', () => {
+    vi.stubGlobal('window', undefined);
+    const g = new Graph3D({});
+    expect(() => {
+      const scene = g.createScene('main');
+      g.setActiveScene(scene);
+      g.chart('bar');
+    }).not.toThrow();
+  });
+
+  it('renderer.render() throws a clear SSR-specific error', () => {
+    vi.stubGlobal('window', undefined);
+    const g = new Graph3D({});
+    expect(() => g.renderer.render({}, {})).toThrow(/browser environment/);
+  });
+
+  it('dispose() does not throw server-side', () => {
+    vi.stubGlobal('window', undefined);
+    const g = new Graph3D({});
+    expect(() => g.dispose()).not.toThrow();
   });
 });
 
@@ -236,6 +290,40 @@ describe('Graph3D.postfx (lazy)', () => {
     const fx = g.postfx;
     g.setSize(800, 600);
     expect(fx.setSize).toHaveBeenCalledWith(800, 600);
+  });
+});
+
+// ── Lazy DevTools (Prompt 178) ───────────────────────────────────────────────
+
+describe('Graph3D.devtools (lazy, dev-only)', () => {
+  it('creates a GraphDevTools instance on first access', async () => {
+    const { GraphDevTools } = await import('../../src/core/GraphDevTools.js');
+    const g = new Graph3D({ canvas: makeCanvas() });
+    expect(g.devtools).toBeInstanceOf(GraphDevTools);
+  });
+
+  it('returns the same instance on repeated access', () => {
+    const g = new Graph3D({ canvas: makeCanvas() });
+    expect(g.devtools).toBe(g.devtools);
+  });
+
+  it('throws after dispose()', () => {
+    const g = new Graph3D({ canvas: makeCanvas() });
+    g.dispose();
+    expect(() => g.devtools).toThrow(/disposed/);
+  });
+
+  it('throws in production (process.env.NODE_ENV === "production")', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    const g = new Graph3D({ canvas: makeCanvas() });
+    expect(() => g.devtools).toThrow(/production/);
+  });
+
+  it('is available again once NODE_ENV is no longer "production"', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    const g = new Graph3D({ canvas: makeCanvas() });
+    vi.stubEnv('NODE_ENV', 'test');
+    expect(() => g.devtools).not.toThrow();
   });
 });
 
@@ -560,6 +648,18 @@ describe('Graph3D.dispose()', () => {
     }).not.toThrow();
   });
 
+  it('Prompt 179: warns (does not throw) on a second dispose() call', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const g = new Graph3D({ canvas: makeCanvas() });
+    g.dispose();
+    warnSpy.mockClear();
+
+    g.dispose();
+
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('already been disposed'));
+    warnSpy.mockRestore();
+  });
+
   it('unregisters from the global registry', () => {
     const g = new Graph3D({ canvas: makeCanvas() });
     g.dispose();
@@ -758,5 +858,149 @@ describe('Graph3D tick rendering', () => {
     g.setActiveScene('main');
     tick(0.016);
     expect(g.renderer.three.setScissorTest).toHaveBeenLastCalledWith(false);
+  });
+});
+
+// ── exportScene() ────────────────────────────────────────────────────────────
+
+describe('Graph3D.exportScene() (Prompt 181)', () => {
+  it('rejects when no active scene exists', async () => {
+    const g = new Graph3D({ canvas: makeCanvas() });
+    await expect(g.exportScene()).rejects.toThrow(/no active scene/);
+  });
+
+  it('rejects after dispose()', async () => {
+    const g = new Graph3D({ canvas: makeCanvas() });
+    g.createScene('main');
+    g.setActiveScene('main');
+    g.dispose();
+    await expect(g.exportScene()).rejects.toThrow(/disposed/);
+  });
+
+  it('resolves with a glTF binary Blob by default', async () => {
+    const g = new Graph3D({ canvas: makeCanvas() });
+    g.createScene('main');
+    g.setActiveScene('main');
+
+    const blob = await g.exportScene();
+
+    expect(blob).toBeInstanceOf(Blob);
+    expect(blob.type).toBe('model/gltf-binary');
+  });
+
+  it('resolves with a plain glTF JSON object when binary:false', async () => {
+    const g = new Graph3D({ canvas: makeCanvas() });
+    g.createScene('main');
+    g.setActiveScene('main');
+
+    const json = await g.exportScene({ binary: false });
+
+    expect(json).toBeTypeOf('object');
+    expect(json.asset).toBeDefined();
+  });
+});
+
+// ── serialize() / deserialize() ──────────────────────────────────────────────
+
+describe('Graph3D.serialize() (Prompt 181)', () => {
+  it('throws after dispose()', () => {
+    const g = new Graph3D({ canvas: makeCanvas() });
+    g.dispose();
+    expect(() => g.serialize()).toThrow(/disposed/);
+  });
+
+  it('captures top-level theme/hdr and each scene\'s camera state', () => {
+    const g = new Graph3D({ canvas: makeCanvas(), theme: 'studio-dark', hdr: '/env/studio.hdr' });
+    const scene = g.createScene('main');
+    scene.camera.setPosition(1, 2, 3);
+    scene.camera.lookAt(4, 5, 6);
+    g.setActiveScene('main');
+
+    const snapshot = g.serialize();
+
+    expect(snapshot.theme).toBe('studio-dark');
+    expect(snapshot.hdr).toBe('/env/studio.hdr');
+    expect(snapshot.activeScene).toBe('main');
+    expect(snapshot.scenes).toHaveLength(1);
+    expect(snapshot.scenes[0]).toEqual({
+      name: 'main',
+      theme: null,
+      camera: { preset: 'orbit', position: [1, 2, 3], target: [4, 5, 6], fov: 60 },
+    });
+  });
+
+  it('reports fov: null for an orthographic preset', () => {
+    const g = new Graph3D({ canvas: makeCanvas() });
+    const scene = g.createScene('main');
+    scene.camera.setPreset('isometric');
+    expect(g.serialize().scenes[0].camera.fov).toBeNull();
+  });
+
+  it('is JSON-safe: round-trips through JSON.stringify/parse unchanged', () => {
+    const g = new Graph3D({ canvas: makeCanvas() });
+    const scene = g.createScene('main');
+    scene.camera.setPosition(1, 2, 3);
+    g.setActiveScene('main');
+    const snapshot = g.serialize();
+
+    expect(JSON.parse(JSON.stringify(snapshot))).toEqual(snapshot);
+  });
+});
+
+describe('Graph3D.deserialize() (Prompt 181)', () => {
+  it('rejects with TypeError for a malformed snapshot', async () => {
+    await expect(Graph3D.deserialize(null, { canvas: makeCanvas() })).rejects.toThrow(TypeError);
+    await expect(Graph3D.deserialize({}, { canvas: makeCanvas() })).rejects.toThrow(TypeError);
+  });
+
+  it('recreates scenes, camera position/target/fov, and the active scene from a snapshot', async () => {
+    const g = new Graph3D({ canvas: makeCanvas() });
+    const scene = g.createScene('main');
+    scene.camera.setPosition(1, 2, 3);
+    scene.camera.lookAt(4, 5, 6);
+    g.setActiveScene('main');
+    const snapshot = g.serialize();
+
+    const restored = await Graph3D.deserialize(snapshot, { canvas: makeCanvas() });
+
+    expect(restored.scenes.has('main')).toBe(true);
+    const restoredScene = restored.scenes.get('main');
+    expect(restoredScene.camera.preset).toBe('orbit');
+    expect(restoredScene.camera.three.position.toArray()).toEqual([1, 2, 3]);
+    expect(restoredScene.camera.target.toArray()).toEqual([4, 5, 6]);
+    expect(restored.activeScene).toBe(restoredScene);
+  });
+
+  it('does not restore an active scene when the snapshot has none', async () => {
+    const g = new Graph3D({ canvas: makeCanvas() });
+    g.createScene('main');
+    const snapshot = g.serialize();
+
+    const restored = await Graph3D.deserialize(snapshot, { canvas: makeCanvas() });
+
+    expect(restored.activeScene).toBeNull();
+  });
+
+  it('applies the per-scene theme before restoring camera state, via GraphScene.applyTheme', async () => {
+    const applySpy = vi.spyOn(GraphScene.prototype, 'applyTheme').mockImplementation(function (name) {
+      // Simulate applyTheme's real side effect (GraphSceneThemes.buildTheme calls
+      // scene.camera.setPreset(config.cameraPreset)) without the real HDR fetch,
+      // so this test can assert the explicit snapshot camera state still wins.
+      this.camera.setPreset('top-down');
+      return Promise.resolve(this);
+    });
+    const g = new Graph3D({ canvas: makeCanvas() });
+    const scene = g.createScene('main');
+    scene.camera.setPosition(7, 8, 9);
+    g.setActiveScene('main');
+    const snapshot = g.serialize();
+    snapshot.scenes[0].theme = 'studio-dark';
+
+    const restored = await Graph3D.deserialize(snapshot, { canvas: makeCanvas() });
+
+    expect(applySpy).toHaveBeenCalledWith('studio-dark');
+    const restoredScene = restored.scenes.get('main');
+    expect(restoredScene.camera.preset).toBe('orbit');
+    expect(restoredScene.camera.three.position.toArray()).toEqual([7, 8, 9]);
   });
 });

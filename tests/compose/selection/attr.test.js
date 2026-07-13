@@ -235,6 +235,33 @@ describe('Selection.attr custom attributes', () => {
   });
 });
 
+// ── nearest-path suggestion (Prompt 179) ────────────────────────────────────
+
+describe('Selection.attr unknown-path nearest-path suggestion', () => {
+  it('meshes backend: a near-miss of a fixed-vocabulary name throws a "did you mean" error instead of the generic one', () => {
+    const selection = meshesSelection([{}]);
+    expect(() => selection.attr('colour', 'red')).toThrow(/unknown path 'colour'\. Did you mean 'color'\?/);
+  });
+
+  it('instanced backend: a near-miss on an undefined attribute throws a "did you mean" error, not the generic defineAttribute message', () => {
+    const { selection } = instancedSelection([{}]);
+    expect(() => selection.attr('colour', 1)).toThrow(/unknown path 'colour'\. Did you mean 'color'\?/);
+  });
+
+  it('instanced backend: a custom attribute name unrelated to the fixed vocabulary still gets the original defineAttribute error', () => {
+    const { selection } = instancedSelection([{}]);
+    expect(() => selection.attr('pulsePhase', 1)).toThrow(/call defineAttribute/);
+  });
+
+  it('instanced backend: an already-defined attribute close to a reserved name is left alone (real, established usage)', () => {
+    const scene = new THREE.Scene();
+    const object = makeInstanced(scene, [{}]);
+    object.defineAttribute('colour', 1); // deliberately named, pre-registered
+    const selection = new Selection({ type: 'instanced', object, indices: Uint32Array.from([0]) });
+    expect(() => selection.attr('colour', 1)).not.toThrow();
+  });
+});
+
 // ── misc ─────────────────────────────────────────────────────────────────
 
 describe('Selection.attr misc', () => {

@@ -1,10 +1,18 @@
 import { CapabilityProbe } from './CapabilityProbe.js';
-import { Graph3DRenderer } from './Graph3DRenderer.js';
+import { Graph3DRenderer, SSRGraph3DRenderer } from './Graph3DRenderer.js';
 import { loop } from './Graph3DLoop.js';
 import { registry } from './Graph3DRegistry.js';
 import { FrameBudget } from './FrameBudget.js';
 import { WorkerPool } from './WorkerPool.js';
 import { createWorkerFactory } from './worker/workerBlob.js';
+// Cross-layer import: a fourth composition-root exception (Prompt 178) —
+// GraphDevTools itself only reaches into anim/ (for the shared `anim`
+// singleton's registered timelines); every other layer it inspects is
+// passed in by the caller as an already-public object (a Selection, a
+// GraphInstancedObject, a Picker hit) rather than imported directly.
+import { GraphDevTools } from './GraphDevTools.js';
+import { isProductionBuild, devWarn } from './devWarnings.js';
+import { nearestMatch } from './textDistance.js';
 // Cross-layer import: Graph3D is the composition root and owns scene lifecycle.
 import { GraphScene } from '../scene/index.js';
 // Cross-layer import: same composition-root exception as GraphScene above (CLAUDE.md §1.4).
@@ -22,57 +30,24 @@ import { BarChart, LineChart, ScatterChart, AreaChart, SurfaceChart, HeatmapChar
 const MAX_SUGGESTION_DISTANCE = 3;
 
 /**
- * Classic Wagner–Fischer edit distance between two strings — the minimum
- * number of single-character insertions/deletions/substitutions to turn `a`
- * into `b`. Used only for `Graph3D.chart()`'s "did you mean" suggestion; not
- * exported, since chart-type-name typo correction is its only consumer.
- * @param {string} a
- * @param {string} b
- * @returns {number}
- */
-function levenshteinDistance(a, b) {
-  const rows = a.length + 1;
-  const cols = b.length + 1;
-  const distances = Array.from({ length: rows }, () => new Array(cols).fill(0));
-  for (let i = 0; i < rows; i++) distances[i][0] = i;
-  for (let j = 0; j < cols; j++) distances[0][j] = j;
-
-  for (let i = 1; i < rows; i++) {
-    for (let j = 1; j < cols; j++) {
-      const substitutionCost = a[i - 1] === b[j - 1] ? 0 : 1;
-      distances[i][j] = Math.min(
-        distances[i - 1][j] + 1, // deletion
-        distances[i][j - 1] + 1, // insertion
-        distances[i - 1][j - 1] + substitutionCost, // substitution
-      );
-    }
-  }
-  return distances[rows - 1][cols - 1];
-}
-
-/**
  * The registered chart type name closest to `typeName` by edit distance, or
- * `null` if nothing is within `MAX_SUGGESTION_DISTANCE`.
+ * `null` if nothing is within `MAX_SUGGESTION_DISTANCE`. Thin wrapper around
+ * `textDistance.js`'s shared `nearestMatch` (CLAUDE.md §1.1 DRY — extracted
+ * there once `Selection.attr()`'s Prompt 179 dev warning needed the same
+ * algorithm this file already had inline).
  * @param {string} typeName
  * @param {string[]} candidates
  * @returns {string|null}
  */
 function closestChartTypeName(typeName, candidates) {
-  let best = null;
-  let bestDistance = Infinity;
-  for (const candidate of candidates) {
-    const distance = levenshteinDistance(typeName, candidate);
-    if (distance < bestDistance) {
-      bestDistance = distance;
-      best = candidate;
-    }
-  }
-  return bestDistance <= MAX_SUGGESTION_DISTANCE ? best : null;
+  return nearestMatch(typeName, candidates, MAX_SUGGESTION_DISTANCE);
 }
 
 /**
  * @typedef {Object} Graph3DOptions
- * @property {HTMLCanvasElement} canvas - Target canvas. Required.
+ * @property {HTMLCanvasElement} [canvas] - Target canvas. Required in a browser;
+ *   omitted automatically covers the SSR case (no `window`), where a mock
+ *   renderer is used instead — see the class doc's "SSR-safe mode" note.
  * @property {string} [hdr] - URL of an HDR environment map applied when a scene is created (Phase 2).
  * @property {boolean} [antialias=true]
  * @property {number} [pixelRatio] - Defaults to `window.devicePixelRatio`.
@@ -95,6 +70,15 @@ function closestChartTypeName(typeName, candidates) {
  * const g = new Graph3D({ canvas, pixelRatio: 2, hdr: '/env/studio.hdr', theme: 'studio-dark' });
  * g.setActiveScene(g.createScene('main'));
  * g.chart('bar').data(values, (d) => d.id).render();
+ *
+ * @example
+ * // SSR-safe mode: no `window` means no canvas is required. Scene setup, chart
+ * // configuration, and data binding all work normally for pre-computing state
+ * // during server-side rendering — only actual pixel rendering needs a browser.
+ * const g = new Graph3D({}); // canvas omitted — detected automatically
+ * g.setActiveScene(g.createScene('main'));
+ * g.chart('bar').data(values, (d) => d.id); // fine server-side
+ * g.renderer.render(scene, camera); // throws a clear error server-side
  */
 export class Graph3D {
   /** @type {CapabilityProbe} */
@@ -111,6 +95,9 @@ export class Graph3D {
 
   /** @type {PostFX|null} */
   #postfx = null;
+
+  /** @type {GraphDevTools|null} */
+  #devtools = null;
 
   /** @type {Map<string, *>} */
   #scenes = new Map();
@@ -167,7 +154,8 @@ export class Graph3D {
 
   /**
    * @param {Graph3DOptions} options
-   * @throws {TypeError} If `canvas` is missing.
+   * @throws {TypeError} If `canvas` is missing in a browser environment
+   *   (canvas is optional under SSR — see the class doc's SSR-safe example).
    */
   constructor({
     canvas,
@@ -178,7 +166,10 @@ export class Graph3D {
     theme,
     respectReducedMotion = true,
   } = {}) {
-    if (!canvas) {
+    // SSR (no `window`): canvas is optional and the mock renderer takes over —
+    // see SSRGraph3DRenderer. In a browser, canvas is still required as before.
+    const isSSR = typeof window === 'undefined';
+    if (!canvas && !isSSR) {
       throw new TypeError(
         'Graph3D: canvas is required. Pass an HTMLCanvasElement.',
       );
@@ -190,7 +181,9 @@ export class Graph3D {
     this.respectReducedMotion = respectReducedMotion;
 
     // Renderer first — CapabilityProbe reuses the same GL context rather than opening a second one.
-    this.#renderer = new Graph3DRenderer({ canvas, antialias, pixelRatio });
+    this.#renderer = isSSR
+      ? new SSRGraph3DRenderer()
+      : new Graph3DRenderer({ canvas, antialias, pixelRatio });
     this.#probe = new CapabilityProbe(canvas);
     this.#frameBudget = new FrameBudget();
 
@@ -234,14 +227,14 @@ export class Graph3D {
           Math.round(vp.height * H),
         );
         threeRenderer.setScissorTest(true);
-        threeRenderer.render(threeScene, threeCamera);
+        this.#renderer.render(threeScene, threeCamera);
       }
 
       threeRenderer.setScissorTest(false);
     };
     loop.add(this.#tick);
 
-    if (autoResize && typeof ResizeObserver !== 'undefined') {
+    if (canvas && autoResize && typeof ResizeObserver !== 'undefined') {
       const parent = canvas.parentElement;
       if (parent) {
         this.#resizeObserver = new ResizeObserver((entries) => {
@@ -323,6 +316,39 @@ export class Graph3D {
       });
     }
     return this.#postfx;
+  }
+
+  /**
+   * Dev-only debugging surface (Prompt 178): scene-graph dumps, active
+   * timelines, GPU memory snapshots, and disposable debug overlays for
+   * picking/frustum/octree/selection. Created lazily on first access.
+   *
+   * Throws in production. The check is a plain `process.env.NODE_ENV`
+   * comparison, unminified — the same convention React/D3 ship — so a
+   * consuming app's own bundler (Vite/webpack `define`/`DefinePlugin`
+   * replacing that expression with the literal `"production"`) dead-code-
+   * eliminates every `g.devtools...` call site downstream, without this
+   * library needing its own production/development build split.
+   * `typeof process !== 'undefined'` guards environments (a raw `<script>`
+   * include) where `process` doesn't exist at all.
+   *
+   * @returns {GraphDevTools}
+   * @throws {Error} If `process.env.NODE_ENV === 'production'`.
+   * @throws {Error} If called after `dispose()`.
+   * @example g.devtools.dumpSceneGraph();
+   */
+  get devtools() {
+    this.#assertNotDisposed('devtools');
+    if (isProductionBuild()) {
+      throw new Error(
+        'Graph3D.devtools: unavailable in production builds (process.env.NODE_ENV === "production"). ' +
+          'This is dev-only tooling, gated out of production so it never ships to your users.',
+      );
+    }
+    if (!this.#devtools) {
+      this.#devtools = new GraphDevTools(this);
+    }
+    return this.#devtools;
   }
 
   /**
@@ -494,7 +520,123 @@ export class Graph3D {
     return new ChartClass(this.#activeScene.three);
   }
 
+  /**
+   * Export the active scene's full `THREE.Scene` graph as glTF (Prompt 181).
+   * `GLTFExporter` is lazy-loaded from `three/examples/jsm/exporters/GLTFExporter.js`
+   * on first call — never bundled unless this method is actually used, same
+   * convention as `GraphSceneCamera.enableOrbitControls`/`GraphObjectLoader`'s
+   * lazy-loaded addons.
+   *
+   * @param {{binary?: boolean}} [options] - `binary: true` (default) returns a
+   *   `.glb` `Blob`; `false` returns the raw glTF JSON object (embed textures
+   *   as data URIs yourself if you need a single-file `.gltf`).
+   * @returns {Promise<Blob|object>}
+   * @throws {Error} If no active scene exists, or called after `dispose()`.
+   * @example
+   * const blob = await g.exportScene();
+   * const url = URL.createObjectURL(blob);
+   */
+  async exportScene({ binary = true } = {}) {
+    this.#assertNotDisposed('exportScene');
+    if (!this.#activeScene) {
+      throw new Error('Graph3D.exportScene: no active scene. Call setActiveScene() first.');
+    }
+    const { GLTFExporter } = await import('three/examples/jsm/exporters/GLTFExporter.js');
+    const result = await new GLTFExporter().parseAsync(this.#activeScene.three, { binary });
+    return binary ? new Blob([result], { type: 'model/gltf-binary' }) : result;
+  }
+
+  /**
+   * Capture this instance's scene/camera composition as a JSON-safe plain
+   * object (Prompt 181) — restorable via `Graph3D.deserialize()`.
+   *
+   * Deliberately narrow: only `theme`/`hdr` and, per scene, the applied
+   * theme plus camera preset/position/look-at-target/fov are captured.
+   * Chart configurations, bound data, and accessor functions are NOT
+   * captured — they're code (closures), which has no JSON representation.
+   * Re-create charts and call `.data()` again after `deserialize()` restores
+   * the view. A scene whose camera was replaced via `useCamera()` (no
+   * preset) still has its position/target/fov captured, just not a preset
+   * name to rebuild the camera type from — `deserialize()` applies them on
+   * top of the new instance's default camera.
+   *
+   * @returns {object} A JSON-safe snapshot.
+   * @throws {Error} If called after `dispose()`.
+   * @example localStorage.setItem('view', JSON.stringify(g.serialize()));
+   */
+  serialize() {
+    this.#assertNotDisposed('serialize');
+    return {
+      version: 1,
+      theme: this.theme ?? null,
+      hdr: this.hdr ?? null,
+      activeScene: this.#activeScene?.name ?? null,
+      scenes: [...this.#scenes.values()].map((scene) => {
+        const threeCamera = scene.camera.three;
+        return {
+          name: scene.name,
+          theme: scene.theme,
+          camera: {
+            preset: scene.camera.preset,
+            position: threeCamera.position.toArray(),
+            target: scene.camera.target.toArray(),
+            fov: threeCamera.isPerspectiveCamera ? threeCamera.fov : null,
+          },
+        };
+      }),
+    };
+  }
+
   // ── Static methods ─────────────────────────────────────────────────────────
+
+  /**
+   * Reconstruct a new `Graph3D` instance from a `serialize()` snapshot
+   * (Prompt 181): recreates each scene by name, its applied theme (if any),
+   * and its camera preset/position/look-at-target/fov. Chart configurations
+   * and data are NOT restored — `serialize()` never captured them (see its
+   * own doc comment) — recreate charts and call `.data()` again after this
+   * returns.
+   *
+   * @param {object} json - A snapshot from `serialize()`.
+   * @param {Graph3DOptions} [options] - Passed through to the `Graph3D`
+   *   constructor — `canvas` is still required in a browser, since a JSON
+   *   snapshot can't carry a DOM element. Overrides `json.theme`/`json.hdr`
+   *   if given.
+   * @returns {Promise<Graph3D>}
+   * @throws {TypeError} If `json` isn't a `serialize()`-shaped object.
+   * @example
+   * const json = JSON.parse(localStorage.getItem('view'));
+   * const g = await Graph3D.deserialize(json, { canvas });
+   */
+  static async deserialize(json, options = {}) {
+    if (!json || !Array.isArray(json.scenes)) {
+      throw new TypeError('Graph3D.deserialize: expected a snapshot from serialize() (missing scenes array).');
+    }
+    const graph3d = new Graph3D({
+      theme: json.theme ?? undefined,
+      hdr: json.hdr ?? undefined,
+      ...options,
+    });
+    for (const sceneSnapshot of json.scenes) {
+      const scene = graph3d.createScene(sceneSnapshot.name);
+      // Theme first — applyTheme() rebuilds the camera to the theme's own
+      // default preset, which the explicit preset/position/target/fov below
+      // must then override to reflect the actual serialized camera state.
+      if (sceneSnapshot.theme) await scene.applyTheme(sceneSnapshot.theme);
+      const cam = sceneSnapshot.camera;
+      if (cam) {
+        if (cam.preset) scene.camera.setPreset(cam.preset);
+        if (cam.position) scene.camera.setPosition(...cam.position);
+        if (cam.target) scene.camera.lookAt(...cam.target);
+        if (typeof cam.fov === 'number' && scene.camera.three.isPerspectiveCamera) {
+          scene.camera.three.fov = cam.fov;
+          scene.camera.three.updateProjectionMatrix();
+        }
+      }
+    }
+    if (json.activeScene) graph3d.setActiveScene(json.activeScene);
+    return graph3d;
+  }
 
   /**
    * Dispose all currently registered `Graph3D` instances.
@@ -518,7 +660,10 @@ export class Graph3D {
    * @example g.dispose();
    */
   dispose() {
-    if (this.#disposed) return;
+    if (this.#disposed) {
+      devWarn('Graph3D.dispose: this instance has already been disposed — this call is a no-op.');
+      return;
+    }
     this.#disposed = true;
 
     this.#resizeObserver?.disconnect();

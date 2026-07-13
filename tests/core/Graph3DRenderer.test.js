@@ -10,6 +10,7 @@ vi.mock('three', async (importActual) => {
       return {
         setPixelRatio: vi.fn(),
         setSize: vi.fn(),
+        render: vi.fn(),
         dispose: vi.fn(),
         domElement: canvas,
         shadowMap: { enabled: false, type: 0 },
@@ -21,7 +22,7 @@ vi.mock('three', async (importActual) => {
   };
 });
 
-import { Graph3DRenderer } from '../../src/core/Graph3DRenderer.js';
+import { Graph3DRenderer, SSRGraph3DRenderer } from '../../src/core/Graph3DRenderer.js';
 import {
   WebGLRenderer,
   SRGBColorSpace,
@@ -151,6 +152,34 @@ describe('Graph3DRenderer', () => {
     const r = new Graph3DRenderer({ canvas });
     expect(r.three).toBeDefined();
     expect(typeof r.three.setSize).toBe('function');
+  });
+
+  // ── render ────────────────────────────────────────────────────────────────
+
+  it('render delegates to three.render with scene and camera', () => {
+    const canvas = makeCanvas();
+    const r = new Graph3DRenderer({ canvas });
+    const scene = {};
+    const camera = {};
+    r.render(scene, camera);
+    expect(r.three.render).toHaveBeenCalledWith(scene, camera);
+  });
+
+  it('render throws after dispose', () => {
+    const canvas = makeCanvas();
+    const r = new Graph3DRenderer({ canvas });
+    r.dispose();
+    expect(() => r.render({}, {})).toThrow(/disposed/);
+  });
+
+  it('render throws after context loss', () => {
+    const canvas = makeCanvas();
+    const r = new Graph3DRenderer({ canvas });
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const [, handler] = canvas.addEventListener.mock.calls[0];
+    handler();
+    errorSpy.mockRestore();
+    expect(() => r.render({}, {})).toThrow(/context is lost/);
   });
 
   // ── setSize ───────────────────────────────────────────────────────────────
@@ -327,5 +356,30 @@ describe('Graph3DRenderer', () => {
     contextRestoredHandler();
     expect(canvas.dispatchEvent).toHaveBeenCalledOnce();
     expect(canvas.dispatchEvent.mock.calls[0][0].type).toBe('graph3d:context-restored');
+  });
+});
+
+// ── SSRGraph3DRenderer (Prompt 177) ─────────────────────────────────────────
+
+describe('SSRGraph3DRenderer', () => {
+  it('constructs without a canvas or any arguments', () => {
+    expect(() => new SSRGraph3DRenderer()).not.toThrow();
+  });
+
+  it('.three is null', () => {
+    expect(new SSRGraph3DRenderer().three).toBeNull();
+  });
+
+  it('setSize/setPixelRatio/setToneMapping/dispose are no-ops', () => {
+    const r = new SSRGraph3DRenderer();
+    expect(() => r.setSize(800, 600)).not.toThrow();
+    expect(() => r.setPixelRatio(2)).not.toThrow();
+    expect(() => r.setToneMapping('AgX')).not.toThrow();
+    expect(() => r.dispose()).not.toThrow();
+  });
+
+  it('render() throws a clear SSR-specific error', () => {
+    const r = new SSRGraph3DRenderer();
+    expect(() => r.render({}, {})).toThrow(/requires a browser environment/);
   });
 });

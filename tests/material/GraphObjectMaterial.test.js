@@ -191,6 +191,68 @@ describe('GraphObjectMaterial.applyShader', () => {
   });
 });
 
+// ── applyShader() dev warning (Prompt 179) ──────────────────────────────────────
+
+describe('GraphObjectMaterial.applyShader dev warning: shader without bindUniforms', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('warns on the next microtask when bindUniforms() never follows a shader with uniforms', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const wrapper = new GraphObjectMaterial(makeMesh());
+    wrapper.applyShader(makeShaderMaterial({ intensity: { value: 1 } }));
+
+    await Promise.resolve();
+
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('bindUniforms() was never called'));
+  });
+
+  it('does not warn when bindUniforms() is called right after applyShader() (still synchronous)', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const wrapper = new GraphObjectMaterial(makeMesh());
+    wrapper.applyShader(makeShaderMaterial({ intensity: { value: 1 } }));
+    wrapper.bindUniforms({ intensity: 2 });
+
+    await Promise.resolve();
+
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not warn when the shader declares no uniforms', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const wrapper = new GraphObjectMaterial(makeMesh());
+    wrapper.applyShader(makeShaderMaterial());
+
+    await Promise.resolve();
+
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not warn if the wrapper was disposed before the microtask fires', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const wrapper = new GraphObjectMaterial(makeMesh());
+    wrapper.applyShader(makeShaderMaterial({ intensity: { value: 1 } }));
+    wrapper.dispose();
+
+    await Promise.resolve();
+
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('a later applyShader() re-arms the check independently of an earlier bindUniforms()', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const wrapper = new GraphObjectMaterial(makeMesh());
+    wrapper.applyShader(makeShaderMaterial({ intensity: { value: 1 } }));
+    wrapper.bindUniforms({ intensity: 2 });
+    wrapper.applyShader(makeShaderMaterial({ glow: { value: 1 } })); // never bound
+
+    await Promise.resolve();
+
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('bindUniforms() was never called'));
+  });
+});
+
 // ── bindUniforms() ─────────────────────────────────────────────────────────────
 
 describe('GraphObjectMaterial.bindUniforms', () => {

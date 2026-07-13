@@ -3,9 +3,11 @@ import { material, effects } from '../material/index.js';
 import { resolve as resolveEasing } from '../anim/index.js';
 import { GraphObjectFactory, GraphInstancedObject } from '../object/index.js';
 import { loop } from '../core/Graph3DLoop.js';
+import { devWarn } from '../core/devWarnings.js';
 import { applyAxisScaleDomain, resolveAxisAccessor } from './axisField.js';
 import { resolveChartMaterial } from './materialField.js';
 import { applyLegend } from './legendField.js';
+import { describeData, ensureA11yElement } from './a11yField.js';
 import { applyStreamChunk } from './streamField.js';
 import { assertLODLevels, pickLODLevel } from './lodField.js';
 
@@ -160,6 +162,13 @@ export class GraphChart {
   /** @type {((datum:*, index:number) => *)|null} */
   #tooltipHandler = null;
 
+  /** @type {string|null} Set by `setAriaLabel()` (Prompt 180). */
+  #ariaLabel = null;
+  /** @type {string|null} Set by `setLongDescription()` — `null` means auto-generate from data. */
+  #longDescription = null;
+  /** @type {HTMLElement|null} The hidden div `setAriaLabel`/`setLongDescription` write into, created on first call. */
+  #a11yElement = null;
+
   #hoverEffectConfig = null;
 
   #selectEffectConfig = null;
@@ -261,6 +270,19 @@ export class GraphChart {
     }
     this.#pendingData = arr;
     this.#pendingKeyFn = keyFn;
+    // Prompt 179 dev warning: data() succeeds silently whether or not
+    // render() ever follows it, so a forgotten render() call shows nothing
+    // with no signal why. Deferred to the next microtask rather than checked
+    // synchronously here, so the ordinary `chart.data(rows).render()` and
+    // `chart.data(rows); chart.render();` idioms — both still synchronous —
+    // never trip it: by the time this runs, either has already set #rendered.
+    queueMicrotask(() => {
+      if (!this.#destroyed && !this.#rendered) {
+        devWarn(
+          'GraphChart.data(): data was set but render() was never called — nothing will appear on screen. Call chart.render() once after data().',
+        );
+      }
+    });
     return this.#backendSelection.data(arr, keyFn);
   }
 
@@ -472,6 +494,57 @@ export class GraphChart {
       throw new TypeError(`GraphChart.tooltip: handlerFn must be a function, received ${JSON.stringify(handlerFn)}.`);
     }
     this.#tooltipHandler = handlerFn;
+    return this;
+  }
+
+  /**
+   * Sets this chart's accessible name (Prompt 180) — a `<canvas>` carries no
+   * readable content of its own, so this is written into a visually-hidden
+   * `<div>` inserted immediately after `options.container` in the DOM
+   * (`document.createElement`, not a THREE.js concept), where a screen
+   * reader actually encounters it. `KeyboardNav`'s ARIA live region (Prompt
+   * 154) already handles *per-datum* announcements as focus moves; this is
+   * the chart's own static label, read once on arrival.
+   * @param {string} label
+   * @param {{ container?: HTMLElement }} [options] `container` is required
+   *   only the first time either this or `setLongDescription()` is called —
+   *   both write into the same hidden div.
+   * @returns {this}
+   * @throws {TypeError} If `label` isn't a non-empty string.
+   * @throws {TypeError} If the hidden div doesn't exist yet and `options.container` isn't a DOM element.
+   * @example chart.setAriaLabel('Quarterly revenue by region', { container: canvas });
+   */
+  setAriaLabel(label, options = {}) {
+    this.#assertNotDisposed('setAriaLabel');
+    if (typeof label !== 'string' || label.length === 0) {
+      throw new TypeError(`GraphChart.setAriaLabel: expected a non-empty string, received ${JSON.stringify(label)}.`);
+    }
+    this.#ariaLabel = label;
+    this.#a11yElement = ensureA11yElement(this.#a11yElement, options.container);
+    this.#syncA11yElement();
+    return this;
+  }
+
+  /**
+   * Sets this chart's accessible long description (Prompt 180), overriding
+   * the auto-generated one (a data-point count and value range) every
+   * `render()`/`update()` writes into the same hidden div otherwise —
+   * useful when the data alone doesn't convey what the chart is showing.
+   * @param {string} text
+   * @param {{ container?: HTMLElement }} [options] Same contract as `setAriaLabel()`'s.
+   * @returns {this}
+   * @throws {TypeError} If `text` isn't a non-empty string.
+   * @throws {TypeError} If the hidden div doesn't exist yet and `options.container` isn't a DOM element.
+   * @example chart.setLongDescription('Revenue climbed steadily each quarter, peaking in Q4.');
+   */
+  setLongDescription(text, options = {}) {
+    this.#assertNotDisposed('setLongDescription');
+    if (typeof text !== 'string' || text.length === 0) {
+      throw new TypeError(`GraphChart.setLongDescription: expected a non-empty string, received ${JSON.stringify(text)}.`);
+    }
+    this.#longDescription = text;
+    this.#a11yElement = ensureA11yElement(this.#a11yElement, options.container);
+    this.#syncA11yElement();
     return this;
   }
 
@@ -1024,6 +1097,67 @@ export class GraphChart {
   }
 
   /**
+   * Renders this chart's scene through `renderer`/`camera` and captures the
+   * result as a PNG data URL. Lossy in one specific sense, documented here:
+   * charts don't own an isolated render target — `renderer`/`camera` render
+   * the *whole* `THREE.Scene` this chart is attached to, so the capture
+   * includes every other chart or object sharing that scene, not just this
+   * chart's own datums. For a chart-only image, keep that chart alone on its
+   * own scene.
+   * @param {{renderer: THREE.WebGLRenderer, camera: THREE.Camera}} options
+   * @returns {string} A `data:image/png;base64,...` URL.
+   * @throws {TypeError} If `renderer` or `camera` is missing/invalid.
+   * @throws {Error} If called after `destroy()`.
+   * @example
+   * const dataUrl = chart.exportPNG({ renderer: g.renderer.three, camera: scene.camera.three });
+   * const img = document.createElement('img');
+   * img.src = dataUrl;
+   */
+  exportPNG({ renderer, camera } = {}) {
+    this.#assertNotDisposed('exportPNG');
+    if (!renderer || typeof renderer.render !== 'function' || !renderer.domElement) {
+      throw new TypeError(`GraphChart.exportPNG: options.renderer must be a THREE.WebGLRenderer, received ${JSON.stringify(renderer)}.`);
+    }
+    if (!camera) {
+      throw new TypeError('GraphChart.exportPNG: options.camera is required.');
+    }
+    renderer.render(this.#scene, camera);
+    return renderer.domElement.toDataURL('image/png');
+  }
+
+  /**
+   * Renders this chart's scene to SVG markup via Three.js's `SVGRenderer`
+   * addon (lazy-loaded on first call — never bundled unless this method is
+   * actually used). Documented lossy: `SVGRenderer` has no concept of
+   * per-instance transforms, so this chart's default instanced backend
+   * (`GraphInstancedObject`, one `THREE.InstancedMesh` standing in for every
+   * datum) draws as a single shape at the object's own base transform rather
+   * than one shape per datum — only mesh-backend charts (one real
+   * `GraphMesh` per datum) render faithfully. `SVGRenderer` also has no
+   * texture, shading, or shadow support (its own documented limitation).
+   * @param {{camera: THREE.Camera, width: number, height: number}} options
+   * @returns {Promise<string>} Serialized `<svg>...</svg>` markup.
+   * @throws {TypeError} If `camera` is missing, or `width`/`height` isn't a positive number.
+   * @throws {Error} If called after `destroy()`.
+   * @example
+   * const svg = await chart.exportSVG({ camera: scene.camera.three, width: 800, height: 600 });
+   */
+  async exportSVG({ camera, width, height } = {}) {
+    this.#assertNotDisposed('exportSVG');
+    if (!camera) {
+      throw new TypeError('GraphChart.exportSVG: options.camera is required.');
+    }
+    if (!Number.isFinite(width) || width <= 0 || !Number.isFinite(height) || height <= 0) {
+      throw new TypeError(`GraphChart.exportSVG: width and height must be positive numbers, received ${JSON.stringify({ width, height })}.`);
+    }
+    const { SVGRenderer } = await import('three/examples/jsm/renderers/SVGRenderer.js');
+    const svgRenderer = new SVGRenderer();
+    svgRenderer.setSize(width, height);
+    svgRenderer.render(this.#scene, camera);
+    return new XMLSerializer().serializeToString(svgRenderer.domElement);
+  }
+
+  /**
    * Registers a handler for either a lifecycle event (`'enter'`/`'update'`/
    * `'exit'` — fired internally by `update()`, Prompt 130, as datums enter,
    * update, or exit on each `data()` call, `handler(selection)`) or an
@@ -1201,6 +1335,7 @@ export class GraphChart {
     }
 
     this.#rendered = true;
+    this.#syncA11yElement();
     return this;
   }
 
@@ -1283,6 +1418,7 @@ export class GraphChart {
     }
 
     this.#backendSelection = joined.merge(entered);
+    this.#syncA11yElement();
     return this;
   }
 
@@ -1377,6 +1513,18 @@ export class GraphChart {
   }
 
   /**
+   * Writes the hidden a11y div's text (Prompt 180) — a no-op until
+   * `setAriaLabel()`/`setLongDescription()` has created it. Called at the
+   * end of `render()`/`update()` so the auto-generated description (used
+   * whenever `setLongDescription()` hasn't been) stays current as data changes.
+   */
+  #syncA11yElement() {
+    if (!this.#a11yElement) return;
+    const description = this.#longDescription ?? describeData(this.#backendSelection.data(), this.#yField.accessor);
+    this.#a11yElement.textContent = this.#ariaLabel ? `${this.#ariaLabel}. ${description}` : description;
+  }
+
+  /**
    * Permanently tears down this chart (Prompt 131): stops every transition
    * `update()` started that hasn't finished yet (`SelectionTransition.stop()`
    * — abandons pending writes rather than snapping to their end value, since
@@ -1396,10 +1544,18 @@ export class GraphChart {
    * @example chart.destroy();
    */
   destroy() {
-    if (this.#destroyed) return;
+    if (this.#destroyed) {
+      devWarn('GraphChart.destroy: this chart has already been destroyed — this call is a no-op.');
+      return;
+    }
     this.#destroyed = true;
     this.#stopStream();
     this.#stopLOD();
+    if (this.#activeTransitions.size > 0) {
+      devWarn(
+        `GraphChart.destroy: destroying with ${this.#activeTransitions.size} transition(s) still in flight — they have been stopped early.`,
+      );
+    }
     for (const transition of this.#activeTransitions) transition.stop();
     this.#activeTransitions.clear();
     for (const exiting of this.#pendingExits) exiting.dispose();
@@ -1411,6 +1567,10 @@ export class GraphChart {
       const { container } = this.#legendConfig;
       while (container.firstChild) container.removeChild(container.firstChild);
       this.#legendConfig = null;
+    }
+    if (this.#a11yElement) {
+      this.#a11yElement.remove();
+      this.#a11yElement = null;
     }
   }
 

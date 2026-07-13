@@ -677,6 +677,7 @@ export class GraphAnim {
   resume(): void;
   get isPaused(): boolean;
   get size(): number;
+  get timelines(): GraphAnimTimeline[];
   dispose(): void;
 }
 
@@ -887,6 +888,7 @@ export class GraphInstancedObject<T = unknown> extends GraphObject {
   get capacity(): number;
   get count(): number;
   get isInstanced(): true;
+  get octree(): Octree;
   setInstanceCount(n: number): this;
   setInstanceMatrix(index: number, matrix4: THREE.Matrix4): this;
   setInstancePosition(index: number, x: number, y: number, z: number): this;
@@ -985,6 +987,7 @@ export class Octree {
   queryRay(ray: THREE.Ray): Array<string | number>;
   queryRadius(point: THREE.Vector3, radius: number): Array<string | number>;
   queryAABB(box: THREE.Box3): Array<string | number>;
+  dumpBounds(): { bounds: THREE.Box3; depth: number; itemCount: number; isLeaf: boolean }[];
 }
 
 export function assignDepthJitter<T = unknown>(
@@ -1007,6 +1010,7 @@ export class GraphSceneCamera {
   constructor(options?: { preset?: string });
   get three(): THREE.Camera;
   get preset(): string | null;
+  get target(): THREE.Vector3;
   setPreset(name: string): this;
   lookAt(x: number, y: number, z: number): this;
   setPosition(x: number, y: number, z: number): this;
@@ -1184,6 +1188,8 @@ export class GraphChart<T = any, R = JoinResult<T>> {
   legend(options: { container: HTMLElement }): this;
   tooltip(): ((datum: T, index: number) => unknown) | null;
   tooltip(handlerFn: (datum: T, index: number) => unknown): this;
+  setAriaLabel(label: string, options?: { container?: HTMLElement }): this;
+  setLongDescription(text: string, options?: { container?: HTMLElement }): this;
   hoverEffect(): EffectConfig | null;
   hoverEffect(presetName: string, options?: object): this;
   selectEffect(): EffectConfig | null;
@@ -1214,6 +1220,9 @@ export class GraphChart<T = any, R = JoinResult<T>> {
 
   exportSelection(selectedData: T[]): unknown[];
   importSelection(keys: unknown[]): T[];
+
+  exportPNG(options: { renderer: THREE.WebGLRenderer; camera: THREE.Camera }): string;
+  exportSVG(options: { camera: THREE.Camera; width: number; height: number }): Promise<string>;
 
   on(event: LifecycleEvent, handler: (selection: Selection<T>) => void): this;
   on(event: InteractionEvent, handler: (payload: InteractionPayload<T>) => void): this;
@@ -1574,7 +1583,31 @@ export class Graph3DRenderer {
   setSize(width: number, height: number, updateStyle?: boolean): void;
   setPixelRatio(ratio: number): void;
   setToneMapping(name: 'None' | 'Linear' | 'Reinhard' | 'Cineon' | 'ACESFilmic' | 'AgX' | 'Neutral'): void;
+  render(scene: THREE.Scene, camera: THREE.Camera): void;
   dispose(): void;
+}
+
+/** SSR-safe stand-in for `Graph3DRenderer`, used automatically when `Graph3D` is constructed with no `window` (server-side). Every method is an inert no-op except `render()`, which throws. */
+export class SSRGraph3DRenderer {
+  constructor();
+  three: null;
+  setSize(width: number, height: number, updateStyle?: boolean): void;
+  setPixelRatio(ratio: number): void;
+  setToneMapping(name: 'None' | 'Linear' | 'Reinhard' | 'Cineon' | 'ACESFilmic' | 'AgX' | 'Neutral'): void;
+  render(scene: THREE.Scene, camera: THREE.Camera): never;
+  dispose(): void;
+}
+
+/** Dev-only debugging surface (Prompt 178), reached via `Graph3D.devtools` — throws in production. */
+export class GraphDevTools {
+  constructor(graph3d: Graph3D);
+  dumpSceneGraph(scene?: GraphScene): { name: string; type: string; uuid: string; visible: boolean; children: unknown[] };
+  listActiveTimelines(): { isPlaying: boolean; time: number; duration: number }[];
+  memorySnapshot(): { geometries: number; textures: number; calls: number; triangles: number; points: number; lines: number };
+  pickingDebugOverlay(hit: { worldPoint: THREE.Vector3; chart?: unknown; instanceIndex: number | null; datum: unknown } | null): THREE.Mesh | null;
+  frustumDebugOverlay(camera?: THREE.Camera): THREE.CameraHelper;
+  octreeDebugOverlay(instancedObject: GraphInstancedObject): THREE.Group;
+  selectionDebugOverlay(selection: Selection): THREE.Group;
 }
 
 export class Graph3DLoop {
@@ -1605,7 +1638,8 @@ export const registry: Graph3DRegistry;
 export type RegisteredChartType = 'bar' | 'line' | 'scatter' | 'area' | 'surface' | 'heatmap' | 'network' | 'tree' | 'pack' | 'pie' | 'volume';
 
 export interface Graph3DOptions {
-  canvas: HTMLCanvasElement;
+  /** Required in a browser; optional under SSR (no `window`), where a mock renderer is used automatically. */
+  canvas?: HTMLCanvasElement;
   hdr?: string;
   antialias?: boolean;
   pixelRatio?: number;
@@ -1614,14 +1648,33 @@ export interface Graph3DOptions {
   respectReducedMotion?: boolean;
 }
 
+/** A `Graph3D.serialize()` snapshot — scene/camera composition only, not chart config or data. See `Graph3D.serialize()`'s doc comment. */
+export interface Graph3DSnapshot {
+  version: number;
+  theme: string | null;
+  hdr: string | null;
+  activeScene: string | null;
+  scenes: Array<{
+    name: string;
+    theme: string | null;
+    camera: {
+      preset: string | null;
+      position: [number, number, number];
+      target: [number, number, number];
+      fov: number | null;
+    };
+  }>;
+}
+
 /** Top-level Graph3D entry point — composes the renderer, animation loop, capability probe, frame budget, and lazily-created worker pool/PostFX pipeline. */
 export class Graph3D {
   constructor(options: Graph3DOptions);
-  get renderer(): Graph3DRenderer;
+  get renderer(): Graph3DRenderer | SSRGraph3DRenderer;
   get capabilities(): Capabilities;
   get frameBudget(): FrameBudget;
   get workers(): WorkerPool;
   get postfx(): PostFX;
+  get devtools(): GraphDevTools;
   get scenes(): Map<string, GraphScene>;
   get activeScene(): GraphScene | null;
 
@@ -1649,6 +1702,11 @@ export class Graph3D {
   chart<T = any>(typeName: 'pie'): PieChart<T>;
   chart<T = any>(typeName: 'volume'): VolumeChart<T>;
   chart<T = any>(typeName: string): GraphChart<T>;
+
+  exportScene(options?: { binary?: true }): Promise<Blob>;
+  exportScene(options: { binary: false }): Promise<object>;
+  serialize(): Graph3DSnapshot;
+  static deserialize(json: Graph3DSnapshot, options?: Graph3DOptions): Promise<Graph3D>;
 
   static disposeAll(): void;
   dispose(): void;

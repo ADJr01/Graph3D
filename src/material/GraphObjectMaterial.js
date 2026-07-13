@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { loop } from '../core/Graph3DLoop.js';
 import { disposeMaterial, retainTexture, releaseTexture } from '../core/GraphDisposal.js';
+import { devWarn } from '../core/devWarnings.js';
 import { GraphMesh } from '../object/GraphMesh.js';
 import { GraphInstancedObject } from '../object/GraphInstancedObject.js';
 
@@ -105,6 +106,9 @@ export class GraphObjectMaterial {
 
   /** @type {(function(): void)|null} */
   #autoResolutionListener = null;
+
+  /** @type {boolean} Prompt 179 dev warning bookkeeping — see `applyShader`. */
+  #boundUniformsSinceApply = true;
 
   /**
    * @param {GraphMesh|GraphInstancedObject} target
@@ -213,7 +217,25 @@ export class GraphObjectMaterial {
         }
       }
     }
-    return this.set(shaderMaterial);
+    const result = this.set(shaderMaterial);
+
+    // Prompt 179 dev warning: a shader material with declared-but-never-bound
+    // uniforms renders with whatever THREE.js defaults them to (often
+    // visually wrong, never an error) — deferred one microtask so a
+    // synchronous `applyShader(...); bindUniforms({...});` pair (the
+    // documented idiom) never trips it.
+    const uniformCount = shaderMaterial.uniforms ? Object.keys(shaderMaterial.uniforms).length : 0;
+    if (uniformCount > 0) {
+      this.#boundUniformsSinceApply = false;
+      queueMicrotask(() => {
+        if (!this.#disposed && !this.#boundUniformsSinceApply) {
+          devWarn(
+            `GraphObjectMaterial.applyShader: the shader declares ${uniformCount} uniform(s) but bindUniforms() was never called — their values may be unset. Call wrapper.bindUniforms({...}) right after applyShader().`,
+          );
+        }
+      });
+    }
+    return result;
   }
 
   /**
@@ -254,6 +276,7 @@ export class GraphObjectMaterial {
       );
     }
 
+    this.#boundUniformsSinceApply = true;
     for (const [name, spec] of Object.entries(uniforms)) {
       if (spec !== 'auto') {
         this.#bindStatic(name, spec);

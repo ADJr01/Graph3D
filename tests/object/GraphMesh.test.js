@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import * as THREE from 'three';
 import { GraphMesh } from '../../src/object/GraphMesh.js';
 
@@ -326,6 +326,18 @@ describe('GraphMesh disposal', () => {
 
     expect(scene.children).not.toContain(mesh.three);
     expect(() => mesh.dispose()).not.toThrow();
+  });
+
+  it('Prompt 179: warns (does not throw) on a second dispose() call', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const mesh = makeMesh();
+    mesh.dispose();
+    warnSpy.mockClear();
+
+    mesh.dispose();
+
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('already been disposed'));
+    warnSpy.mockRestore();
   });
 
   it('all public methods throw after dispose', () => {

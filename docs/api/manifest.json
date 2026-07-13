@@ -1,0 +1,108 @@
+{
+  "layerOrder": [
+    "core",
+    "scene",
+    "object",
+    "compose",
+    "anim",
+    "material",
+    "postfx",
+    "chart",
+    "interact",
+    "stream"
+  ],
+  "layerTitle": {
+    "core": "Core Engine",
+    "scene": "Scene Composition",
+    "object": "Object & Mesh",
+    "compose": "Compose",
+    "anim": "Anim",
+    "material": "Material",
+    "postfx": "PostFX & Particles",
+    "chart": "Chart",
+    "interact": "Interaction",
+    "stream": "Stream"
+  },
+  "classesByLayer": {
+    "anim": [
+      "CameraTour",
+      "GraphAnim",
+      "GraphAnimKeyframe",
+      "GraphAnimTimeline",
+      "Transition"
+    ],
+    "chart": [
+      "AreaChart",
+      "BarChart",
+      "GraphChart",
+      "HeatmapChart",
+      "LineChart",
+      "NetworkChart",
+      "PackChart",
+      "PieChart",
+      "ScatterChart",
+      "SurfaceChart",
+      "TreeChart",
+      "VolumeChart"
+    ],
+    "compose": [
+      "Axis",
+      "Selection",
+      "SelectionTransition"
+    ],
+    "core": [
+      "CapabilityProbe",
+      "FrameBudget",
+      "Graph3D",
+      "Graph3DLoop",
+      "Graph3DRegistry",
+      "Graph3DRenderer",
+      "GraphDevTools",
+      "SSRGraph3DRenderer",
+      "WorkerPool"
+    ],
+    "interact": [
+      "Brush",
+      "FocusFollower",
+      "KeyboardNav",
+      "Lasso",
+      "Picker",
+      "PointerRouter",
+      "StateMachine"
+    ],
+    "material": [
+      "GraphObjectMaterial",
+      "SDFText"
+    ],
+    "object": [
+      "GraphInstancedObject",
+      "GraphLine",
+      "GraphMesh",
+      "GraphObject",
+      "GraphObjectFactory",
+      "GraphObjectLoader",
+      "Octree"
+    ],
+    "postfx": [
+      "ParticleSystem",
+      "PostFX"
+    ],
+    "scene": [
+      "GraphScene",
+      "GraphSceneCamera",
+      "GraphSceneClipping",
+      "GraphSceneEnvironment",
+      "GraphSceneLight",
+      "GraphSceneSetup",
+      "GraphSceneShadows"
+    ],
+    "stream": [
+      "Aggregator",
+      "DataStream",
+      "GPGPU",
+      "JoinDiff",
+      "LOD",
+      "OriginShift"
+    ]
+  }
+}

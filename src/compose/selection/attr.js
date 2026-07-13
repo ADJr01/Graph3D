@@ -1,7 +1,14 @@
 import { accessor } from '../generator/index.js';
+import { nearestMatch } from '../../core/textDistance.js';
 
 export const VECTOR_COMPONENTS = new Set(['x', 'y', 'z']);
 export const TRANSFORM_BASES = new Set(['position', 'rotation', 'scale']);
+
+// Every fixed-vocabulary base name — checked against an unrecognized `attr()`
+// path (Prompt 179) for a "did you mean" suggestion. Custom attribute names
+// are an open, unbounded vocabulary (`GraphInstancedObject.defineAttribute`),
+// so this can only ever suggest, never reject outright.
+const KNOWN_ATTR_BASES = [...TRANSFORM_BASES, 'color', 'opacity', 'visible'];
 
 /**
  * `get`/`set` method-name pairs for each transform base, on both backends —
@@ -166,10 +173,31 @@ function applyVisible(backend, size, datumAt, resolve) {
 // ── custom instance attribute (Prompt 38's defineAttribute) ────────────────
 
 function applyCustomAttribute(backend, size, datumAt, resolve, name) {
+  const suggestion = nearestMatch(name, KNOWN_ATTR_BASES);
+
   if (backend.type === 'meshes') {
-    throw new Error(`Selection.attr: custom attribute '${name}' is only supported on the instanced backend — meshes have no per-instance attributes.`);
+    // Prompt 179: a close match to a real fixed-vocabulary name is far more
+    // likely a typo than a genuine custom-attribute name — meshes have no
+    // per-instance attributes at all, so this path can only ever be a
+    // mistake; surface the likely intent instead of the generic message.
+    throw new Error(
+      suggestion
+        ? `Selection.attr: unknown path '${name}'. Did you mean '${suggestion}'?`
+        : `Selection.attr: custom attribute '${name}' is only supported on the instanced backend — meshes have no per-instance attributes.`,
+    );
   }
+
   const { object, indices } = backend;
+  // A near-miss on an attribute that was never explicitly `defineAttribute`d
+  // is far more likely a typo than a genuine custom attribute — surface the
+  // likely intent instead of the generic "call defineAttribute() first"
+  // GraphInstancedObject.setInstanceAttribute would otherwise throw below.
+  // An already-defined attribute close to a reserved name (someone
+  // deliberately named a custom attribute 'colour') is left alone — it's
+  // real, established usage, not a typo to flag.
+  if (suggestion && !object.hasAttribute(name)) {
+    throw new Error(`Selection.attr: unknown path '${name}'. Did you mean '${suggestion}'?`);
+  }
   for (let i = 0; i < size; i++) {
     object.setInstanceAttribute(indices[i], name, resolve(datumAt(i), i));
   }

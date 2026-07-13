@@ -149,6 +149,34 @@ describe('GraphSceneCamera.lookAt()', () => {
   });
 });
 
+// ── target ────────────────────────────────────────────────────────────────────
+
+describe('GraphSceneCamera.target', () => {
+  it('defaults to the active preset\'s configured target', () => {
+    const cam = new GraphSceneCamera({ preset: 'isometric' });
+    expect(cam.target.toArray()).toEqual([0, 0, 0]);
+  });
+
+  it('reflects the last lookAt() call', () => {
+    const cam = new GraphSceneCamera();
+    cam.lookAt(1, 2, 3);
+    expect(cam.target.toArray()).toEqual([1, 2, 3]);
+  });
+
+  it('resets to the new preset\'s target on setPreset()', () => {
+    const cam = new GraphSceneCamera();
+    cam.lookAt(9, 9, 9);
+    cam.setPreset('top-down');
+    expect(cam.target.toArray()).toEqual([0, 0, 0]);
+  });
+
+  it('returns a fresh clone each time — mutating it does not affect the camera', () => {
+    const cam = new GraphSceneCamera();
+    cam.target.set(99, 99, 99);
+    expect(cam.target.toArray()).toEqual([0, 0, 0]);
+  });
+});
+
 // ── setPosition() ─────────────────────────────────────────────────────────────
 
 describe('GraphSceneCamera.setPosition()', () => {

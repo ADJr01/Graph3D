@@ -457,3 +457,70 @@ setInterval(() => {
 - **`window(size)`** caps `data()`'s array to the `size` most-recently-bound datums: once it's exceeded, the oldest (frontmost) entries are trimmed *before* `.filter()`/`.use()`/`.sort()` in `#prepareData()`'s pipeline, so `update()`'s existing join treats them as ordinary exits — no second removal path exists here (CLAUDE.md §1.1 DRY). They dissolve out exactly like any other departing datum: the built-in shrink-and-fade default, a registered `on('exit', fn)`, or `exitAnimation()`, whichever is configured. Meant for a `stream()`-driven chart whose `data()` array keeps growing — caps memory/instance count at a fixed ceiling regardless of how long the stream has been running.
 
 `memoryPressure()` (`stream/`, Prompt 168) is the suggested trigger for both — a heuristic `[0, 1]` ratio off the non-standard, Chromium-only `performance.memory` API (`null` where it's unavailable). See `docs/concepts/stream.md` for its own docs.
+
+## `chart.setAriaLabel(label, options)` / `chart.setLongDescription(text, options)` (Prompt 180)
+
+```js
+chart.setAriaLabel('Quarterly revenue by region', { container: canvas });
+chart.data(rows, (d) => d.id).render();
+// no setLongDescription() call: the hidden div reads
+// "Quarterly revenue by region. 24 data points, values ranging from 1200 to 58900."
+```
+
+A `<canvas>` carries no readable content of its own, so both methods write into
+a visually-hidden (`position:absolute`, 1×1px, clipped — not `display:none`,
+which would also hide it from screen readers) `<div>` inserted immediately
+after `options.container` in the DOM via the native `insertAdjacentElement`.
+`container` (typically the `<canvas>` element itself) is only required on
+whichever of the two methods is called first — both write into the same div,
+created once and reused.
+
+If `setLongDescription()` is never called, `render()`/`update()` keep the div's
+description in sync automatically: a one-line auto-generated summary
+(`chart/a11yField.js`'s `describeData`) — a data-point count, plus a value
+range read through the chart's own `.y()` accessor when the values are
+numeric. An explicit `setLongDescription()` always wins over the
+auto-generated text, and stops it from being recomputed until cleared by a
+fresh chart.
+
+This is a *static* label/description, read once as a screen reader arrives at
+the chart — distinct from `interact/KeyboardNav`'s ARIA live region (Prompt
+154, `docs/concepts/interact.md`), which announces *per-datum* content as
+keyboard focus moves between them. Both use the same underlying
+visually-hidden-element technique (`core/visuallyHidden.js`, shared to avoid
+two copies of the same CSS). `destroy()` removes the hidden div from the DOM.
+
+## `chart.exportPNG(options)` / `chart.exportSVG(options)` (Prompt 181)
+
+```js
+const dataUrl = chart.exportPNG({ renderer: g.renderer.three, camera: scene.camera.three });
+const img = document.createElement('img');
+img.src = dataUrl; // ready to <img>, download, or upload
+
+const svg = await chart.exportSVG({ camera: scene.camera.three, width: 800, height: 600 });
+new Blob([svg], { type: 'image/svg+xml' }); // ready to save as a .svg file
+```
+
+Both are lossy, in two different, specific, documented ways:
+
+- **`exportPNG`** renders through the `renderer`/`camera` you pass in and reads
+  the result back with `HTMLCanvasElement.toDataURL('image/png')`. A chart
+  doesn't own an isolated render target — `renderer`/`camera` render the
+  *whole* `THREE.Scene` the chart is attached to — so the capture includes
+  every other chart or object sharing that scene, not just this one's own
+  datums. For a chart-only image, keep that chart alone on its own scene.
+- **`exportSVG`** lazy-loads Three.js's `SVGRenderer` addon (from
+  `three/examples/jsm/renderers/SVGRenderer.js` — never bundled unless this
+  method is actually called) and serializes its output via `XMLSerializer`.
+  `SVGRenderer` predates `InstancedMesh` and has no concept of per-instance
+  transforms, so this chart's default instanced backend
+  (`GraphInstancedObject`, one `THREE.InstancedMesh` standing in for every
+  datum) draws as a *single* shape at the object's own base transform rather
+  than one shape per datum — only mesh-backend charts (the below-
+  `INSTANCING_THRESHOLD` path, one real `GraphMesh` per datum, see
+  `chart.compact()` above) render one shape per datum faithfully.
+  `SVGRenderer` also has no texture, shading, or shadow support — its own
+  documented limitation, inherited here unchanged.
+
+`exportPNG` is synchronous (`renderer.render()` + `toDataURL()` both are);
+`exportSVG` is async, purely because the `SVGRenderer` import is lazy.

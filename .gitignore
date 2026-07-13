@@ -4,6 +4,10 @@ dist/
 coverage/
 *.log
 
+# VitePress build output/cache (docs/ source markdown is committed, this isn't)
+docs/.vitepress/dist/
+docs/.vitepress/cache/
+
 # Local dev-only test assets
 HDRI/
 

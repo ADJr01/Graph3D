@@ -168,6 +168,17 @@ export class GraphAnim {
   }
 
   /**
+   * Every timeline currently registered with this engine — the introspection
+   * primitive `Graph3D.devtools.listActiveTimelines` (Prompt 178) reads.
+   * A snapshot array, not a live view: mutating it doesn't affect this engine.
+   * @returns {GraphAnimTimeline[]}
+   * @example anim.timelines.filter((tl) => tl.isPlaying).length;
+   */
+  get timelines() {
+    return [...this.#timelines];
+  }
+
+  /**
    * Unsubscribes from the shared RAF loop and drops every tracked timeline.
    * Idempotent. After disposal, `timeline()`/`add()` throw; `remove()`/
    * `pause()`/`resume()` become no-ops (nothing is ticking regardless).

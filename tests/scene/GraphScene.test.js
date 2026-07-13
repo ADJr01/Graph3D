@@ -483,6 +483,17 @@ describe('GraphScene.dispose()', () => {
     }).not.toThrow();
   });
 
+  it('Prompt 179: warns (does not throw) on a second dispose() call', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    scene.dispose();
+    warnSpy.mockClear();
+
+    scene.dispose();
+
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('already been disposed'));
+    warnSpy.mockRestore();
+  });
+
   it('disposes geometry for every mesh in the scene', () => {
     const geo = new THREE.BoxGeometry();
     const spy = vi.spyOn(geo, 'dispose');

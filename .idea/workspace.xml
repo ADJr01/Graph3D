@@ -1,22 +1,45 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="33557d05-3974-4e5d-9972-8791b8163414" name="Changes" comment="typescript wrapper">
-      <change beforePath="$PROJECT_DIR$/.claude/TODO.md" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.github/workflows/ci.yml" beforeDir="false" afterPath="$PROJECT_DIR$/.github/workflows/ci.yml" afterDir="false" />
+    <list default="true" id="33557d05-3974-4e5d-9972-8791b8163414" name="Changes" comment="updated few issues">
       <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BUILD_PLAN.md" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/concepts/scene.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/concepts/scene.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/examples/02-scene/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/examples/02-scene/index.html" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/examples/02-scene/main.js" beforeDir="false" afterPath="$PROJECT_DIR$/examples/02-scene/main.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CLAUDE.md" beforeDir="false" afterPath="$PROJECT_DIR$/CLAUDE.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/concepts/chart.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/concepts/chart.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/concepts/core.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/concepts/core.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/eslint.config.js" beforeDir="false" afterPath="$PROJECT_DIR$/eslint.config.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/package-lock.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/prompts.md" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/rollup.config.js" beforeDir="false" afterPath="$PROJECT_DIR$/rollup.config.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/skipping_list.md" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/scene/GraphSceneEnvironment.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/scene/GraphSceneEnvironment.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/scene/GraphSceneEnvironment.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/scene/GraphSceneEnvironment.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/anim/GraphAnim.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/anim/GraphAnim.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/chart/GraphChart.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/chart/GraphChart.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/compose/selection/attr.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/selection/attr.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/core/CapabilityProbe.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/CapabilityProbe.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/core/Graph3D.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/Graph3D.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/core/Graph3DLoop.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/Graph3DLoop.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/core/Graph3DRenderer.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/Graph3DRenderer.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/index.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/interact/KeyboardNav.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/interact/KeyboardNav.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/material/GraphObjectMaterial.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/material/GraphObjectMaterial.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/object/GraphInstancedObject.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/object/GraphInstancedObject.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/object/GraphMesh.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/object/GraphMesh.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/object/Octree.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/object/Octree.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/scene/GraphScene.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/scene/GraphScene.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/scene/GraphSceneCamera.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/scene/GraphSceneCamera.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/__snapshots__/api-surface.test.js.snap" beforeDir="false" afterPath="$PROJECT_DIR$/tests/__snapshots__/api-surface.test.js.snap" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/anim/GraphAnim.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/anim/GraphAnim.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/chart/GraphChart.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/chart/GraphChart.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/compose/selection/attr.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/compose/selection/attr.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/core/CapabilityProbe.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/core/CapabilityProbe.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/core/Graph3D.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/core/Graph3D.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/core/Graph3DLoop.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/core/Graph3DLoop.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/core/Graph3DRenderer.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/core/Graph3DRenderer.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/material/GraphObjectMaterial.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/material/GraphObjectMaterial.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/object/GraphInstancedObject.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/object/GraphInstancedObject.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/object/GraphMesh.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/object/GraphMesh.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/object/Octree.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/object/Octree.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/scene/GraphScene.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/scene/GraphScene.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/scene/GraphSceneCamera.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/scene/GraphSceneCamera.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/types/index.d.ts" beforeDir="false" afterPath="$PROJECT_DIR$/types/index.d.ts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -104,7 +127,7 @@
       <workItem from="1783746142508" duration="27096000" />
       <workItem from="1783796936930" duration="55000" />
       <workItem from="1783832301972" duration="2744000" />
-      <workItem from="1783861007618" duration="3231000" />
+      <workItem from="1783861007618" duration="16347000" />
     </task>
     <task id="LOCAL-00001" summary="graph3D created">
       <option name="closed" value="true" />
@@ -186,7 +209,15 @@
       <option name="project" value="LOCAL" />
       <updated>1783796974295</updated>
     </task>
-    <option name="localTasksCounter" value="11" />
+    <task id="LOCAL-00011" summary="updated few issues">
+      <option name="closed" value="true" />
+      <created>1783864988579</created>
+      <option name="number" value="00011" />
+      <option name="presentableId" value="LOCAL-00011" />
+      <option name="project" value="LOCAL" />
+      <updated>1783864988579</updated>
+    </task>
+    <option name="localTasksCounter" value="12" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -202,6 +233,7 @@
     <MESSAGE value="Phase 9 Complete" />
     <MESSAGE value="Phase 10 on process" />
     <MESSAGE value="typescript wrapper" />
-    <option name="LAST_COMMIT_MESSAGE" value="typescript wrapper" />
+    <MESSAGE value="updated few issues" />
+    <option name="LAST_COMMIT_MESSAGE" value="updated few issues" />
   </component>
 </project>
