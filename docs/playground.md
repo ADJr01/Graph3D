@@ -1,12 +1,28 @@
+---
+layout: page
+aside: false
+---
+
+<script setup>
+import PlaygroundDemo from './.vitepress/theme/components/PlaygroundDemo.vue';
+</script>
+
+<div class="vp-doc" style="padding: 24px;">
+
 # Playground
 
-An interactive, in-browser Monaco code playground (edit + run Graph3D.js
-snippets with no local setup), alongside a gallery of every chart type ×
-theme × postfx combination, is scaffolded but not yet built.
+Edit Graph3D.js code on the left, click **Run** (or `Ctrl`/`Cmd`+`Enter`) to
+render it on the right — no local setup. The preview runs your code as a
+real ES module in an isolated iframe; `graph3d.js` resolves to this site's
+own built library, `three` to [esm.sh](https://esm.sh/three), so it behaves
+exactly like a real project with both installed.
 
-Until then, the repository ships a local live-reload sandbox at
-`examples/playground/`, wired to this repo's own source (not the published
-package) via Vite:
+<ClientOnly>
+  <PlaygroundDemo />
+</ClientOnly>
+
+For a local, hot-reloading sandbox wired to this repository's own source
+(not the published package) instead of the browser above:
 
 ```bash
 git clone <this repository>
@@ -15,8 +31,11 @@ npm install
 npm run dev
 ```
 
-Edit `examples/playground/main.js` directly — every change hot-reloads in
-the browser. Every other folder under `examples/` (`08-bar-chart/`,
-`09-line-chart/`, …, `22-million-points/`, `23-live-trading/`) is a complete,
-runnable example of one feature; open any of them with the same `vite`
-dev server (see that example's own `index.html`/`main.js`) to see it live.
+Edit `examples/playground/main.js` directly — every change hot-reloads.
+Every other folder under `examples/` (`08-bar-chart/`, `09-line-chart/`, …,
+`22-million-points/`, `23-live-trading/`) is a complete, runnable example of
+one feature; run `npx vite examples/<folder> --config vite.config.js` to see
+any of them live, or browse [Recipes](/recipes/) for a guided tour of the
+same code.
+
+</div>

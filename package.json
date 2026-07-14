@@ -5,7 +5,9 @@
   "description": "A developer-first 3D data visualization framework that treats charts as fully inspectable, fully controllable Three.js scenes — not black-box widgets.",
   "main": "src/index.js",
   "types": "types/index.d.ts",
-  "sideEffects": false,
+  "sideEffects": [
+    "src/postfx/**"
+  ],
   "keywords": [
     "3d",
     "visualization",
@@ -28,7 +30,9 @@
     "bench": "node bench/harness.js",
     "bench:stress": "node bench/stress-million.bench.js",
     "docs:api": "node scripts/docs-api.js",
+    "predocs:dev": "npm run build && node scripts/syncPlaygroundLibrary.js",
     "docs:dev": "vitepress dev docs",
+    "predocs:build": "npm run build && node scripts/syncPlaygroundLibrary.js",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs"
   },
@@ -43,6 +47,7 @@
     "eslint": "^10.6.0",
     "jsdoc-to-markdown": "^9.1.3",
     "jsdom": "^29.1.1",
+    "monaco-editor": "^0.55.1",
     "prettier": "^3.9.3",
     "rollup": "^4.62.2",
     "rollup-plugin-visualizer": "^7.0.1",

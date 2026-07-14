@@ -1,6 +1,7 @@
 import { defineConfig } from 'vitepress';
 import fs from 'node:fs';
 import path from 'node:path';
+import { buildWorkerBlob, workerBlobPlugin } from '../../scripts/workerBlobPlugin.js';
 
 /**
  * The `/api/` sidebar, built from `docs/api/manifest.json` — written by
@@ -45,7 +46,24 @@ const conceptsSidebar = [
   { text: 'Scaling to Millions', link: '/concepts/scale' },
 ];
 
-export default defineConfig({
+const recipesSidebar = [
+  { text: 'Overview', link: '/recipes/' },
+  { text: 'Hello Bar', link: '/recipes/hello-bar' },
+  { text: 'Live Stream', link: '/recipes/live-stream' },
+  { text: 'Million-Point Scatter', link: '/recipes/million-point-scatter' },
+  { text: 'Multi-Chart Dashboard', link: '/recipes/multi-chart-dashboard' },
+  { text: 'The Data Join & Selections', link: '/recipes/data-join-selections' },
+  { text: 'Custom GLSL', link: '/recipes/custom-glsl' },
+  { text: 'GLTF Chart Shapes', link: '/recipes/gltf-chart-shapes' },
+  { text: 'Entry Animation + Camera Tour', link: '/recipes/entry-animation-camera-tour' },
+  { text: 'Brush + Cross-Filter', link: '/recipes/brush-cross-filter' },
+  { text: 'Surface from CSV', link: '/recipes/surface-from-csv' },
+  { text: 'Network from JSON', link: '/recipes/network-from-json' },
+  { text: 'Theme Swap', link: '/recipes/theme-swap' },
+  { text: 'PNG Export', link: '/recipes/png-export' },
+];
+
+export default defineConfig(async () => ({
   title: 'Graph3D.js',
   description: "A developer-first 3D data visualization framework that treats charts as fully inspectable, fully controllable Three.js scenes — not black-box widgets.",
   srcDir: '.',
@@ -60,6 +78,15 @@ export default defineConfig({
   // always use root-absolute `/concepts/...` links, never relative `./`).
   ignoreDeadLinks: [/^\.\//],
 
+  // GalleryDemo.vue (Prompt 188) imports ../../../../src/index.js directly
+  // (a real, live Graph3D instance, not a code sample) so it needs the same
+  // virtual:worker-blob resolution vite.config.js already gives
+  // examples/playground/ — without this, that import fails to resolve
+  // src/core/worker/workerBlob.js at dev/build time.
+  vite: {
+    plugins: [workerBlobPlugin(await buildWorkerBlob())],
+  },
+
   themeConfig: {
     nav: [
       { text: 'Guide', link: '/getting-started' },
@@ -68,11 +95,13 @@ export default defineConfig({
       { text: 'Recipes', link: '/recipes/' },
       { text: 'API Reference', link: '/api/' },
       { text: 'Migration', link: '/migration/' },
+      { text: 'Gallery', link: '/gallery' },
       { text: 'Playground', link: '/playground' },
     ],
 
     sidebar: {
       '/concepts/': conceptsSidebar,
+      '/recipes/': recipesSidebar,
       '/api/': apiSidebar(),
       '/': [
         { text: 'Introduction', link: '/' },
@@ -82,4 +111,4 @@ export default defineConfig({
 
     search: { provider: 'local' },
   },
-});
+}));

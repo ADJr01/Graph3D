@@ -80,5 +80,6 @@ API this is built on.
 - **[Recipes](/recipes/)** — end-to-end walkthroughs (live streaming data,
   million-point scatter plots, custom shaders, camera tours, and more).
 - **Live examples** — every concept page's snippets have a runnable
-  counterpart under the repository's `examples/` directory; clone it and run
-  `npm run dev`.
+  counterpart under the repository's `examples/` directory; clone it, then
+  run `npx vite examples/<folder> --config vite.config.js` for any of them
+  (`npm run dev` runs `examples/playground/` specifically).
