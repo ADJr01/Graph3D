@@ -1,12 +1,14 @@
 import * as THREE from 'three';
-import { GraphMesh } from '../../object/GraphMesh.js';
-import { GraphInstancedObject } from '../../object/GraphInstancedObject.js';
 import { loop } from '../../core/Graph3DLoop.js';
 // The SDFText fallback below builds via Label (a same-layer sibling under
 // material/label/, CLAUDE.md §1.4's compose/ row note on this exact crossing)
 // instead of calling SDFText.create() + hand-rolling billboarding/disposal a
 // second time — Axis.js's tick labels were the first copy of that sequence.
 import { Label } from '../label/Label.js';
+// resolveTarget/assertPositiveFiniteNumber/buildPlaneMesh moved to
+// billboardTarget.js once graphIcon.js (material/icon/) needed the exact
+// same three helpers — CLAUDE.md §1.1 DRY's two-strike rule.
+import { resolveBillboardTarget, assertPositiveFiniteNumber, buildTexturedPlane } from '../billboardTarget.js';
 
 /** @see https://developer.chrome.com/blog/html-in-canvas-origin-trial */
 const ORIGIN_TRIAL_DOC_URL = 'https://developer.chrome.com/blog/html-in-canvas-origin-trial';
@@ -46,54 +48,11 @@ export function isHTMLInCanvasSupported() {
   );
 }
 
-/** @param {string} name @param {*} value @throws {TypeError} */
-function assertPositiveFiniteNumber(name, value) {
-  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
-    throw new TypeError(`graphHTML: ${name} must be a positive finite number, received ${JSON.stringify(value)}.`);
-  }
-}
-
 /** Strips markup down to plain text for the SDFText fallback. A detached element never touches the live document. @param {string} html @returns {string} */
 function textFromHtml(html) {
   const container = document.createElement('div');
   container.innerHTML = html;
   return container.textContent ?? '';
-}
-
-/**
- * Resolves a `graphHTML` target down to a world-space position plus the
- * `THREE.Scene` its rendered mesh should join.
- * @param {GraphMesh|{object: GraphInstancedObject, index: number}|{scene: THREE.Scene, position: {x:number,y:number,z:number}}} target
- * @returns {{ position: THREE.Vector3, scene: THREE.Scene }}
- * @throws {TypeError} If `target` doesn't match any recognized shape, or resolves to no scene.
- */
-function resolveTarget(target) {
-  let position;
-  let scene;
-  if (target instanceof GraphMesh) {
-    position = target.three.getWorldPosition(new THREE.Vector3());
-    scene = target.three.parent;
-  } else if (target && target.object instanceof GraphInstancedObject && Number.isInteger(target.index)) {
-    const local = target.object.getInstancePosition(target.index);
-    position = target.object.three.localToWorld(new THREE.Vector3(local.x, local.y, local.z));
-    scene = target.object.three.parent;
-  } else if (target && target.scene instanceof THREE.Scene && target.position) {
-    const p = target.position;
-    if (!Number.isFinite(p.x) || !Number.isFinite(p.y) || !Number.isFinite(p.z)) {
-      throw new TypeError(`graphHTML: target.position must be a finite {x,y,z}, received ${JSON.stringify(p)}.`);
-    }
-    position = new THREE.Vector3(p.x, p.y, p.z);
-    scene = target.scene;
-  } else {
-    throw new TypeError(
-      'graphHTML: target must be a GraphMesh, { object: GraphInstancedObject, index }, or ' +
-        `{ scene, position }, received ${JSON.stringify(target)}.`,
-    );
-  }
-  if (!(scene instanceof THREE.Scene)) {
-    throw new TypeError('graphHTML: target resolves to no THREE.Scene — has it been added to a scene yet?');
-  }
-  return { position, scene };
 }
 
 /**
@@ -138,18 +97,6 @@ function captureHtmlTexture({ html, pixelWidth, pixelHeight }) {
   texture.minFilter = THREE.LinearFilter;
   texture.magFilter = THREE.LinearFilter;
   return texture;
-}
-
-/**
- * Builds a billboard mesh: a `THREE.PlaneGeometry` textured with `texture`,
- * transparent, unlit.
- * @param {THREE.Texture} texture @param {number} width @param {number} height
- * @returns {THREE.Mesh}
- */
-function buildPlaneMesh(texture, width, height) {
-  const geometry = new THREE.PlaneGeometry(width, height);
-  const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false, side: THREE.DoubleSide });
-  return new THREE.Mesh(geometry, material);
 }
 
 /**
@@ -231,7 +178,7 @@ export function graphHTML(target, options = {}) {
   assertPositiveFiniteNumber('pixelWidth', pixelWidth);
   assertPositiveFiniteNumber('pixelHeight', pixelHeight);
 
-  const { position, scene } = resolveTarget(target);
+  const { position, scene } = resolveBillboardTarget(target);
 
   let disposed = false;
   let unbillboard = null;
@@ -279,7 +226,7 @@ export function graphHTML(target, options = {}) {
       }
       try {
         const texture = captureHtmlTexture({ html, pixelWidth, pixelHeight });
-        const mesh = buildPlaneMesh(texture, width, height);
+        const mesh = buildTexturedPlane(texture, width, height);
         finalize(mesh, true, () => {
           mesh.geometry.dispose();
           mesh.material.dispose();

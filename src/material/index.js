@@ -21,6 +21,7 @@ import { setPaletteForAttribute } from './setPaletteForAttribute.js';
 export { GraphObjectMaterial } from './GraphObjectMaterial.js';
 export { SDFText } from './text/SDFText.js';
 export { graphHTML, isHTMLInCanvasSupported } from './text/GraphHTML.js';
+export { graphIcon } from './icon/GraphIcon.js';
 export { effects, applyEffect, removeEffect } from './effects/index.js';
 export { Label, label } from './label/index.js';
 

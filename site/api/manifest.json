@@ -123,6 +123,7 @@
     "fixWinding": "/concepts/object#recomputenormals-fixwinding-—-normals-shading-fixes",
     "generator": "/concepts/compose#generators-—-generator",
     "graphHTML": "/concepts/material#graphhtml-—-experimental-html-in-canvas-labels-user-requested-not-part-of-prompts-md-s-numbered-sequence",
+    "graphIcon": "/concepts/material#graphicon-—-image-svg-icons-riding-an-animated-bar",
     "interpolate": "/concepts/compose#interpolation-—-interpolate-interpolatenumber-interpolatergb-interpolatehsl-interpolatelab-interpolatearray-interpolateobject",
     "interpolateArray": "/concepts/compose#interpolation-—-interpolate-interpolatenumber-interpolatergb-interpolatehsl-interpolatelab-interpolatearray-interpolateobject",
     "interpolateHsl": "/concepts/compose#interpolation-—-interpolate-interpolatenumber-interpolatergb-interpolatehsl-interpolatelab-interpolatearray-interpolateobject",

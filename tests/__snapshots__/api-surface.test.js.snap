@@ -79,6 +79,7 @@ exports[`public API surface > matches the frozen export snapshot 1`] = `
   "fixWinding",
   "generator",
   "graphHTML",
+  "graphIcon",
   "interpolate",
   "interpolateArray",
   "interpolateHsl",

@@ -217,6 +217,33 @@ Skipped for now (YAGNI): updating a label's content after creation (`handle.upda
 
 ---
 
+## graphIcon — image/SVG icons riding an animated bar
+
+```js
+import { graphIcon } from 'graph3d';
+
+const handle = graphIcon(bar, { src: '/icons/btc.svg', camera: scene.camera.three });
+await handle.ready;
+handle.dispose();
+```
+
+`graphHTML` (above) can only show real markup — an `<img>`, an inline `<svg>` — on Chrome's experimental HTML-in-Canvas path; its universal `SDFText` fallback strips all markup down to plain text, so an icon silently disappears for almost every user. `graphIcon` shows the same `src` (any PNG/JPG/SVG `THREE.TextureLoader` can load, including a `data:` URI) in every browser, no experimental API involved. It targets the same shapes as `graphHTML` — a `GraphMesh`, one instance of a `GraphInstancedObject` (`{ object, index }`), or an explicit `{ scene, position }` pair — and returns the same shaped handle (`{ mesh, ready, dispose() }`), fire-and-forget: `handle.mesh` is `null` until `handle.ready` resolves, and `handle.dispose()` before then safely discards the in-flight build. There is no fallback path here (unlike `graphHTML`'s `SDFText` fallback) — a failed image load rejects `handle.ready` instead of silently substituting a placeholder.
+
+**Riding an animating bar.** Unlike `graphHTML`, which snapshots its target's position once, `graphIcon` re-resolves the target every frame by default (`options.follow`, default `true`) — needed so an icon pinned to an instanced chart bar keeps tracking the bar's top through a `chart.update()` transition, not just where the bar was the moment `graphIcon()` was called. `options.offset` may also be a callback, re-evaluated every frame alongside the position, since a bar's "top" keeps moving as its height animates — `graphIcon` itself has no notion of "bar top," it only calls `offset()` again and lets the caller supply that meaning:
+
+```js
+bars.forEach((bar, i) => {
+  graphIcon(
+    { object: bars, index: i },
+    { src: coinIconUrls[i], camera, offset: () => ({ y: bars.getInstanceScale(i).y / 2 + 0.15 }) },
+  );
+});
+```
+
+Set `follow: false` for a target that never moves (cheaper — no per-frame position re-resolution). `width`/`height` (default `0.6`×`0.6`) are the built `THREE.PlaneGeometry`'s size in world units, same space as everything else in the scene.
+
+---
+
 ## Material-picker gallery
 
 A textual reference until `examples/06-materials/main.js` (a real rendered 4×4 grid, `studio-dark` themed) and its screenshot exist in whatever hosts these docs. Sixteen of the twenty-one factories above are shown there — `physical`/`lambert`/`basic`/`frostedGlass` are visually redundant with a sibling already in the grid, and `crystal` needs an external cubemap image this repo doesn't bundle.

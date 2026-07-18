@@ -820,6 +820,22 @@ export function graphHTML(target: GraphHTMLTarget, options: {
   style?: { fontSize?: number; color?: string | number; outline?: object; glow?: object };
 }): GraphHTMLHandle;
 
+export interface GraphIconHandle {
+  type: 'graphIcon';
+  mesh: THREE.Mesh | null;
+  ready: Promise<void>;
+  dispose(): void;
+}
+
+export function graphIcon(target: GraphHTMLTarget, options: {
+  src: string;
+  camera: THREE.Camera;
+  width?: number;
+  height?: number;
+  offset?: { x?: number; y?: number; z?: number } | (() => { x?: number; y?: number; z?: number });
+  follow?: boolean;
+}): GraphIconHandle;
+
 export interface EffectPreset {
   name: string;
   defaultOptions: object;
