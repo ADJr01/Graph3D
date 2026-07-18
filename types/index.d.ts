@@ -160,6 +160,24 @@ export class SelectionTransition<T = unknown> {
   stop(): void;
 }
 
+/**
+ * Reusable `Selection.call()` behaviors (improvement.md initiative (c), PR 5)
+ * for bulk per-datum labeling — `selection.call(syncLabels, textFn, options)`
+ * from an enter/update callback, `selection.call(removeLabels)` from an exit
+ * callback before `.remove()`.
+ */
+export function syncLabels<T = unknown>(
+  selection: Selection<T>,
+  textFn: string | ((datum: T, index: number) => string),
+  options?: {
+    font?: LabelFontOptions;
+    anchor?: 'center' | 'start';
+    billboard?: THREE.Camera | null;
+    offset?: { x?: number; y?: number; z?: number };
+  },
+): Selection<T>;
+export function removeLabels<T = unknown>(selection: Selection<T>): Selection<T>;
+
 // ============================================================================
 // compose/ — scale, color, palette, generator, layout, transform, Axis, annotation
 // ============================================================================
@@ -592,10 +610,14 @@ export interface LabelAnnotation {
   style: object;
   on(event: 'click', handler: (...args: any[]) => void): LabelAnnotation;
   emit(event: string, ...args: any[]): void;
+  dispose(): void;
 }
 
 export const annotation: {
-  label(config: { text: string; position?: { x?: number; y?: number; z?: number }; style?: object }): LabelAnnotation;
+  label(config: {
+    text: string; position?: { x?: number; y?: number; z?: number }; style?: object;
+    scene?: THREE.Scene; camera?: THREE.Camera;
+  }): LabelAnnotation;
   callout(config: {
     scene: THREE.Scene; name: string;
     from: { x: number; y: number; z: number }; to: { x: number; y: number; z: number };
@@ -749,6 +771,54 @@ export class SDFText {
     glow?: { color?: string | number | THREE.Color; width?: number; intensity?: number } | false;
   }): Promise<SDFText>;
 }
+
+export interface LabelFontOptions {
+  fontSize?: number;
+  letterSpacing?: number;
+  align?: 'left' | 'center' | 'right';
+  color?: string | number;
+  outline?: { color?: string | number; width?: number } | false;
+  glow?: { color?: string | number; width?: number; intensity?: number } | false;
+}
+
+export class Label {
+  text(value: string): this;
+  position(position: { x: number; y: number; z: number }): this;
+  font(options: LabelFontOptions): this;
+  anchor(value: 'center' | 'start'): this;
+  billboard(camera?: THREE.Camera | null): this;
+  get mesh(): GraphMesh | null;
+  get ready(): Promise<void>;
+  render(scene: THREE.Scene, name: string): this;
+  dispose(): void;
+}
+
+export function label(): Label;
+
+export type GraphHTMLTarget =
+  | GraphMesh
+  | { object: GraphInstancedObject<unknown>; index: number }
+  | { scene: THREE.Scene; position: { x: number; y: number; z: number } };
+
+export interface GraphHTMLHandle {
+  type: 'graphHTML';
+  mesh: THREE.Mesh | null;
+  isExperimental: boolean;
+  ready: Promise<void>;
+  dispose(): void;
+}
+
+export function isHTMLInCanvasSupported(): boolean;
+export function graphHTML(target: GraphHTMLTarget, options: {
+  html: string;
+  camera: THREE.Camera;
+  width?: number;
+  height?: number;
+  pixelWidth?: number;
+  pixelHeight?: number;
+  text?: string;
+  style?: { fontSize?: number; color?: string | number; outline?: object; glow?: object };
+}): GraphHTMLHandle;
 
 export interface EffectPreset {
   name: string;
@@ -1015,6 +1085,8 @@ export class GraphSceneCamera {
   lookAt(x: number, y: number, z: number): this;
   setPosition(x: number, y: number, z: number): this;
   useCustom(camera: THREE.Camera): this;
+  setMaxZoomIn(value: number): this;
+  setMaxZoomOut(value: number): this;
   dollyZoom(targetFOV: number, duration?: number): CameraTour;
   tour(waypoints: CameraWaypoint[], options?: object): CameraTour;
   follow(target: THREE.Object3D): CameraTour;
@@ -1640,19 +1712,15 @@ export type RegisteredChartType = 'bar' | 'line' | 'scatter' | 'area' | 'surface
 export interface Graph3DOptions {
   /** Required in a browser; optional under SSR (no `window`), where a mock renderer is used automatically. */
   canvas?: HTMLCanvasElement;
-  hdr?: string;
   antialias?: boolean;
   pixelRatio?: number;
   autoResize?: boolean;
-  theme?: string;
   respectReducedMotion?: boolean;
 }
 
 /** A `Graph3D.serialize()` snapshot — scene/camera composition only, not chart config or data. See `Graph3D.serialize()`'s doc comment. */
 export interface Graph3DSnapshot {
   version: number;
-  theme: string | null;
-  hdr: string | null;
   activeScene: string | null;
   scenes: Array<{
     name: string;
@@ -1678,8 +1746,6 @@ export class Graph3D {
   get scenes(): Map<string, GraphScene>;
   get activeScene(): GraphScene | null;
 
-  hdr: string | undefined;
-  theme: string | undefined;
   autoResize: boolean;
   respectReducedMotion: boolean;
   static readonly version: string;

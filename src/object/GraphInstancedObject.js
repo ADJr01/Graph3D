@@ -128,6 +128,10 @@ export class GraphInstancedObject extends GraphObject {
   #frustumScratch = new THREE.Frustum();
   /** @type {THREE.Matrix4} */
   #projScreenMatrixScratch = new THREE.Matrix4();
+  /** @type {THREE.Matrix4} inverse of mesh.matrixWorld, recomputed per pick() call */
+  #worldToLocalScratch = new THREE.Matrix4();
+  /** @type {THREE.Ray} raycaster.ray converted into the mesh's local space, for the octree query */
+  #localRayScratch = new THREE.Ray();
 
   /** @type {boolean} */
   #cullingEnabled = false;
@@ -1268,7 +1272,17 @@ export class GraphInstancedObject extends GraphObject {
     if (!(raycaster instanceof THREE.Raycaster)) {
       throw new TypeError(`GraphInstancedObject.${method}: raycaster must be a THREE.Raycaster instance.`);
     }
-    const candidates = this.#octree.queryRay(raycaster.ray);
+    // The octree stores each instance's position in the mesh's LOCAL space
+    // (the same space setInstancePosition/#syncOctree write into), but
+    // raycaster.ray is always world-space (THREE.Raycaster.setFromCamera's
+    // contract) — querying it unconverted silently returns zero candidates
+    // for any instance whose mesh itself isn't at the identity transform
+    // (e.g. after OriginShift repositions it). Convert into local space
+    // first; the final per-candidate raycast below already does this
+    // correctly via matrixWorld, so only the octree-pruning query needed it.
+    this.#worldToLocalScratch.copy(this.#mesh.matrixWorld).invert();
+    this.#localRayScratch.copy(raycaster.ray).applyMatrix4(this.#worldToLocalScratch);
+    const candidates = this.#octree.queryRay(this.#localRayScratch);
     const intersections = [];
     for (const index of candidates) {
       if (index >= this.#mesh.count) continue;

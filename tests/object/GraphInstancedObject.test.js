@@ -769,6 +769,28 @@ describe('GraphInstancedObject.pick', () => {
     raycaster.set(new THREE.Vector3(0, 0, 5), new THREE.Vector3(0, 0, -1));
     expect(obj.pick(raycaster)).toBe(0);
   });
+
+  it('still hits the correct instance once the mesh itself is moved off the scene origin', () => {
+    // The octree stores instance positions in the mesh's LOCAL space
+    // (matching setInstanceMatrix), but a real raycaster.ray is always
+    // world-space — repositioning the mesh's own .position (e.g. what
+    // OriginShift does) must not make every instance silently unpickable.
+    const obj = makePickable(); // instance 1 sits at local (3, 0, 0)
+    obj.three.position.set(100, 0, 0);
+    obj.three.updateMatrixWorld(true);
+
+    const raycaster = new THREE.Raycaster();
+    // Instance 1's world position is now (100 + 3, 0, 0) = (103, 0, 0).
+    raycaster.set(new THREE.Vector3(103, 0, 5), new THREE.Vector3(0, 0, -1));
+    expect(obj.pick(raycaster)).toBe(1);
+
+    // The same world-space ray that hit instance 1 before the move now
+    // finds nothing there — proving the hit above isn't a stale/local-space
+    // coincidence.
+    const oldWorldSpot = new THREE.Raycaster();
+    oldWorldSpot.set(new THREE.Vector3(3, 0, 5), new THREE.Vector3(0, 0, -1));
+    expect(obj.pick(oldWorldSpot)).toBeNull();
+  });
 });
 
 describe('GraphInstancedObject.pickDetailed', () => {
@@ -807,6 +829,19 @@ describe('GraphInstancedObject.pickDetailed', () => {
   it('throws TypeError for a non-Raycaster', () => {
     const obj = makeInstanced();
     expect(() => obj.pickDetailed({})).toThrow(TypeError);
+  });
+
+  it('returns a world-space hit point that accounts for the mesh being moved off the scene origin', () => {
+    const obj = makePickable(); // instance 1 sits at local (3, 0, 0)
+    obj.three.position.set(100, 0, 0);
+    obj.three.updateMatrixWorld(true);
+
+    const raycaster = new THREE.Raycaster();
+    raycaster.set(new THREE.Vector3(103, 0, 5), new THREE.Vector3(0, 0, -1));
+    const detailed = obj.pickDetailed(raycaster);
+    expect(detailed.instanceIndex).toBe(1);
+    expect(detailed.point.x).toBeCloseTo(103);
+    expect(detailed.point.z).toBeCloseTo(0.5);
   });
 });
 

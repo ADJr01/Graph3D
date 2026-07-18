@@ -1,14 +1,10 @@
 import * as THREE from 'three';
 
 /**
- * Bundled Roboto MSDF atlas — requires `roboto-msdf.png` (the multi-channel
+ * Bundled Roboto MSDF atlas — `roboto-msdf.png` (the multi-channel
  * signed-distance atlas image) and `roboto-msdf.json` (BMFont-style glyph
  * metrics: `chars[]`, `common.{scaleW,scaleH,lineHeight}`, `info.size`,
- * optional `kernings[]`) to be present under `src/material/text/assets/`.
- * See this file's `.claude/TODO.md` entry — as of Prompt 108 these two files
- * have not been generated yet (no MSDF font tool / Roboto TTF was available
- * to produce them in this environment), so `SDFText.create()` throws a clear
- * error identifying exactly what's missing until they're added.
+ * optional `kernings[]`) ship under `src/material/text/assets/`.
  */
 const ATLAS_IMAGE_URL = new URL('./assets/roboto-msdf.png', import.meta.url).href;
 const ATLAS_METRICS_URL = new URL('./assets/roboto-msdf.json', import.meta.url).href;
@@ -63,6 +59,12 @@ function loadAtlas() {
       texture.generateMipmaps = false;
       texture.minFilter = THREE.LinearFilter;
       texture.magFilter = THREE.LinearFilter;
+      // buildTextGeometry's UVs are computed directly from the BMFont JSON's
+      // pixel-space glyph.x/y (top-left origin, y increasing downward) with
+      // no flip of their own — THREE's default flipY=true inverts the
+      // uploaded texture rows, so every glyph would sample the wrong part of
+      // the atlas (typically empty space) without this.
+      texture.flipY = false;
 
       return { texture, metrics };
     })();
@@ -291,6 +293,27 @@ export class SDFText {
   get height() {
     this.#assertNotDisposed('height');
     return this.#height;
+  }
+
+  /**
+   * The `{x, y}` offset that recenters this block on a target anchor point.
+   * `buildTextGeometry` always places the block's local origin at its
+   * top-left corner (glyph advance starts at `x=0`; the first line's top
+   * sits at `y=0`) regardless of `align` — `align` only affects lines
+   * relative to each other, never the block relative to its own origin
+   * (see this file's own alignment test). Every caller that wants to anchor
+   * a label's *center* at a point — `Axis`'s tick labels, `graphHTML`'s
+   * SDFText fallback — needs this same `-width/2, +height/2` shift
+   * (CLAUDE.md §1.1 DRY two-strike rule: `Axis.js` was the first caller).
+   * @returns {{x: number, y: number}}
+   * @throws {Error} If called after `dispose()`.
+   * @example
+   * const offset = text.centerOffset;
+   * mesh.position.set(target.x + offset.x, target.y + offset.y, target.z);
+   */
+  get centerOffset() {
+    this.#assertNotDisposed('centerOffset');
+    return { x: -this.#width / 2, y: this.#height / 2 };
   }
 
   /**

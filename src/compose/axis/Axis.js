@@ -6,8 +6,20 @@ import * as THREE from 'three';
 // §1.4's compose/ row) for the same reason: a real 3D scene needs literal
 // renderable primitives, not describable-only data.
 import { GraphMesh } from '../../object/index.js';
+import { bandCenter } from '../scale/index.js';
 import { assertOrientation, longAxisBoxSize, pointAlong } from './orientationAxes.js';
 import { label } from '../annotation/label.js';
+// Real tick-label text (as opposed to the { text, position } stub above) is
+// built via the shared Label primitive (material/label, improvement.md
+// section (c)) rather than hand-rolling SDFText.create() + billboarding —
+// Axis.js was the first of three independent copies of that sequence that
+// motivated extracting it (CLAUDE.md §1.1 DRY two-strike rule). Label lives
+// in material/, not compose/, so material/text/GraphHTML.js (the second
+// copy) can reuse it too without an upward import — this is the same
+// sanctioned compose/ -> material/ crossing Axis.js already used for
+// SDFText directly. `Label` is imported directly (not the `label()`
+// factory) to avoid colliding with the stub-metadata `label` import above.
+import { Label } from '../../material/label/Label.js';
 
 const DEFAULT_TICK_COUNT = 10;
 const DEFAULT_TICK_SIZE = 0.2;
@@ -15,6 +27,10 @@ const DEFAULT_TICK_SIZE = 0.2;
 // (CLAUDE.md §1.1 DRY: "a line is a thin box" is decided once, project-wide).
 const AXIS_LINE_THICKNESS = 0.02;
 const AXIS_COLOR = 0x333333;
+const DEFAULT_LABEL_FONT_SIZE = 0.3;
+const DEFAULT_LABEL_COLOR = '#e6e6e6';
+// Gap between a tick mark's outer tip and where its label text begins.
+const LABEL_MARGIN = 0.08;
 
 function assertFiniteNumber(method, value) {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
@@ -40,6 +56,12 @@ function assertFunction(method, value) {
   }
 }
 
+function assertCamera(method, value) {
+  if (!(value instanceof THREE.Camera)) {
+    throw new TypeError(`Axis.${method}: options.camera must be a THREE.Camera instance, received ${JSON.stringify(value)}.`);
+  }
+}
+
 /** The axis all ticks extend outward along — perpendicular to the spine's own axis. */
 function tickOffsetAxis(orientation) {
   return orientation === 'y' ? 'x' : 'y';
@@ -54,12 +76,16 @@ function tickCenter(orientation, alongValue, tickSize) {
 /**
  * Renders a scale as a real 3D scene object: a spine line spanning the
  * scale's range, one tick mark per `scale.ticks()`/`scale.domain()` entry,
- * and one label per tick. Label rendering is stubbed to metadata
- * (`{ text, position }`, via `annotation.label`) until Phase 6's SDF text
- * material exists — see `docs/concepts/compose.md`.
+ * and one label per tick. `axis.labels` always carries `{ text, position }`
+ * stub metadata (via `annotation.label`); passing `options.camera` to
+ * `render()` additionally builds each label as a real, billboarded
+ * `SDFText` mesh in the scene (named `${name}_ticklabel_<i>`), disposed
+ * alongside the rest of the axis. Omitting `camera` keeps the original
+ * metadata-only behavior — real text costs a texture-atlas load and one
+ * `SDFText.create()` per tick, so it's opt-in rather than automatic.
  * @example
  * const axis = new Axis().scale(scale.linear().domain([0, 100]).range([0, 10])).orientation('x');
- * axis.render(graphScene.three, 'xAxis');
+ * axis.render(graphScene.three, 'xAxis', { camera: graphScene.camera.three });
  * axis.labels[0]; // { type: 'label', text: '0', position: { x: 0, y: -0.1, z: 0 }, style: {} }
  * axis.dispose();
  */
@@ -83,6 +109,8 @@ export class Axis {
   #tickMeshes = [];
   /** @type {object[]} */
   #labelsValue = [];
+  /** @type {Label[]} */
+  #labelHandles = [];
   /** @type {boolean} */
   #disposed = false;
 
@@ -200,17 +228,22 @@ export class Axis {
   /**
    * Builds the spine line, tick marks, and stubbed label metadata as real
    * `GraphMesh` scene objects under `scene`, named `${name}_line`/
-   * `${name}_tick_<i>`.
+   * `${name}_tick_<i>`. Pass `options.camera` to also build each label as a
+   * real, camera-billboarded `SDFText` mesh (`${name}_ticklabel_<i>`) — see
+   * this class's own doc comment.
    * @param {THREE.Scene} scene
    * @param {string} name
+   * @param {{ camera?: THREE.Camera }} [options]
    * @returns {this}
    * @throws {Error} If `.scale()` was never set, or `render()` was already
    *   called on this instance (call `dispose()` first to re-render).
-   * @throws {TypeError} If `scene`/`name` are the wrong type, or the scale's
-   *   range doesn't resolve to finite numbers.
+   * @throws {TypeError} If `scene`/`name` are the wrong type, `options` isn't
+   *   a plain object, `options.camera` isn't a `THREE.Camera`, or the
+   *   scale's range doesn't resolve to finite numbers.
    * @example axis.render(graphScene.three, 'xAxis');
+   * @example axis.render(graphScene.three, 'xAxis', { camera: graphScene.camera.three });
    */
-  render(scene, name) {
+  render(scene, name, options = {}) {
     this.#assertNotDisposed('render');
     if (this.#lineMesh !== null) {
       throw new Error('Axis.render: already rendered — call dispose() before rendering again.');
@@ -221,6 +254,11 @@ export class Axis {
     if (typeof name !== 'string' || name === '') {
       throw new TypeError(`Axis.render: expected a non-empty string name, received ${JSON.stringify(name)}.`);
     }
+    if (options === null || typeof options !== 'object' || Array.isArray(options)) {
+      throw new TypeError(`Axis.render: options must be a plain object, received ${JSON.stringify(options)}.`);
+    }
+    const { camera } = options;
+    if (camera !== undefined) assertCamera('render', camera);
     if (this.#scaleValue === null) {
       throw new Error('Axis.render: call .scale(s) before render().');
     }
@@ -247,7 +285,7 @@ export class Axis {
     const tickValues = this.#resolveTicks();
     const format = this.#resolveFormat();
     const tickSize = this.#tickSizeValue;
-    const bandOffset = typeof this.#scaleValue.bandwidth === 'function' ? this.#scaleValue.bandwidth() / 2 : 0;
+    const bandOffset = bandCenter(this.#scaleValue);
 
     this.#tickMeshes = tickValues.map((value, i) => {
       const along = this.#scaleValue(value) + bandOffset;
@@ -268,12 +306,54 @@ export class Axis {
       return label({ text: format(value), position: pointAlong(orientation, along), style: this.#labelStyleValue });
     });
 
+    if (camera !== undefined) {
+      // Fire-and-forget: render() stays synchronous (existing call sites and
+      // the tick/spine meshes above are unaffected), real text arrives a
+      // frame or two later once the atlas + per-glyph geometry resolve.
+      this.#renderTextLabels(scene, name, camera);
+    }
+
     return this;
   }
 
   /**
-   * Disposes the spine and tick meshes. Idempotent; safe before `render()`
-   * has ever been called.
+   * Builds one `Label` per already-computed `#labelsValue` entry, billboarded
+   * toward `camera` via the shared billboard registry. Fire-and-forget, same
+   * as `render()` itself: a single glyph/atlas failure is logged (inside
+   * `Label`'s own build) and skipped, so the rest of the axis (spine, ticks,
+   * stub metadata, other labels) stays usable.
+   * @param {THREE.Scene} scene @param {string} name @param {THREE.Camera} camera
+   */
+  #renderTextLabels(scene, name, camera) {
+    const style = this.#labelStyleValue;
+    const offsetAxis = tickOffsetAxis(this.#orientationValue);
+    const tickSize = this.#tickSizeValue;
+
+    for (let i = 0; i < this.#labelsValue.length; i++) {
+      const meta = this.#labelsValue[i];
+      const position = { ...meta.position };
+      position[offsetAxis] -= tickSize + LABEL_MARGIN;
+
+      const handle = new Label()
+        .text(meta.text)
+        .position(position)
+        .font({
+          fontSize: style.fontSize ?? DEFAULT_LABEL_FONT_SIZE,
+          color: style.color ?? DEFAULT_LABEL_COLOR,
+          align: 'center',
+          outline: style.outline,
+          glow: style.glow,
+        })
+        .anchor('center')
+        .billboard(camera)
+        .render(scene, `${name}_ticklabel_${i}`);
+      this.#labelHandles.push(handle);
+    }
+  }
+
+  /**
+   * Disposes the spine, tick, and label meshes. Idempotent; safe before
+   * `render()` has ever been called.
    * @example axis.dispose();
    */
   dispose() {
@@ -283,6 +363,8 @@ export class Axis {
     this.#lineMesh = null;
     for (const mesh of this.#tickMeshes) mesh.dispose();
     this.#tickMeshes = [];
+    for (const handle of this.#labelHandles) handle.dispose();
+    this.#labelHandles = [];
     this.#labelsValue = [];
   }
 

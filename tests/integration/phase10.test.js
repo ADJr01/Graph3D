@@ -229,14 +229,20 @@ describe('(c) OriginShift keeps a real chart visually consistent under a real Pi
     expect(worldAfter.y).toBeCloseTo(worldBefore.y, 5);
     expect(worldAfter.z).toBeCloseTo(worldBefore.z, 5);
 
-    // Picking through the SAME screen position after the shift is NOT
-    // asserted here — GraphInstancedObject.#closestIntersection queries its
-    // octree with the raycaster's *world*-space ray, but the octree stores
-    // *local* (mesh-relative) positions (skipping_list.md, Phase 10): they
-    // only agree while the mesh sits at the scene origin, which OriginShift's
-    // whole job is to violate. The world-position check above is the actual
-    // "visual consistency" guarantee OriginShift's own docs make; picking
-    // post-shift is a separate, real, currently-broken capability.
+    // Picking through the SAME screen position after the shift: OriginShift
+    // moves the camera by the same delta as every scene child (see the
+    // world-position check above), so the camera-to-target vector — and
+    // therefore the screen-space projection — is unchanged; the same
+    // pickAt(50, 50) must still resolve to 'target'. This used to fail
+    // silently (skipping_list.md, Phase 10): GraphInstancedObject.#closestIntersection
+    // queried its octree with the raycaster's *world*-space ray while the
+    // octree itself stores *local* (mesh-relative) positions, which only
+    // agreed while the mesh sat at the scene origin — exactly what
+    // OriginShift's whole job is to violate. Fixed by converting the ray into
+    // the mesh's local space before querying.
+    camera.updateMatrixWorld(true); // OriginShift moved camera.position — not a scene child, so this doesn't happen automatically
+    const after = picker.pickAt(50, 50);
+    expect(after?.datum.id).toBe('target');
 
     originShift.dispose();
     chart.destroy();

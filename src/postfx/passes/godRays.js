@@ -64,75 +64,96 @@ const GodRaysShader = {
   `,
 };
 
+/** Memoized by {@link getGodRaysPassClass} — see that function's doc for why this isn't a plain top-level `class ... extends Pass`. */
+let GodRaysPassClass = null;
+
 /**
- * @augments Pass
+ * Builds (and memoizes) the `GodRaysPass` class. Deferred until first call,
+ * rather than a plain top-level `class GodRaysPass extends Pass {}`: the
+ * `extends Pass` clause touches the `three/addons/postprocessing/Pass.js`
+ * import the instant it runs, and this module is imported unconditionally
+ * by `postfx/index.js` to self-register via `PostFX.registerPass()`. In the
+ * UMD `<script>`-tag build without the matching `Pass_js` global, a top-level
+ * `extends` would crash while the *library itself* is still loading — before
+ * `Graph3D` is even defined — instead of only when `'godRays'` is actually
+ * enabled. Deferring it here means the failure (if any) happens inside
+ * `create()` below, where `PostFX.enable()`'s shared guard
+ * (`core/umdCompat.js`) turns it into an actionable error. See
+ * `improvement.md` initiative (d) PR 2.
+ * @returns {typeof Pass}
  */
-class GodRaysPass extends Pass {
-  /**
-   * @param {import('three').Scene} scene
-   * @param {import('three').Camera} camera
-   * @param {import('three').Object3D} light - Any object with a world
-   *   position (`DirectionalLight`/`PointLight`/`SpotLight`); for directional
-   *   lights this is the point they shine *from*, matching Three.js's own
-   *   `position` → `target` convention.
-   * @param {{exposure?: number, decay?: number, density?: number, weight?: number, samples?: number}} [opts={}]
-   */
-  constructor(scene, camera, light, opts = {}) {
-    super();
-    this.scene = scene;
-    this.camera = camera;
-    this.light = light;
+function getGodRaysPassClass() {
+  if (GodRaysPassClass !== null) return GodRaysPassClass;
 
-    this._depth = new DepthPrepass();
-    this._viewProjection = new Matrix4();
-    this._lightWorldPosition = new Vector3();
+  /** @augments Pass */
+  GodRaysPassClass = class GodRaysPass extends Pass {
+    /**
+     * @param {import('three').Scene} scene
+     * @param {import('three').Camera} camera
+     * @param {import('three').Object3D} light - Any object with a world
+     *   position (`DirectionalLight`/`PointLight`/`SpotLight`); for directional
+     *   lights this is the point they shine *from*, matching Three.js's own
+     *   `position` → `target` convention.
+     * @param {{exposure?: number, decay?: number, density?: number, weight?: number, samples?: number}} [opts={}]
+     */
+    constructor(scene, camera, light, opts = {}) {
+      super();
+      this.scene = scene;
+      this.camera = camera;
+      this.light = light;
 
-    this.uniforms = UniformsUtils.clone(GodRaysShader.uniforms);
-    this.uniforms.exposure.value = opts.exposure ?? 0.25;
-    this.uniforms.decay.value = opts.decay ?? 0.95;
-    this.uniforms.density.value = opts.density ?? 0.7;
-    this.uniforms.weight.value = opts.weight ?? 0.4;
-    this.uniforms.samples.value = Math.min(opts.samples ?? 48, MAX_SAMPLES - 1);
+      this._depth = new DepthPrepass();
+      this._viewProjection = new Matrix4();
+      this._lightWorldPosition = new Vector3();
 
-    this.material = new ShaderMaterial({
-      name: 'GodRaysShader',
-      uniforms: this.uniforms,
-      vertexShader: GodRaysShader.vertexShader,
-      fragmentShader: GodRaysShader.fragmentShader,
-    });
-    this._fsQuad = new FullScreenQuad(this.material);
-  }
+      this.uniforms = UniformsUtils.clone(GodRaysShader.uniforms);
+      this.uniforms.exposure.value = opts.exposure ?? 0.25;
+      this.uniforms.decay.value = opts.decay ?? 0.95;
+      this.uniforms.density.value = opts.density ?? 0.7;
+      this.uniforms.weight.value = opts.weight ?? 0.4;
+      this.uniforms.samples.value = Math.min(opts.samples ?? 48, MAX_SAMPLES - 1);
 
-  render(renderer, writeBuffer, readBuffer) {
-    this._depth.render(renderer, this.scene, this.camera);
-
-    this.light.getWorldPosition(this._lightWorldPosition);
-    this._viewProjection.multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse);
-    const screen = this._lightWorldPosition.clone().applyMatrix4(this._viewProjection);
-    this.uniforms.lightScreenPosition.value.set(screen.x * 0.5 + 0.5, screen.y * 0.5 + 0.5);
-
-    this.uniforms.tDiffuse.value = readBuffer.texture;
-    this.uniforms.tDepth.value = this._depth.target.texture;
-
-    if (this.renderToScreen) {
-      renderer.setRenderTarget(null);
-      this._fsQuad.render(renderer);
-    } else {
-      renderer.setRenderTarget(writeBuffer);
-      renderer.clear();
-      this._fsQuad.render(renderer);
+      this.material = new ShaderMaterial({
+        name: 'GodRaysShader',
+        uniforms: this.uniforms,
+        vertexShader: GodRaysShader.vertexShader,
+        fragmentShader: GodRaysShader.fragmentShader,
+      });
+      this._fsQuad = new FullScreenQuad(this.material);
     }
-  }
 
-  setSize(width, height) {
-    this._depth.setSize(width, height);
-  }
+    render(renderer, writeBuffer, readBuffer) {
+      this._depth.render(renderer, this.scene, this.camera);
 
-  dispose() {
-    this._depth.dispose();
-    this.material.dispose();
-    this._fsQuad.dispose();
-  }
+      this.light.getWorldPosition(this._lightWorldPosition);
+      this._viewProjection.multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse);
+      const screen = this._lightWorldPosition.clone().applyMatrix4(this._viewProjection);
+      this.uniforms.lightScreenPosition.value.set(screen.x * 0.5 + 0.5, screen.y * 0.5 + 0.5);
+
+      this.uniforms.tDiffuse.value = readBuffer.texture;
+      this.uniforms.tDepth.value = this._depth.target.texture;
+
+      if (this.renderToScreen) {
+        renderer.setRenderTarget(null);
+        this._fsQuad.render(renderer);
+      } else {
+        renderer.setRenderTarget(writeBuffer);
+        renderer.clear();
+        this._fsQuad.render(renderer);
+      }
+    }
+
+    setSize(width, height) {
+      this._depth.setSize(width, height);
+    }
+
+    dispose() {
+      this._depth.dispose();
+      this.material.dispose();
+      this._fsQuad.dispose();
+    }
+  };
+  return GodRaysPassClass;
 }
 
 /**
@@ -186,6 +207,7 @@ PostFX.registerPass('godRays', {
           "graph3d.postfx.enable('godRays', { light: mySunLight }).",
       );
     }
+    const GodRaysPass = getGodRaysPassClass();
     return new GodRaysPass(scene, camera, light, opts);
   },
   configure: configureGodRays,

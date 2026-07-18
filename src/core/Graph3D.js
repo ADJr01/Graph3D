@@ -48,11 +48,9 @@ function closestChartTypeName(typeName, candidates) {
  * @property {HTMLCanvasElement} [canvas] - Target canvas. Required in a browser;
  *   omitted automatically covers the SSR case (no `window`), where a mock
  *   renderer is used instead — see the class doc's "SSR-safe mode" note.
- * @property {string} [hdr] - URL of an HDR environment map applied when a scene is created (Phase 2).
  * @property {boolean} [antialias=true]
  * @property {number} [pixelRatio] - Defaults to `window.devicePixelRatio`.
  * @property {boolean} [autoResize=true] - Attach a ResizeObserver to keep the canvas filling its parent.
- * @property {string} [theme] - Named visual theme applied by the material layer (Phase 6).
  * @property {boolean} [respectReducedMotion=true] - Suppresses transitions when the OS prefers reduced motion.
  */
 
@@ -67,8 +65,11 @@ function closestChartTypeName(typeName, candidates) {
  * g.dispose();
  *
  * @example
- * const g = new Graph3D({ canvas, pixelRatio: 2, hdr: '/env/studio.hdr', theme: 'studio-dark' });
- * g.setActiveScene(g.createScene('main'));
+ * const g = new Graph3D({ canvas, pixelRatio: 2 });
+ * const scene = g.createScene('main');
+ * g.setActiveScene(scene);
+ * scene.environment.setHDR('/env/studio.hdr');
+ * scene.applyTheme('studio-dark');
  * g.chart('bar').data(values, (d) => d.id).render();
  *
  * @example
@@ -136,13 +137,6 @@ export class Graph3D {
     ['volume', VolumeChart],
   ]);
 
-  // Stored for higher layers: hdr → GraphSceneEnvironment (Phase 2), theme → material presets (Phase 6).
-  /** @type {string|undefined} */
-  hdr;
-
-  /** @type {string|undefined} */
-  theme;
-
   /** @type {boolean} */
   autoResize;
 
@@ -159,11 +153,9 @@ export class Graph3D {
    */
   constructor({
     canvas,
-    hdr,
     antialias = true,
     pixelRatio,
     autoResize = true,
-    theme,
     respectReducedMotion = true,
   } = {}) {
     // SSR (no `window`): canvas is optional and the mock renderer takes over —
@@ -175,8 +167,6 @@ export class Graph3D {
       );
     }
 
-    this.hdr = hdr;
-    this.theme = theme;
     this.autoResize = autoResize;
     this.respectReducedMotion = respectReducedMotion;
 
@@ -190,7 +180,15 @@ export class Graph3D {
     registry.register(this);
 
     this.#tick = (deltaSec) => {
-      this.#frameBudget.record(deltaSec * 1000);
+      const info = this.#renderer.three?.info;
+      this.#frameBudget.record(deltaSec * 1000, {
+        // No "active chart" concept exists on Graph3D yet — only an active scene,
+        // which may host multiple charts — so per-chart attribution isn't wired up.
+        chartId: null,
+        drawCalls: info?.render.calls ?? 0,
+        triangleCount: info?.render.triangles ?? 0,
+        meshCount: info?.memory.geometries ?? 0,
+      });
 
       if (!this.#activeScene) return;
 
@@ -550,9 +548,9 @@ export class Graph3D {
    * Capture this instance's scene/camera composition as a JSON-safe plain
    * object (Prompt 181) — restorable via `Graph3D.deserialize()`.
    *
-   * Deliberately narrow: only `theme`/`hdr` and, per scene, the applied
-   * theme plus camera preset/position/look-at-target/fov are captured.
-   * Chart configurations, bound data, and accessor functions are NOT
+   * Deliberately narrow: only, per scene, the applied theme plus camera
+   * preset/position/look-at-target/fov are captured. Chart configurations,
+   * bound data, and accessor functions are NOT
    * captured — they're code (closures), which has no JSON representation.
    * Re-create charts and call `.data()` again after `deserialize()` restores
    * the view. A scene whose camera was replaced via `useCamera()` (no
@@ -568,8 +566,6 @@ export class Graph3D {
     this.#assertNotDisposed('serialize');
     return {
       version: 1,
-      theme: this.theme ?? null,
-      hdr: this.hdr ?? null,
       activeScene: this.#activeScene?.name ?? null,
       scenes: [...this.#scenes.values()].map((scene) => {
         const threeCamera = scene.camera.three;
@@ -600,8 +596,7 @@ export class Graph3D {
    * @param {object} json - A snapshot from `serialize()`.
    * @param {Graph3DOptions} [options] - Passed through to the `Graph3D`
    *   constructor — `canvas` is still required in a browser, since a JSON
-   *   snapshot can't carry a DOM element. Overrides `json.theme`/`json.hdr`
-   *   if given.
+   *   snapshot can't carry a DOM element.
    * @returns {Promise<Graph3D>}
    * @throws {TypeError} If `json` isn't a `serialize()`-shaped object.
    * @example
@@ -612,11 +607,7 @@ export class Graph3D {
     if (!json || !Array.isArray(json.scenes)) {
       throw new TypeError('Graph3D.deserialize: expected a snapshot from serialize() (missing scenes array).');
     }
-    const graph3d = new Graph3D({
-      theme: json.theme ?? undefined,
-      hdr: json.hdr ?? undefined,
-      ...options,
-    });
+    const graph3d = new Graph3D({ ...options });
     for (const sceneSnapshot of json.scenes) {
       const scene = graph3d.createScene(sceneSnapshot.name);
       // Theme first — applyTheme() rebuilds the camera to the theme's own

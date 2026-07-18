@@ -85,6 +85,14 @@ describe('PostFX', () => {
     expect(fx.enabled()).toEqual([]); // RenderPass itself isn't a named/enabled pass
   });
 
+  it('throws a clear, actionable error (not a bare TypeError) when EffectComposer is unavailable — the UMD-without-globals case', () => {
+    vi.mocked(EffectComposer).mockImplementationOnce(() => {
+      throw new TypeError("Cannot read properties of undefined (reading 'EffectComposer')");
+    });
+    const { renderer, scene, camera } = makeCtx();
+    expect(() => new PostFX({ renderer, scene, camera })).toThrow(/PostFX isn't available in this build/);
+  });
+
   // ── registerPass ────────────────────────────────────────────────────────
 
   describe('PostFX.registerPass', () => {
@@ -117,6 +125,18 @@ describe('PostFX', () => {
     it('throws TypeError for a non-string name', () => {
       const fx = new PostFX(makeCtx());
       expect(() => fx.enable(42)).toThrow(TypeError);
+    });
+
+    it('throws a clear, actionable error (not a bare TypeError) when a pass\'s create() fails on a missing UMD global', () => {
+      const name = 'enable-umd-gap-' + Math.random();
+      PostFX.registerPass(name, {
+        order: 1,
+        create: () => {
+          throw new TypeError("Cannot read properties of undefined (reading 'UnrealBloomPass')");
+        },
+      });
+      const fx = new PostFX(makeCtx());
+      expect(() => fx.enable(name)).toThrow(new RegExp(`PostFX '${name}' pass isn't available in this build`));
     });
 
     it('creates the pass via the registered factory and adds it to the composer', () => {

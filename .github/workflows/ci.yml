@@ -24,6 +24,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Circular dependency check
+        run: npm run lint:circular
+
       - name: Type check (src vs types/index.d.ts drift)
         run: npm run typecheck
 

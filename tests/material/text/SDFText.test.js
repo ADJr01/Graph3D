@@ -145,6 +145,11 @@ describe('SDFText.create', () => {
     expect(text.width).toBeGreaterThan(0);
   });
 
+  it('centerOffset is half the block size, negated on x', async () => {
+    const text = await SDFText.create('loo', { fontSize: 32 });
+    expect(text.centerOffset).toEqual({ x: -text.width / 2, y: text.height / 2 });
+  });
+
   it('letterSpacing increases the total block width', async () => {
     const tight = await SDFText.create('lo');
     const spaced = await SDFText.create('lo', { letterSpacing: 5 });
@@ -227,5 +232,6 @@ describe('SDFText.create', () => {
     expect(() => text.mesh).toThrow(pattern);
     expect(() => text.width).toThrow(pattern);
     expect(() => text.height).toThrow(pattern);
+    expect(() => text.centerOffset).toThrow(pattern);
   });
 });

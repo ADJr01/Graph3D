@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import { Axis } from '../../../src/compose/axis/Axis.js';
-import { scale } from '../../../src/compose/scale/index.js';
+import { scale, bandCenter } from '../../../src/compose/scale/index.js';
 
 describe('Axis chainable setters', () => {
   it('get with no args, set (chainable) with one — scale/orientation/tickCount/tickFormat/tickSize/labelStyle', () => {
@@ -103,6 +103,9 @@ describe('Axis.render', () => {
     const tickMeshes = scene.children.filter((c) => c.name.startsWith('x_tick_'));
     expect(tickMeshes.length).toBe(3);
     expect(tickMeshes[0].position.x).toBeCloseTo(s('a') + s.bandwidth() / 2);
+    // Pins Axis's internal offset to the shared bandCenter() helper (used by
+    // chart/axisField.js too) so the two can't silently diverge.
+    expect(tickMeshes[0].position.x).toBeCloseTo(s('a') + bandCenter(s));
   });
 
   it("orientation 'y': spine and ticks run along y, offset along x", () => {

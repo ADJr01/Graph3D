@@ -81,6 +81,12 @@ export class GraphSceneCamera {
   /** @type {THREE.Vector3} — tracks the last explicit lookAt target for tour() start state */
   #lookAtTarget = new THREE.Vector3(0, 0, 0);
 
+  /** @type {number|null} — reapplied to OrbitControls on every enableOrbitControls() call */
+  #maxZoomIn = null;
+
+  /** @type {number|null} — reapplied to OrbitControls on every enableOrbitControls() call */
+  #maxZoomOut = null;
+
   /** @type {boolean} */
   #disposed = false;
 
@@ -232,6 +238,64 @@ export class GraphSceneCamera {
     return this;
   }
 
+  // ── Zoom limits ────────────────────────────────────────────────────────────
+
+  /**
+   * Set how far in the user may zoom via OrbitControls (mouse wheel / pinch).
+   * On a perspective preset this is the closest dolly distance
+   * (OrbitControls' `minDistance`); on an orthographic preset it's the
+   * highest magnification (OrbitControls' `maxZoom`). Takes effect
+   * immediately if OrbitControls are active, and is reapplied automatically
+   * on every future `enableOrbitControls()` call (including after a
+   * `setPreset()` switch between perspective and orthographic).
+   *
+   * @param {number} value - A positive distance (perspective) or zoom factor (orthographic).
+   * @returns {this}
+   * @throws {TypeError} If `value` is not a positive finite number.
+   * @throws {Error} If called after `dispose()`.
+   * @example
+   * cam.setMaxZoomIn(2); // never let the user dolly closer than 2 units
+   */
+  setMaxZoomIn(value) {
+    this.#assertNotDisposed('setMaxZoomIn');
+    if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+      throw new TypeError(
+        `GraphSceneCamera.setMaxZoomIn: expected a positive finite number, received ${value}.`,
+      );
+    }
+    this.#maxZoomIn = value;
+    this.#applyZoomLimits();
+    return this;
+  }
+
+  /**
+   * Set how far out the user may zoom via OrbitControls (mouse wheel / pinch).
+   * On a perspective preset this is the farthest dolly distance
+   * (OrbitControls' `maxDistance`); on an orthographic preset it's the
+   * lowest magnification (OrbitControls' `minZoom`). Takes effect
+   * immediately if OrbitControls are active, and is reapplied automatically
+   * on every future `enableOrbitControls()` call (including after a
+   * `setPreset()` switch between perspective and orthographic).
+   *
+   * @param {number} value - A positive distance (perspective) or zoom factor (orthographic).
+   * @returns {this}
+   * @throws {TypeError} If `value` is not a positive finite number.
+   * @throws {Error} If called after `dispose()`.
+   * @example
+   * cam.setMaxZoomOut(50); // never let the user dolly past 50 units away
+   */
+  setMaxZoomOut(value) {
+    this.#assertNotDisposed('setMaxZoomOut');
+    if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+      throw new TypeError(
+        `GraphSceneCamera.setMaxZoomOut: expected a positive finite number, received ${value}.`,
+      );
+    }
+    this.#maxZoomOut = value;
+    this.#applyZoomLimits();
+    return this;
+  }
+
   // ── Cinematic animation primitives ────────────────────────────────────────
 
   /**
@@ -351,6 +415,7 @@ export class GraphSceneCamera {
     // Guard: dispose() may have been called during the async import.
     if (this.#disposed) return this;
     this.#orbitControls = new OrbitControls(this.#camera, domElement);
+    this.#applyZoomLimits();
     return this;
   }
 
@@ -386,6 +451,22 @@ export class GraphSceneCamera {
   }
 
   // ── Private ────────────────────────────────────────────────────────────────
+
+  /**
+   * Reapplies #maxZoomIn/#maxZoomOut to the active OrbitControls, mapped to
+   * the property pair that actually bounds dolly for the current camera type.
+   * No-op if OrbitControls aren't active — there's nothing to clamp yet.
+   */
+  #applyZoomLimits() {
+    if (!this.#orbitControls) return;
+    if (this.#camera.isOrthographicCamera) {
+      if (this.#maxZoomIn !== null) this.#orbitControls.maxZoom = this.#maxZoomIn;
+      if (this.#maxZoomOut !== null) this.#orbitControls.minZoom = this.#maxZoomOut;
+    } else {
+      if (this.#maxZoomIn !== null) this.#orbitControls.minDistance = this.#maxZoomIn;
+      if (this.#maxZoomOut !== null) this.#orbitControls.maxDistance = this.#maxZoomOut;
+    }
+  }
 
   /** @param {string} method */
   #assertNotDisposed(method) {

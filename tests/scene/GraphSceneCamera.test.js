@@ -232,6 +232,68 @@ describe('GraphSceneCamera.useCustom()', () => {
   });
 });
 
+// ── setMaxZoomIn() / setMaxZoomOut() ─────────────────────────────────────────
+
+describe('GraphSceneCamera.setMaxZoomIn() / setMaxZoomOut()', () => {
+  let cam;
+  beforeEach(() => { cam = new GraphSceneCamera(); });
+
+  it('are chainable', () => {
+    expect(cam.setMaxZoomIn(2)).toBe(cam);
+    expect(cam.setMaxZoomOut(50)).toBe(cam);
+  });
+
+  it('throw TypeError for non-positive or non-finite values', () => {
+    for (const bad of [0, -1, NaN, Infinity, '2', null, undefined]) {
+      expect(() => cam.setMaxZoomIn(bad)).toThrow(TypeError);
+      expect(() => cam.setMaxZoomOut(bad)).toThrow(TypeError);
+    }
+  });
+
+  it('throw after dispose()', () => {
+    cam.dispose();
+    expect(() => cam.setMaxZoomIn(2)).toThrow(/disposed/);
+    expect(() => cam.setMaxZoomOut(50)).toThrow(/disposed/);
+  });
+
+  it('do nothing observable when no OrbitControls are active yet', () => {
+    expect(() => cam.setMaxZoomIn(2).setMaxZoomOut(50)).not.toThrow();
+  });
+
+  it('set minDistance/maxDistance on OrbitControls for a perspective preset', async () => {
+    cam.setMaxZoomIn(2).setMaxZoomOut(50);
+    await cam.enableOrbitControls(document.createElement('canvas'));
+    const controls = await getLastControls();
+    expect(controls.minDistance).toBe(2);
+    expect(controls.maxDistance).toBe(50);
+  });
+
+  it('set maxZoom/minZoom on OrbitControls for an orthographic preset', async () => {
+    cam.setPreset('isometric');
+    cam.setMaxZoomIn(4).setMaxZoomOut(0.5);
+    await cam.enableOrbitControls(document.createElement('canvas'));
+    const controls = await getLastControls();
+    expect(controls.maxZoom).toBe(4);
+    expect(controls.minZoom).toBe(0.5);
+  });
+
+  it('apply immediately when OrbitControls are already active', async () => {
+    await cam.enableOrbitControls(document.createElement('canvas'));
+    const controls = await getLastControls();
+    cam.setMaxZoomIn(3);
+    expect(controls.minDistance).toBe(3);
+  });
+
+  it('are reapplied after a setPreset() + re-enableOrbitControls() switch to orthographic', async () => {
+    cam.setMaxZoomIn(4).setMaxZoomOut(0.5);
+    cam.setPreset('top-down');
+    await cam.enableOrbitControls(document.createElement('canvas'));
+    const controls = await getLastControls();
+    expect(controls.maxZoom).toBe(4);
+    expect(controls.minZoom).toBe(0.5);
+  });
+});
+
 // ── enableOrbitControls() / disableOrbitControls() ───────────────────────────
 
 describe('GraphSceneCamera orbit controls', () => {

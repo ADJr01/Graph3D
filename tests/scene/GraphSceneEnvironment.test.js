@@ -44,8 +44,13 @@ vi.mock('three', async (importOriginal) => {
   };
 });
 
+vi.mock('../../src/core/Graph3DLoop.js', () => ({
+  loop: { isRunning: false, start: vi.fn(), stop: vi.fn() },
+}));
+
 const { RGBELoader } = await import('three/examples/jsm/loaders/RGBELoader.js');
 const { EXRLoader } = await import('three/examples/jsm/loaders/EXRLoader.js');
+const { loop } = await import('../../src/core/Graph3DLoop.js');
 
 function makeRenderer() {
   return { domElement: { tagName: 'CANVAS' }, shadowMap: { enabled: false } };
@@ -61,6 +66,7 @@ function makeEnv(opts = {}) {
 
 afterEach(() => {
   vi.clearAllMocks();
+  loop.isRunning = false;
 });
 
 // ── Constructor ───────────────────────────────────────────────────────────────
@@ -223,6 +229,169 @@ describe('GraphSceneEnvironment.setHDR()', () => {
     env.dispose();
     expect(supersededTexture.dispose).toHaveBeenCalled();
     expect(winnerTexture.dispose).toHaveBeenCalled();
+  });
+});
+
+// ── setHDR() loading overlay ──────────────────────────────────────────────────
+
+describe('GraphSceneEnvironment setHDR() loading overlay', () => {
+  function makeRealCanvasRenderer() {
+    const parent = document.createElement('div');
+    const canvas = document.createElement('canvas');
+    parent.appendChild(canvas);
+    return { domElement: canvas, shadowMap: { enabled: false } };
+  }
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('shows a spinner overlay on the canvas parent while loading, removed once applied', async () => {
+    const renderer = makeRealCanvasRenderer();
+    const parent   = renderer.domElement.parentNode;
+    const env      = new GraphSceneEnvironment({ renderer, scene: new THREE.Scene() });
+
+    const pending = env.setHDR('/test.hdr');
+    expect(parent.querySelector('.graph3d-hdr-loader')).not.toBeNull();
+
+    await pending;
+    expect(parent.querySelector('.graph3d-hdr-loader')).toBeNull();
+    env.dispose();
+  });
+
+  it('removes the overlay when the load rejects', async () => {
+    RGBELoader.mockImplementationOnce(function () {
+      this.load = vi.fn((_url, _onLoad, _onProgress, onError) => onError(new Error('404')));
+    });
+    const renderer = makeRealCanvasRenderer();
+    const parent   = renderer.domElement.parentNode;
+    const env      = new GraphSceneEnvironment({ renderer, scene: new THREE.Scene() });
+
+    await expect(env.setHDR('/bad.hdr')).rejects.toThrow('404');
+    expect(parent.querySelector('.graph3d-hdr-loader')).toBeNull();
+    env.dispose();
+  });
+
+  it('removes a leftover overlay on dispose() even if the load never settles', async () => {
+    RGBELoader.mockImplementationOnce(function () {
+      this.load = vi.fn(() => {}); // never calls onLoad/onError
+    });
+    const renderer = makeRealCanvasRenderer();
+    const parent   = renderer.domElement.parentNode;
+    const env      = new GraphSceneEnvironment({ renderer, scene: new THREE.Scene() });
+
+    env.setHDR('/stuck.hdr').catch(() => {});
+    expect(parent.querySelector('.graph3d-hdr-loader')).not.toBeNull();
+
+    env.dispose();
+    expect(parent.querySelector('.graph3d-hdr-loader')).toBeNull();
+  });
+
+  it('is a no-op when the canvas has no parent (SSR-safe)', async () => {
+    const env = makeEnv(); // makeRenderer()'s domElement is a plain object, no parentNode
+    await expect(env.setHDR('/test.hdr')).resolves.toBe(env);
+    env.dispose();
+  });
+
+  it('overlay title reads "loading assets"', async () => {
+    const renderer = makeRealCanvasRenderer();
+    const parent   = renderer.domElement.parentNode;
+    const env      = new GraphSceneEnvironment({ renderer, scene: new THREE.Scene() });
+
+    const pending = env.setHDR('/test.hdr');
+    expect(parent.querySelector('.graph3d-hdr-loader__title')?.textContent).toBe('loading assets');
+
+    await pending;
+    env.dispose();
+  });
+});
+
+// ── setHDR() render loop pause ───────────────────────────────────────────────
+
+describe('GraphSceneEnvironment setHDR() render loop pause', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+    loop.isRunning = false;
+  });
+
+  it('pauses and resumes the shared loop around a load when it was running', async () => {
+    loop.isRunning = true;
+    const env = makeEnv();
+
+    const pending = env.setHDR('/test.hdr');
+    expect(loop.stop).toHaveBeenCalledOnce();
+    expect(loop.start).not.toHaveBeenCalled();
+
+    await pending;
+    expect(loop.start).toHaveBeenCalledOnce();
+    env.dispose();
+  });
+
+  it('does not touch the loop when it was not running', async () => {
+    loop.isRunning = false;
+    const env = makeEnv();
+
+    await env.setHDR('/test.hdr');
+    expect(loop.stop).not.toHaveBeenCalled();
+    expect(loop.start).not.toHaveBeenCalled();
+    env.dispose();
+  });
+
+  it('only pauses/resumes once for overlapping setHDR() calls across instances', async () => {
+    // ponytail: warm the RGBELoader dynamic import + cache one URL first so
+    // only one of the two racing calls below needs a fresh import — racing
+    // two cold first-time import()s of the same specifier can resolve one to
+    // the real, un-mocked module (see the "superseded call" test above for
+    // the same quirk).
+    const warmEnv = makeEnv();
+    await warmEnv.setHDR('/warm.hdr');
+    vi.clearAllMocks();
+
+    loop.isRunning = true;
+    const envA = makeEnv();
+    const envB = makeEnv();
+
+    const a = envA.setHDR('/warm.hdr'); // cache hit — no fresh import
+    const b = envB.setHDR('/cold.hdr'); // the only fresh import in flight
+    expect(loop.stop).toHaveBeenCalledOnce();
+
+    await Promise.all([a, b]);
+    expect(loop.start).toHaveBeenCalledOnce();
+    warmEnv.dispose();
+    envA.dispose();
+    envB.dispose();
+  });
+
+  it('resumes the loop even when the load rejects', async () => {
+    RGBELoader.mockImplementationOnce(function () {
+      this.load = vi.fn((_url, _onLoad, _onProgress, onError) => onError(new Error('404')));
+    });
+    loop.isRunning = true;
+    const env = makeEnv();
+
+    await expect(env.setHDR('/bad.hdr')).rejects.toThrow('404');
+    expect(loop.stop).toHaveBeenCalledOnce();
+    expect(loop.start).toHaveBeenCalledOnce();
+    env.dispose();
+  });
+
+  it('dispose() force-resumes the loop even if the load never settles', async () => {
+    RGBELoader.mockImplementationOnce(function () {
+      this.load = vi.fn(() => {}); // never calls onLoad/onError
+    });
+    loop.isRunning = true;
+    const env = makeEnv();
+
+    // ponytail: a distinct URL, not the '/stuck.hdr' the overlay describe
+    // block above already parked forever in hdrCache — reusing that key would
+    // hit the cache and skip constructing a new RGBELoader, leaving this
+    // mockImplementationOnce unconsumed to leak into a later, unrelated test.
+    env.setHDR('/stuck-loop-pause.hdr').catch(() => {});
+    expect(loop.stop).toHaveBeenCalledOnce();
+    expect(loop.start).not.toHaveBeenCalled();
+
+    env.dispose();
+    expect(loop.start).toHaveBeenCalledOnce();
   });
 });
 

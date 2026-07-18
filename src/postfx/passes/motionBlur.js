@@ -63,72 +63,89 @@ const MotionBlurShader = {
   `,
 };
 
+/** Memoized by {@link getMotionBlurPassClass} — see that function's doc for why this isn't a plain top-level `class ... extends Pass`. */
+let MotionBlurPassClass = null;
+
 /**
- * @augments Pass
+ * Builds (and memoizes) the `MotionBlurPass` class. Deferred until first
+ * call, rather than a plain top-level `class MotionBlurPass extends Pass {}`
+ * — same reasoning as `godRays.js`'s `getGodRaysPassClass()` (see that
+ * function's doc): a top-level `extends Pass` would crash while the library
+ * itself is loading in the UMD `<script>`-tag build without the matching
+ * `Pass_js` global, since this module is imported unconditionally by
+ * `postfx/index.js` to self-register via `PostFX.registerPass()`. See
+ * `improvement.md` initiative (d) PR 2.
+ * @returns {typeof Pass}
  */
-class MotionBlurPass extends Pass {
-  /**
-   * @param {import('three').Scene} scene
-   * @param {import('three').Camera} camera
-   * @param {{strength?: number, samples?: number}} [opts={}]
-   */
-  constructor(scene, camera, opts = {}) {
-    super();
-    this.scene = scene;
-    this.camera = camera;
+function getMotionBlurPassClass() {
+  if (MotionBlurPassClass !== null) return MotionBlurPassClass;
 
-    this._depth = new DepthPrepass();
+  /** @augments Pass */
+  MotionBlurPassClass = class MotionBlurPass extends Pass {
+    /**
+     * @param {import('three').Scene} scene
+     * @param {import('three').Camera} camera
+     * @param {{strength?: number, samples?: number}} [opts={}]
+     */
+    constructor(scene, camera, opts = {}) {
+      super();
+      this.scene = scene;
+      this.camera = camera;
 
-    this._previousViewProjection = new Matrix4();
-    this._viewProjection = new Matrix4();
+      this._depth = new DepthPrepass();
 
-    this.uniforms = UniformsUtils.clone(MotionBlurShader.uniforms);
-    this.uniforms.strength.value = opts.strength ?? 1.0;
-    this.uniforms.samples.value = Math.min(opts.samples ?? 16, MAX_SAMPLES - 1);
+      this._previousViewProjection = new Matrix4();
+      this._viewProjection = new Matrix4();
 
-    this.material = new ShaderMaterial({
-      name: 'MotionBlurShader',
-      uniforms: this.uniforms,
-      vertexShader: MotionBlurShader.vertexShader,
-      fragmentShader: MotionBlurShader.fragmentShader,
-    });
-    this._fsQuad = new FullScreenQuad(this.material);
-  }
+      this.uniforms = UniformsUtils.clone(MotionBlurShader.uniforms);
+      this.uniforms.strength.value = opts.strength ?? 1.0;
+      this.uniforms.samples.value = Math.min(opts.samples ?? 16, MAX_SAMPLES - 1);
 
-  render(renderer, writeBuffer, readBuffer) {
-    const oldAutoClear = renderer.autoClear;
-    renderer.autoClear = false;
-
-    this._depth.render(renderer, this.scene, this.camera);
-
-    this._viewProjection.multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse);
-    this.uniforms.currentInverseViewProjection.value.copy(this._viewProjection).invert();
-    this.uniforms.previousViewProjection.value.copy(this._previousViewProjection);
-    this.uniforms.tDiffuse.value = readBuffer.texture;
-    this.uniforms.tDepth.value = this._depth.target.texture;
-
-    if (this.renderToScreen) {
-      renderer.setRenderTarget(null);
-      this._fsQuad.render(renderer);
-    } else {
-      renderer.setRenderTarget(writeBuffer);
-      renderer.clear();
-      this._fsQuad.render(renderer);
+      this.material = new ShaderMaterial({
+        name: 'MotionBlurShader',
+        uniforms: this.uniforms,
+        vertexShader: MotionBlurShader.vertexShader,
+        fragmentShader: MotionBlurShader.fragmentShader,
+      });
+      this._fsQuad = new FullScreenQuad(this.material);
     }
 
-    this._previousViewProjection.copy(this._viewProjection);
-    renderer.autoClear = oldAutoClear;
-  }
+    render(renderer, writeBuffer, readBuffer) {
+      const oldAutoClear = renderer.autoClear;
+      renderer.autoClear = false;
 
-  setSize(width, height) {
-    this._depth.setSize(width, height);
-  }
+      this._depth.render(renderer, this.scene, this.camera);
 
-  dispose() {
-    this._depth.dispose();
-    this.material.dispose();
-    this._fsQuad.dispose();
-  }
+      this._viewProjection.multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse);
+      this.uniforms.currentInverseViewProjection.value.copy(this._viewProjection).invert();
+      this.uniforms.previousViewProjection.value.copy(this._previousViewProjection);
+      this.uniforms.tDiffuse.value = readBuffer.texture;
+      this.uniforms.tDepth.value = this._depth.target.texture;
+
+      if (this.renderToScreen) {
+        renderer.setRenderTarget(null);
+        this._fsQuad.render(renderer);
+      } else {
+        renderer.setRenderTarget(writeBuffer);
+        renderer.clear();
+        this._fsQuad.render(renderer);
+      }
+
+      this._previousViewProjection.copy(this._viewProjection);
+      renderer.autoClear = oldAutoClear;
+    }
+
+    setSize(width, height) {
+      this._depth.setSize(width, height);
+    }
+
+    dispose() {
+      this._depth.dispose();
+      this.material.dispose();
+      this._fsQuad.dispose();
+    }
+  };
+  return MotionBlurPassClass;
 }
 
 /**
@@ -139,6 +156,9 @@ class MotionBlurPass extends Pass {
  */
 PostFX.registerPass('motionBlur', {
   order: 40,
-  create: ({ scene, camera }, opts) => new MotionBlurPass(scene, camera, opts),
+  create: ({ scene, camera }, opts) => {
+    const MotionBlurPass = getMotionBlurPassClass();
+    return new MotionBlurPass(scene, camera, opts);
+  },
   configure: configureUniforms,
 });

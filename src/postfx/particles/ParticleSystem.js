@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
+import { guardExternalImport } from '../../core/umdCompat.js';
 import { buildParticleShaders } from './particleShaders.js';
 import { buildVelocityFragmentShader, POSITION_SIM_FRAGMENT_SHADER, SIMULATION_VERTEX_SHADER } from './behaviorShaders.js';
 import { advanceRingCursor, splitRingRangeIntoRectangles } from './ringBuffer.js';
@@ -168,6 +169,9 @@ export class ParticleSystem {
    * @throws {TypeError} If `scene`, `camera`, or `renderer` is missing, if
    *   `capacity` isn't a positive integer, or if `geometry` is given but
    *   isn't a `THREE.BufferGeometry`.
+   * @throws {Error} If the GPU-simulated path is selected and constructed from
+   *   the UMD `<script>`-tag build without the `three/addons/postprocessing/Pass.js`
+   *   global set (`core/umdCompat.js`).
    */
   constructor({ scene, camera, renderer, capacity = DEFAULT_CAPACITY, geometry, billboard, capabilities } = {}) {
     if (!scene) throw new TypeError('ParticleSystem: scene is required.');
@@ -554,30 +558,32 @@ export class ParticleSystem {
   }
 
   #initGPUBuffers() {
-    const size = this.#textureSize;
-    const targetOptions = {
-      type: THREE.FloatType,
-      format: THREE.RGBAFormat,
-      minFilter: THREE.NearestFilter,
-      magFilter: THREE.NearestFilter,
-      depthBuffer: false,
-      stencilBuffer: false,
-    };
-    this.#gpuPosTargets = [new THREE.WebGLRenderTarget(size, size, targetOptions), new THREE.WebGLRenderTarget(size, size, targetOptions)];
-    this.#gpuVelTargets = [new THREE.WebGLRenderTarget(size, size, targetOptions), new THREE.WebGLRenderTarget(size, size, targetOptions)];
+    guardExternalImport('ParticleSystem GPU simulation', () => {
+      const size = this.#textureSize;
+      const targetOptions = {
+        type: THREE.FloatType,
+        format: THREE.RGBAFormat,
+        minFilter: THREE.NearestFilter,
+        magFilter: THREE.NearestFilter,
+        depthBuffer: false,
+        stencilBuffer: false,
+      };
+      this.#gpuPosTargets = [new THREE.WebGLRenderTarget(size, size, targetOptions), new THREE.WebGLRenderTarget(size, size, targetOptions)];
+      this.#gpuVelTargets = [new THREE.WebGLRenderTarget(size, size, targetOptions), new THREE.WebGLRenderTarget(size, size, targetOptions)];
 
-    this.#gpuPosSimMaterial = new THREE.ShaderMaterial({
-      name: 'ParticlePositionSimMaterial',
-      uniforms: { tPosition: { value: null }, tVelocity: { value: null }, delta: { value: 0 } },
-      vertexShader: SIMULATION_VERTEX_SHADER,
-      fragmentShader: POSITION_SIM_FRAGMENT_SHADER,
+      this.#gpuPosSimMaterial = new THREE.ShaderMaterial({
+        name: 'ParticlePositionSimMaterial',
+        uniforms: { tPosition: { value: null }, tVelocity: { value: null }, delta: { value: 0 } },
+        vertexShader: SIMULATION_VERTEX_SHADER,
+        fragmentShader: POSITION_SIM_FRAGMENT_SHADER,
+      });
+      this.#gpuPosSimQuad = new FullScreenQuad(this.#gpuPosSimMaterial);
+
+      this.#rebuildVelocitySimMaterial();
+
+      this.#material.uniforms.tPosition.value = this.#gpuPosTargets[this.#gpuReadIndex].texture;
+      this.#material.uniforms.tVelocityLifetime.value = this.#gpuVelTargets[this.#gpuReadIndex].texture;
     });
-    this.#gpuPosSimQuad = new FullScreenQuad(this.#gpuPosSimMaterial);
-
-    this.#rebuildVelocitySimMaterial();
-
-    this.#material.uniforms.tPosition.value = this.#gpuPosTargets[this.#gpuReadIndex].texture;
-    this.#material.uniforms.tVelocityLifetime.value = this.#gpuVelTargets[this.#gpuReadIndex].texture;
   }
 
   /**

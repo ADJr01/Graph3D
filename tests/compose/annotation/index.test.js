@@ -23,6 +23,7 @@ describe('annotation.callout', () => {
       style: {},
       on: expect.any(Function),
       emit: expect.any(Function),
+      dispose: expect.any(Function),
     });
     expect(scene.children).toContain(c.line.three);
   });

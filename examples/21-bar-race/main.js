@@ -94,7 +94,7 @@ refreshPanel(yearIndex);
 // skipping_list.md), which is fine here since this scale's domain never
 // changes — only the category (band) field reorders, and that has no
 // visible axis at all (no SDF text assets exist yet to label rows, so the
-// leaderboard panel carries company identity instead — see docs/concepts/
+// leaderboard panel carries company identity instead — see site/concepts/
 // material.md's SDFText section).
 const valueAxisScale = scale.linear().domain([0, MAX_VALUE]).range([0, WORLD_MAX_LENGTH]);
 new Axis().scale(valueAxisScale).orientation('x').tickCount(6).tickSize(0.25).render(scene.three, 'valueAxis');

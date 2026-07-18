@@ -56,7 +56,7 @@ function levenshtein(a, b) {
  * `name` throws with a "did you mean" suggestion instead of silently
  * no-op'ing). Strict scope limit (Prompt 150): only these 7 registered
  * presets are accepted — no user-authored/custom GLSL in this prompt (see
- * `docs/concepts/interact.md` for the documented future-work note).
+ * `site/concepts/interact.md` for the documented future-work note).
  */
 export const effects = {
   /**

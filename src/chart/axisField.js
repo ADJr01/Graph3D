@@ -1,3 +1,5 @@
+import { bandCenter } from '../compose/scale/index.js';
+
 /**
  * Fits a scaled axis field's domain to `data`, via that field's own
  * accessor — continuous scales (anything exposing `.invert`, e.g.
@@ -38,10 +40,14 @@ export function applyAxisScaleDomain(field, data) {
 /**
  * Composes an axis field's accessor with its scale (if any) into the single
  * `(datum, index) => value` function a generator's `x`/`y`/`z` setter expects.
+ * Adds `bandCenter(scale)` so a band scale's data lands at the band's center
+ * — matching `Axis`'s tick/label placement — rather than its start edge;
+ * a no-op for every other scale type (CLAUDE.md §1.1 DRY two-strike rule:
+ * `Axis.js` was the first caller of this offset, this is the second).
  * @param {{accessor: (datum:*, index:number) => *, scale: object|null}} field
  * @returns {(datum:*, index:number) => *}
  */
 export function resolveAxisAccessor(field) {
   const { accessor: fieldAccessor, scale } = field;
-  return scale ? (d, i) => scale(fieldAccessor(d, i)) : fieldAccessor;
+  return scale ? (d, i) => scale(fieldAccessor(d, i)) + bandCenter(scale) : fieldAccessor;
 }

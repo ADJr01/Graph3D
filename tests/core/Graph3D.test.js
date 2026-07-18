@@ -17,6 +17,7 @@ vi.mock('../../src/core/Graph3DRenderer.js', () => ({
         domElement: el,
         shadowMap: { enabled: false, type: 0 },
         clippingPlanes: [],
+        info: { render: { calls: 0, triangles: 0 }, memory: { geometries: 0 } },
       };
     }
     render(scene, camera) {
@@ -121,16 +122,12 @@ describe('Graph3D constructor', () => {
     addSpy.mockRestore();
   });
 
-  it('stores hdr, theme, autoResize, and respectReducedMotion as public properties', () => {
+  it('stores autoResize and respectReducedMotion as public properties', () => {
     const g = new Graph3D({
       canvas: makeCanvas(),
-      hdr: '/studio.hdr',
-      theme: 'studio-dark',
       autoResize: false,
       respectReducedMotion: false,
     });
-    expect(g.hdr).toBe('/studio.hdr');
-    expect(g.theme).toBe('studio-dark');
     expect(g.autoResize).toBe(false);
     expect(g.respectReducedMotion).toBe(false);
   });
@@ -392,11 +389,37 @@ describe('Graph3D loop tick', () => {
     const tick = addSpy.mock.calls[0][0];
 
     const recordSpy = vi.spyOn(g.frameBudget, 'record');
+    const emptyContext = { chartId: null, drawCalls: 0, triangleCount: 0, meshCount: 0 };
     tick(0.016); // 16 ms expressed as seconds
-    expect(recordSpy).toHaveBeenCalledWith(16);
+    expect(recordSpy).toHaveBeenCalledWith(16, emptyContext);
 
     tick(0.033); // 33 ms
-    expect(recordSpy).toHaveBeenCalledWith(33);
+    expect(recordSpy).toHaveBeenCalledWith(33, emptyContext);
+
+    addSpy.mockRestore();
+  });
+
+  it('carries real renderer.info stats on the emitted graph3d:slow-frame event', () => {
+    const addSpy = vi.spyOn(loop, 'add');
+    const g = new Graph3D({ canvas: makeCanvas() });
+    const tick = addSpy.mock.calls[0][0];
+    g.renderer.three.info.render.calls = 7;
+    g.renderer.three.info.render.triangles = 15000;
+    g.renderer.three.info.memory.geometries = 4;
+
+    const handler = vi.fn();
+    g.frameBudget.addEventListener('graph3d:slow-frame', handler);
+
+    // FrameBudget's default windowSize is 5 consecutive over-budget (>16ms) frames.
+    for (let i = 0; i < 5; i++) tick(0.033); // 33 ms each
+
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(handler.mock.calls[0][0].detail).toMatchObject({
+      chartId: null,
+      drawCalls: 7,
+      triangleCount: 15000,
+      meshCount: 4,
+    });
 
     addSpy.mockRestore();
   });
@@ -909,8 +932,8 @@ describe('Graph3D.serialize() (Prompt 181)', () => {
     expect(() => g.serialize()).toThrow(/disposed/);
   });
 
-  it('captures top-level theme/hdr and each scene\'s camera state', () => {
-    const g = new Graph3D({ canvas: makeCanvas(), theme: 'studio-dark', hdr: '/env/studio.hdr' });
+  it('captures the active scene name and each scene\'s camera state', () => {
+    const g = new Graph3D({ canvas: makeCanvas() });
     const scene = g.createScene('main');
     scene.camera.setPosition(1, 2, 3);
     scene.camera.lookAt(4, 5, 6);
@@ -918,8 +941,6 @@ describe('Graph3D.serialize() (Prompt 181)', () => {
 
     const snapshot = g.serialize();
 
-    expect(snapshot.theme).toBe('studio-dark');
-    expect(snapshot.hdr).toBe('/env/studio.hdr');
     expect(snapshot.activeScene).toBe('main');
     expect(snapshot.scenes).toHaveLength(1);
     expect(snapshot.scenes[0]).toEqual({

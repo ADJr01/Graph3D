@@ -8,3 +8,4 @@ export { SelectionTransition } from './SelectionTransition.js';
 // right members (CLAUDE.md §1.1 DRY: reuse the single diff authority rather
 // than reimplementing diffing in chart/).
 export { diffData } from './diff.js';
+export { syncLabels, removeLabels } from './labels.js';

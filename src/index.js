@@ -19,6 +19,8 @@ export {
   transform,
   Selection,
   SelectionTransition,
+  syncLabels,
+  removeLabels,
   Axis,
   annotation,
   accessor,
@@ -46,7 +48,7 @@ export {
   Transition,
   CameraTour,
 } from './anim/index.js';
-export { GraphObjectMaterial, material, SDFText, texture, effects } from './material/index.js';
+export { GraphObjectMaterial, material, SDFText, texture, effects, graphHTML, isHTMLInCanvasSupported, Label, label } from './material/index.js';
 export { PostFX, ParticleSystem } from './postfx/index.js';
 export { GraphChart, BarChart, LineChart, ScatterChart, AreaChart, SurfaceChart, HeatmapChart, NetworkChart, TreeChart, PackChart, PieChart, VolumeChart } from './chart/index.js';
 export { Picker, StateMachine, PointerRouter, Brush, Lasso, link, KeyboardNav, FocusFollower } from './interact/index.js';

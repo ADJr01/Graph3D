@@ -3,6 +3,7 @@ import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { GraphObject } from './GraphObject.js';
 import { disposeMaterial } from '../core/GraphDisposal.js';
+import { guardExternalImport } from '../core/umdCompat.js';
 
 const DEFAULT_LINEWIDTH = 2;
 const DEFAULT_COLOR = 0xffffff;
@@ -40,22 +41,26 @@ export class GraphLine extends GraphObject {
   /**
    * @param {{ scene: THREE.Scene, name: string, color?: (number|string), linewidth?: number }} options
    * @throws {TypeError} If `linewidth` isn't a positive number.
+   * @throws {Error} If constructed from the UMD `<script>`-tag build without
+   *   the `three/examples/jsm/lines/*` globals set (`core/umdCompat.js`).
    * @example new GraphLine({ scene: graphScene.three, name: 'line-A', color: '#3b82f6', linewidth: 3 });
    */
   constructor({ scene, name, color = DEFAULT_COLOR, linewidth = DEFAULT_LINEWIDTH } = {}) {
     if (typeof linewidth !== 'number' || linewidth <= 0) {
       throw new TypeError(`GraphLine: linewidth must be a positive number, received ${JSON.stringify(linewidth)}.`);
     }
-    const geometry = new LineGeometry();
-    const material = new LineMaterial({ color, linewidth });
-    // LineMaterial's linewidth is in screen pixels, resolved against this
-    // uniform — without it (default (0,0)) the line doesn't render at all.
-    // `object/` doesn't own DOM event lifecycles, so resize isn't wired here;
-    // see setResolution().
-    if (typeof window !== 'undefined') {
-      material.resolution.set(window.innerWidth, window.innerHeight);
-    }
-    const line = new Line2(geometry, material);
+    const { geometry, line } = guardExternalImport('GraphLine (thick-line rendering)', () => {
+      const lineGeometry = new LineGeometry();
+      const lineMaterial = new LineMaterial({ color, linewidth });
+      // LineMaterial's linewidth is in screen pixels, resolved against this
+      // uniform — without it (default (0,0)) the line doesn't render at all.
+      // `object/` doesn't own DOM event lifecycles, so resize isn't wired here;
+      // see setResolution().
+      if (typeof window !== 'undefined') {
+        lineMaterial.resolution.set(window.innerWidth, window.innerHeight);
+      }
+      return { geometry: lineGeometry, line: new Line2(lineGeometry, lineMaterial) };
+    });
     super({ scene, name, three: line });
     this.#line = line;
     this.#geometry = geometry;

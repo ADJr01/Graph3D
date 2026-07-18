@@ -184,8 +184,10 @@ function region(box, { scene, name } = {}) {
 }
 
 /**
- * The `annotation` namespace (CLAUDE.md §5). `label` is a text-metadata stub
- * (real SDF text lands in Phase 6); `callout`/`referenceLine`/`referencePlane`/
+ * The `annotation` namespace (CLAUDE.md §5). `label` returns `{text, position,
+ * style}` metadata by default, or a real, camera-billboarded label (via
+ * `graphHTML` — experimental HTML-in-Canvas, falling back to `SDFText`) when
+ * `scene`/`camera` are passed; `callout`/`referenceLine`/`referencePlane`/
  * `region` are real `GraphMesh` scene objects — dispose them (or, for
  * `callout`, call the returned `.dispose()`) like any other `GraphMesh`.
  */

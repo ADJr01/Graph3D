@@ -1,0 +1,155 @@
+{
+  "layerOrder": [
+    "core",
+    "scene",
+    "object",
+    "compose",
+    "anim",
+    "material",
+    "postfx",
+    "chart",
+    "interact",
+    "stream"
+  ],
+  "layerTitle": {
+    "core": "Core Engine",
+    "scene": "Scene Composition",
+    "object": "Object & Mesh",
+    "compose": "Compose",
+    "anim": "Anim",
+    "material": "Material",
+    "postfx": "PostFX & Particles",
+    "chart": "Chart",
+    "interact": "Interaction",
+    "stream": "Stream"
+  },
+  "classesByLayer": {
+    "anim": [
+      "CameraTour",
+      "GraphAnim",
+      "GraphAnimKeyframe",
+      "GraphAnimTimeline",
+      "Transition"
+    ],
+    "chart": [
+      "AreaChart",
+      "BarChart",
+      "GraphChart",
+      "HeatmapChart",
+      "LineChart",
+      "NetworkChart",
+      "PackChart",
+      "PieChart",
+      "ScatterChart",
+      "SurfaceChart",
+      "TreeChart",
+      "VolumeChart"
+    ],
+    "compose": [
+      "Axis",
+      "Selection",
+      "SelectionTransition"
+    ],
+    "core": [
+      "CapabilityProbe",
+      "FrameBudget",
+      "Graph3D",
+      "Graph3DLoop",
+      "Graph3DRegistry",
+      "Graph3DRenderer",
+      "GraphDevTools",
+      "SSRGraph3DRenderer",
+      "WorkerPool"
+    ],
+    "interact": [
+      "Brush",
+      "FocusFollower",
+      "KeyboardNav",
+      "Lasso",
+      "Picker",
+      "PointerRouter",
+      "StateMachine"
+    ],
+    "material": [
+      "GraphObjectMaterial",
+      "Label",
+      "SDFText"
+    ],
+    "object": [
+      "GraphInstancedObject",
+      "GraphLine",
+      "GraphMesh",
+      "GraphObject",
+      "GraphObjectFactory",
+      "GraphObjectLoader",
+      "Octree"
+    ],
+    "postfx": [
+      "ParticleSystem",
+      "PostFX"
+    ],
+    "scene": [
+      "GraphScene",
+      "GraphSceneCamera",
+      "GraphSceneClipping",
+      "GraphSceneEnvironment",
+      "GraphSceneLight",
+      "GraphSceneSetup",
+      "GraphSceneShadows"
+    ],
+    "stream": [
+      "Aggregator",
+      "DataStream",
+      "GPGPU",
+      "JoinDiff",
+      "LOD",
+      "OriginShift"
+    ]
+  },
+  "nonClassLinks": {
+    "INSTANCING_THRESHOLD": "/concepts/object#the-instancing-decision-graphmesh-vs-graphinstancedobject",
+    "VERSION": "/concepts/core#version",
+    "accessor": "/concepts/compose#generators-—-generator",
+    "accessorField": "/concepts/compose#generators-—-generator",
+    "anim": "/concepts/anim#graphanim-—-the-engine-root",
+    "annotation": "/concepts/compose#annotation-—-annotation",
+    "assignDepthJitter": "/concepts/object#assigndepthjitter-—-z-fighting-mitigation",
+    "bezier": "/concepts/anim#graphanimcurve-—-curve-spring-bezier-noise-resolve",
+    "buildBuffers": "/concepts/compose#generators-—-generator",
+    "color": "/concepts/compose#color-palettes-—-color-palette",
+    "createWorkerFactory": "/concepts/core#building-a-workerpool-directly",
+    "curve": "/concepts/anim#graphanimcurve-—-curve-spring-bezier-noise-resolve",
+    "effects": "/concepts/interact#material-effects-—-premade-glsl-hover-select-shader-effects-prompt-150",
+    "fixWinding": "/concepts/object#recomputenormals-fixwinding-—-normals-shading-fixes",
+    "generator": "/concepts/compose#generators-—-generator",
+    "graphHTML": "/concepts/material#graphhtml-—-experimental-html-in-canvas-labels-user-requested-not-part-of-prompts-md-s-numbered-sequence",
+    "interpolate": "/concepts/compose#interpolation-—-interpolate-interpolatenumber-interpolatergb-interpolatehsl-interpolatelab-interpolatearray-interpolateobject",
+    "interpolateArray": "/concepts/compose#interpolation-—-interpolate-interpolatenumber-interpolatergb-interpolatehsl-interpolatelab-interpolatearray-interpolateobject",
+    "interpolateHsl": "/concepts/compose#interpolation-—-interpolate-interpolatenumber-interpolatergb-interpolatehsl-interpolatelab-interpolatearray-interpolateobject",
+    "interpolateLab": "/concepts/compose#interpolation-—-interpolate-interpolatenumber-interpolatergb-interpolatehsl-interpolatelab-interpolatearray-interpolateobject",
+    "interpolateNumber": "/concepts/compose#interpolation-—-interpolate-interpolatenumber-interpolatergb-interpolatehsl-interpolatelab-interpolatearray-interpolateobject",
+    "interpolateObject": "/concepts/compose#interpolation-—-interpolate-interpolatenumber-interpolatergb-interpolatehsl-interpolatelab-interpolatearray-interpolateobject",
+    "interpolateRgb": "/concepts/compose#interpolation-—-interpolate-interpolatenumber-interpolatergb-interpolatehsl-interpolatelab-interpolatearray-interpolateobject",
+    "isHTMLInCanvasSupported": "/concepts/material#graphhtml-—-experimental-html-in-canvas-labels-user-requested-not-part-of-prompts-md-s-numbered-sequence",
+    "label": "/concepts/material#label-—-the-shared-gpu-text-primitive-improvement-md-initiative-c",
+    "layout": "/concepts/compose#layouts-—-layout",
+    "link": "/concepts/interact#link-—-cross-filtering-prompt-153",
+    "loop": "/concepts/core#how-it-works",
+    "material": "/concepts/material#the-material-namespace-—-presets-prompts-101–106-111–112",
+    "memoryPressure": "/concepts/stream#memorypressure-prompt-168",
+    "middleware": "/concepts/stream#aggregator-middleware-decimate-prompt-162",
+    "noise": "/concepts/anim#graphanimcurve-—-curve-spring-bezier-noise-resolve",
+    "palette": "/concepts/compose#color-palettes-—-color-palette",
+    "recomputeNormals": "/concepts/object#recomputenormals-fixwinding-—-normals-shading-fixes",
+    "registerWorkerTask": "/concepts/core#registering-custom-tasks",
+    "registry": "/concepts/core#the-registry-singleton",
+    "removeLabels": "/concepts/compose#bulk-labeling-synclabels-removelabels-improvement-md-initiative-c",
+    "resolve": "/concepts/anim#graphanimcurve-—-curve-spring-bezier-noise-resolve",
+    "scale": "/concepts/compose#scales-—-scale",
+    "spring": "/concepts/anim#graphanimcurve-—-curve-spring-bezier-noise-resolve",
+    "syncLabels": "/concepts/compose#bulk-labeling-synclabels-removelabels-improvement-md-initiative-c",
+    "texture": "/concepts/material#the-texture-namespace-—-procedural-textures-prompt-110",
+    "transform": "/concepts/chart#chart-use-middleware-data-transforms-prompt-142",
+    "validateGeometry": "/concepts/object#validategeometry-—-structural-topological-mesh-diagnostics"
+  }
+}

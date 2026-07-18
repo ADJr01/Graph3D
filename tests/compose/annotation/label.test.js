@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import * as THREE from 'three';
 import { annotation } from '../../../src/compose/annotation/index.js';
 
 describe('annotation.label', () => {
@@ -11,7 +12,28 @@ describe('annotation.label', () => {
       style: {},
       on: expect.any(Function),
       emit: expect.any(Function),
+      dispose: expect.any(Function),
     });
+  });
+
+  it('dispose() is a safe no-op when no real label was ever requested', () => {
+    const result = annotation.label({ text: 'hello' });
+    expect(() => result.dispose()).not.toThrow();
+  });
+
+  it('throws when scene is supplied but is not a THREE.Scene', () => {
+    const camera = new THREE.PerspectiveCamera();
+    expect(() => annotation.label({ text: 'hello', scene: {}, camera })).toThrow(TypeError);
+  });
+
+  it('throws when camera is supplied but is not a THREE.Camera', () => {
+    const scene = new THREE.Scene();
+    expect(() => annotation.label({ text: 'hello', scene, camera: {} })).toThrow(TypeError);
+  });
+
+  it('stays metadata-only (no throw, no async build) when only one of scene/camera is supplied', () => {
+    const scene = new THREE.Scene();
+    expect(() => annotation.label({ text: 'hello', scene })).not.toThrow();
   });
 
   it('carries through a supplied position and style', () => {

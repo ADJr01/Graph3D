@@ -1,16 +1,150 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="33557d05-3974-4e5d-9972-8791b8163414" name="Changes" comment="updated few issues">
+    <list default="true" id="33557d05-3974-4e5d-9972-8791b8163414" name="Changes" comment="step 188 complete">
+      <change beforePath="$PROJECT_DIR$/.github/workflows/ci.yml" beforeDir="false" afterPath="$PROJECT_DIR$/.github/workflows/ci.yml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/.vitepress/config.mjs" beforeDir="false" afterPath="$PROJECT_DIR$/docs/.vitepress/config.mjs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/getting-started.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/getting-started.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/playground.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/playground.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/recipes/index.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/recipes/index.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CLAUDE.md" beforeDir="false" afterPath="$PROJECT_DIR$/CLAUDE.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/.vitepress/config.mjs" beforeDir="false" afterPath="$PROJECT_DIR$/site/.vitepress/config.mjs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/.vitepress/theme/components/GalleryDemo.vue" beforeDir="false" afterPath="$PROJECT_DIR$/site/.vitepress/theme/components/GalleryDemo.vue" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/.vitepress/theme/components/PlaygroundDemo.vue" beforeDir="false" afterPath="$PROJECT_DIR$/site/.vitepress/theme/components/PlaygroundDemo.vue" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/.vitepress/theme/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/site/.vitepress/theme/index.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/Aggregator.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/Aggregator.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/AreaChart.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/AreaChart.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/Axis.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/Axis.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/BarChart.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/BarChart.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/Brush.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/Brush.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/CameraTour.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/CameraTour.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/CapabilityProbe.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/CapabilityProbe.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/DataStream.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/DataStream.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/FocusFollower.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/FocusFollower.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/FrameBudget.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/FrameBudget.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/GPGPU.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/GPGPU.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/Graph3D.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/Graph3D.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/Graph3DLoop.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/Graph3DLoop.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/Graph3DRegistry.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/Graph3DRegistry.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/Graph3DRenderer.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/Graph3DRenderer.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/GraphAnim.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/GraphAnim.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/GraphAnimKeyframe.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/GraphAnimKeyframe.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/GraphAnimTimeline.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/GraphAnimTimeline.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/GraphChart.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/GraphChart.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/GraphDevTools.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/GraphDevTools.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/GraphInstancedObject.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/GraphInstancedObject.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/GraphLine.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/GraphLine.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/GraphMesh.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/GraphMesh.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/GraphObject.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/GraphObject.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/GraphObjectFactory.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/GraphObjectFactory.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/GraphObjectLoader.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/GraphObjectLoader.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/GraphObjectMaterial.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/GraphObjectMaterial.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/GraphScene.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/GraphScene.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/GraphSceneCamera.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/GraphSceneCamera.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/GraphSceneClipping.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/GraphSceneClipping.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/GraphSceneEnvironment.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/GraphSceneEnvironment.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/GraphSceneLight.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/GraphSceneLight.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/GraphSceneSetup.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/GraphSceneSetup.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/GraphSceneShadows.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/GraphSceneShadows.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/HeatmapChart.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/HeatmapChart.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/JoinDiff.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/JoinDiff.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/KeyboardNav.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/KeyboardNav.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/LOD.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/LOD.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/Lasso.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/Lasso.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/LineChart.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/LineChart.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/NetworkChart.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/NetworkChart.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/Octree.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/Octree.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/OriginShift.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/OriginShift.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/PackChart.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/PackChart.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/ParticleSystem.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/ParticleSystem.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/Picker.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/Picker.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/PieChart.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/PieChart.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/PointerRouter.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/PointerRouter.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/PostFX.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/PostFX.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/SDFText.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/SDFText.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/SSRGraph3DRenderer.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/SSRGraph3DRenderer.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/ScatterChart.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/ScatterChart.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/Selection.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/Selection.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/SelectionTransition.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/SelectionTransition.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/StateMachine.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/StateMachine.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/SurfaceChart.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/SurfaceChart.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/Transition.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/Transition.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/TreeChart.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/TreeChart.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/VolumeChart.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/VolumeChart.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/WorkerPool.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/WorkerPool.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/index.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/index.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/api/manifest.json" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/manifest.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/chart-types/index.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/chart-types/index.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/concepts/anim.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/concepts/anim.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/concepts/chart.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/concepts/chart.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/concepts/compose.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/concepts/compose.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/concepts/core.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/concepts/core.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/concepts/index.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/concepts/index.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/concepts/interact.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/concepts/interact.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/concepts/material.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/concepts/material.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/concepts/object.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/concepts/object.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/concepts/postfx.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/concepts/postfx.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/concepts/scale.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/concepts/scale.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/concepts/scene.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/concepts/scene.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/concepts/stream.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/concepts/stream.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/gallery.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/gallery.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/getting-started.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/getting-started.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/index.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/index.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/migration/index.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/migration/index.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/playground.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/playground.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/recipes/brush-cross-filter.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/recipes/brush-cross-filter.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/recipes/custom-glsl.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/recipes/custom-glsl.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/recipes/data-join-selections.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/recipes/data-join-selections.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/recipes/entry-animation-camera-tour.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/recipes/entry-animation-camera-tour.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/recipes/gltf-chart-shapes.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/recipes/gltf-chart-shapes.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/recipes/hello-bar.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/recipes/hello-bar.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/recipes/index.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/recipes/index.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/recipes/live-stream.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/recipes/live-stream.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/recipes/million-point-scatter.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/recipes/million-point-scatter.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/recipes/multi-chart-dashboard.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/recipes/multi-chart-dashboard.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/recipes/network-from-json.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/recipes/network-from-json.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/recipes/png-export.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/recipes/png-export.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/recipes/surface-from-csv.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/recipes/surface-from-csv.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/recipes/theme-swap.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/recipes/theme-swap.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/examples/08-bar-chart/main.js" beforeDir="false" afterPath="$PROJECT_DIR$/examples/08-bar-chart/main.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/examples/21-bar-race/main.js" beforeDir="false" afterPath="$PROJECT_DIR$/examples/21-bar-race/main.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/package-lock.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/postfx/passes/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/postfx/passes/index.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/docs-api.js" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/docs-api.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/syncPlaygroundLibrary.js" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/syncPlaygroundLibrary.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/chart/axisField.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/chart/axisField.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/compose/annotation/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/annotation/index.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/compose/annotation/label.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/annotation/label.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/compose/axis/Axis.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/axis/Axis.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/compose/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/index.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/compose/scale/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/scale/index.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/compose/selection/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/compose/selection/index.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/core/Graph3D.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/Graph3D.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/index.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/material/effects/registry.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/material/effects/registry.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/material/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/material/index.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/material/text/SDFText.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/material/text/SDFText.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/object/GraphInstancedObject.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/object/GraphInstancedObject.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/object/GraphLine.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/object/GraphLine.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/object/Octree.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/object/Octree.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/postfx/PostFX.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/postfx/PostFX.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/postfx/particles/ParticleSystem.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/postfx/particles/ParticleSystem.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/postfx/passes/godRays.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/postfx/passes/godRays.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/postfx/passes/motionBlur.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/postfx/passes/motionBlur.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/scene/GraphSceneCamera.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/scene/GraphSceneCamera.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/scene/GraphSceneEnvironment.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/scene/GraphSceneEnvironment.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/__snapshots__/api-surface.test.js.snap" beforeDir="false" afterPath="$PROJECT_DIR$/tests/__snapshots__/api-surface.test.js.snap" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/compose/annotation/index.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/compose/annotation/index.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/compose/annotation/label.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/compose/annotation/label.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/compose/axis/Axis.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/compose/axis/Axis.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/core/Graph3D.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/core/Graph3D.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/integration/phase1.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/integration/phase1.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/integration/phase10.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/integration/phase10.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/material/text/SDFText.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/material/text/SDFText.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/object/GraphInstancedObject.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/object/GraphInstancedObject.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/postfx/PostFX.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/postfx/PostFX.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/scene/GraphSceneCamera.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/scene/GraphSceneCamera.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/scene/GraphSceneEnvironment.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/scene/GraphSceneEnvironment.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/types/index.d.ts" beforeDir="false" afterPath="$PROJECT_DIR$/types/index.d.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/vitest.config.js" beforeDir="false" afterPath="$PROJECT_DIR$/vitest.config.js" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -100,7 +234,12 @@
       <workItem from="1783832301972" duration="2744000" />
       <workItem from="1783861007618" duration="17157000" />
       <workItem from="1783925245869" duration="632000" />
-      <workItem from="1783963115113" duration="11960000" />
+      <workItem from="1783963115113" duration="12117000" />
+      <workItem from="1784025691952" duration="22778000" />
+      <workItem from="1784093066519" duration="19000" />
+      <workItem from="1784187030468" duration="11070000" />
+      <workItem from="1784208517441" duration="8505000" />
+      <workItem from="1784267306876" duration="30651000" />
     </task>
     <task id="LOCAL-00001" summary="graph3D created">
       <option name="closed" value="true" />
@@ -198,7 +337,15 @@
       <option name="project" value="LOCAL" />
       <updated>1783924827175</updated>
     </task>
-    <option name="localTasksCounter" value="13" />
+    <task id="LOCAL-00013" summary="step 188 complete">
+      <option name="closed" value="true" />
+      <created>1784010691591</created>
+      <option name="number" value="00013" />
+      <option name="presentableId" value="LOCAL-00013" />
+      <option name="project" value="LOCAL" />
+      <updated>1784010691592</updated>
+    </task>
+    <option name="localTasksCounter" value="14" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -215,6 +362,7 @@
     <MESSAGE value="Phase 10 on process" />
     <MESSAGE value="typescript wrapper" />
     <MESSAGE value="updated few issues" />
-    <option name="LAST_COMMIT_MESSAGE" value="updated few issues" />
+    <MESSAGE value="step 188 complete" />
+    <option name="LAST_COMMIT_MESSAGE" value="step 188 complete" />
   </component>
 </project>

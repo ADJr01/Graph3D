@@ -12,7 +12,7 @@
 // and every method's prose/@throws/@example content survives unchanged;
 // only the displayed *type* of an unparseable expression is flattened to
 // Function/Object. types/index.d.ts remains the precise, authoritative type
-// signature for the same members (cross-referenced from docs/api/index.md).
+// signature for the same members (cross-referenced from site/api/index.md).
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -20,7 +20,7 @@ import jsdoc2md from 'jsdoc-to-markdown';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const SRC_DIR = path.join(ROOT, 'src');
-const API_DOCS_DIR = path.join(ROOT, 'docs', 'api');
+const API_DOCS_DIR = path.join(ROOT, 'site', 'api');
 const INDEX_FILE = path.join(SRC_DIR, 'index.js');
 
 /**
@@ -46,7 +46,7 @@ function publicExportNames() {
   return names;
 }
 
-// Matches CLAUDE.md §1.4's layer table — order used for docs/api/index.md's grouping.
+// Matches CLAUDE.md §1.4's layer table — order used for site/api/index.md's grouping.
 const LAYER_ORDER = ['core', 'scene', 'object', 'compose', 'anim', 'material', 'postfx', 'chart', 'interact', 'stream'];
 const LAYER_TITLE = {
   core: 'Core Engine',
@@ -59,6 +59,62 @@ const LAYER_TITLE = {
   chart: 'Chart',
   interact: 'Interaction',
   stream: 'Stream',
+};
+
+// Where each non-class export is actually documented in prose — classes get
+// an auto-generated /api/<Name> page (below), but a namespace/function export
+// has no `@class` to anchor one, so this table is the one place that maps it
+// to its real home on the Concepts pages (CLAUDE.md §1.1 DRY: manifest.json
+// re-exports this same table for ApiSearch.vue, rather than a second
+// hand-maintained copy there). Anchors are verified against `npm run
+// docs:build`'s rendered heading ids, not hand-slugified — VitePress's
+// slugifier keeps unicode dashes literally and doesn't always match a naive
+// guess (see e.g. `material`'s `101–106` en-dash below).
+const NON_CLASS_DOC_LINKS = {
+  VERSION: '/concepts/core#version',
+  INSTANCING_THRESHOLD: '/concepts/object#the-instancing-decision-graphmesh-vs-graphinstancedobject',
+  accessor: '/concepts/compose#generators-—-generator',
+  accessorField: '/concepts/compose#generators-—-generator',
+  anim: '/concepts/anim#graphanim-—-the-engine-root',
+  annotation: '/concepts/compose#annotation-—-annotation',
+  assignDepthJitter: '/concepts/object#assigndepthjitter-—-z-fighting-mitigation',
+  bezier: '/concepts/anim#graphanimcurve-—-curve-spring-bezier-noise-resolve',
+  buildBuffers: '/concepts/compose#generators-—-generator',
+  color: '/concepts/compose#color-palettes-—-color-palette',
+  createWorkerFactory: '/concepts/core#building-a-workerpool-directly',
+  curve: '/concepts/anim#graphanimcurve-—-curve-spring-bezier-noise-resolve',
+  effects: '/concepts/interact#material-effects-—-premade-glsl-hover-select-shader-effects-prompt-150',
+  fixWinding: '/concepts/object#recomputenormals-fixwinding-—-normals-shading-fixes',
+  generator: '/concepts/compose#generators-—-generator',
+  graphHTML: '/concepts/material#graphhtml-—-experimental-html-in-canvas-labels-user-requested-not-part-of-prompts-md-s-numbered-sequence',
+  interpolate: '/concepts/compose#interpolation-—-interpolate-interpolatenumber-interpolatergb-interpolatehsl-interpolatelab-interpolatearray-interpolateobject',
+  interpolateArray: '/concepts/compose#interpolation-—-interpolate-interpolatenumber-interpolatergb-interpolatehsl-interpolatelab-interpolatearray-interpolateobject',
+  interpolateHsl: '/concepts/compose#interpolation-—-interpolate-interpolatenumber-interpolatergb-interpolatehsl-interpolatelab-interpolatearray-interpolateobject',
+  interpolateLab: '/concepts/compose#interpolation-—-interpolate-interpolatenumber-interpolatergb-interpolatehsl-interpolatelab-interpolatearray-interpolateobject',
+  interpolateNumber: '/concepts/compose#interpolation-—-interpolate-interpolatenumber-interpolatergb-interpolatehsl-interpolatelab-interpolatearray-interpolateobject',
+  interpolateObject: '/concepts/compose#interpolation-—-interpolate-interpolatenumber-interpolatergb-interpolatehsl-interpolatelab-interpolatearray-interpolateobject',
+  interpolateRgb: '/concepts/compose#interpolation-—-interpolate-interpolatenumber-interpolatergb-interpolatehsl-interpolatelab-interpolatearray-interpolateobject',
+  isHTMLInCanvasSupported: '/concepts/material#graphhtml-—-experimental-html-in-canvas-labels-user-requested-not-part-of-prompts-md-s-numbered-sequence',
+  label: '/concepts/material#label-—-the-shared-gpu-text-primitive-improvement-md-initiative-c',
+  layout: '/concepts/compose#layouts-—-layout',
+  link: '/concepts/interact#link-—-cross-filtering-prompt-153',
+  loop: '/concepts/core#how-it-works',
+  material: '/concepts/material#the-material-namespace-—-presets-prompts-101–106-111–112',
+  memoryPressure: '/concepts/stream#memorypressure-prompt-168',
+  middleware: '/concepts/stream#aggregator-middleware-decimate-prompt-162',
+  noise: '/concepts/anim#graphanimcurve-—-curve-spring-bezier-noise-resolve',
+  palette: '/concepts/compose#color-palettes-—-color-palette',
+  recomputeNormals: '/concepts/object#recomputenormals-fixwinding-—-normals-shading-fixes',
+  registerWorkerTask: '/concepts/core#registering-custom-tasks',
+  registry: '/concepts/core#the-registry-singleton',
+  resolve: '/concepts/anim#graphanimcurve-—-curve-spring-bezier-noise-resolve',
+  removeLabels: '/concepts/compose#bulk-labeling-synclabels-removelabels-improvement-md-initiative-c',
+  scale: '/concepts/compose#scales-—-scale',
+  syncLabels: '/concepts/compose#bulk-labeling-synclabels-removelabels-improvement-md-initiative-c',
+  spring: '/concepts/anim#graphanimcurve-—-curve-spring-bezier-noise-resolve',
+  texture: '/concepts/material#the-texture-namespace-—-procedural-textures-prompt-110',
+  transform: '/concepts/chart#chart-use-middleware-data-transforms-prompt-142',
+  validateGeometry: '/concepts/object#validategeometry-—-structural-topological-mesh-diagnostics',
 };
 
 const TYPE_TAGS = ['type', 'param', 'returns', 'return', 'throws', 'property', 'yields', 'typedef'];
@@ -172,39 +228,30 @@ function layerOf(doclet, tempSrcDir) {
   return LAYER_ORDER.includes(first) ? first : null;
 }
 
-/** Writes `docs/api/index.md`, grouping generated class pages by layer plus a namespaces/functions cross-reference. */
-function writeIndexPage(classesByLayer, nonClassExportNames) {
+/** Writes `site/api/index.md`, embedding the filterable `ApiSearch` component (sourced from manifest.json) — it covers both auto-generated class pages and the namespace/function cross-reference below. */
+function writeIndexPage() {
   const lines = [
     '# API Reference',
     '',
     'Auto-generated from this codebase\'s own JSDoc (`npm run docs:api`, via',
     '`jsdoc-to-markdown`) — one page per exported class, always regenerated',
     'from source rather than hand-maintained, so it never drifts from the',
-    'real public API.',
+    'real public API. The namespace/function portion of the public surface',
+    '(`scale`, `generator`, `palette`, `layout`, `material`, `color`, `curve`,',
+    '`noise`, `texture`, `effects`, `transform`, `middleware`, `interpolate`,',
+    '`anim`, and standalone helpers) has no `@class` to anchor a generated page',
+    'on, so the search box below links each one straight to its prose',
+    'documentation (with runnable examples) on the [Concepts](/concepts/)',
+    'pages instead. `types/index.d.ts` in the repository remains the exact,',
+    'authoritative type signature for every member on this page.',
     '',
-    '**Scope:** classes only. The namespace/function portion of the public',
-    'surface (`scale`, `generator`, `palette`, `layout`, `material`, `color`,',
-    '`curve`, `noise`, `texture`, `effects`, `transform`, `middleware`,',
-    '`interpolate`, `anim`, and standalone helpers) is plain-object/function',
-    'exports without a `@class` to anchor a page on — those are documented in',
-    'prose with runnable examples on the [Concepts](/concepts/) pages instead',
-    'of being thinly auto-extracted here. `types/index.d.ts` in the',
-    'repository remains the exact, authoritative type signature for every',
-    'member on this page.',
+    '<script setup>',
+    "import ApiSearch from '../.vitepress/theme/components/ApiSearch.vue';",
+    '</script>',
+    '',
+    '<ApiSearch />',
     '',
   ];
-  for (const layer of LAYER_ORDER) {
-    const names = classesByLayer[layer];
-    if (!names || names.length === 0) continue;
-    lines.push(`## ${LAYER_TITLE[layer]}`, '');
-    for (const name of names) lines.push(`- [${name}](/api/${name})`);
-    lines.push('');
-  }
-  if (nonClassExportNames.length > 0) {
-    lines.push('## Namespaces & Functions (see Concepts)', '');
-    lines.push(nonClassExportNames.map((name) => `\`${name}\``).join(', '));
-    lines.push('');
-  }
   fs.writeFileSync(path.join(API_DOCS_DIR, 'index.md'), lines.join('\n'));
 }
 
@@ -255,18 +302,36 @@ async function main() {
 
     const documentedNames = new Set(classDoclets.map((d) => d.name));
     const nonClassExportNames = [...publicNames].filter((name) => !documentedNames.has(name)).sort();
-    writeIndexPage(classesByLayer, nonClassExportNames);
 
-    // docs/.vitepress/config.mjs reads this to build the `/api/` sidebar —
-    // one source of truth for the layer grouping (CLAUDE.md §1.1 DRY),
-    // rather than hand-maintaining a second copy of the class list there
-    // that would silently drift from what's actually generated.
+    // Fail Fast (CLAUDE.md §1.5): a namespace/function export with no entry
+    // in NON_CLASS_DOC_LINKS would otherwise silently vanish from both the
+    // generated index page and ApiSearch's results the moment someone adds
+    // a new one to src/index.js — exactly the discoverability gap this
+    // table exists to close.
+    const undocumented = nonClassExportNames.filter((name) => !(name in NON_CLASS_DOC_LINKS));
+    if (undocumented.length > 0) {
+      throw new Error(
+        `docs-api: ${undocumented.join(', ')} ${undocumented.length === 1 ? 'is a' : 'are'} public export(s) with ` +
+          'no NON_CLASS_DOC_LINKS entry in scripts/docs-api.js. Add a prose section documenting it on the ' +
+          'relevant site/concepts/*.md page, then add its anchor to NON_CLASS_DOC_LINKS.',
+      );
+    }
+    const nonClassLinks = Object.fromEntries(nonClassExportNames.map((name) => [name, NON_CLASS_DOC_LINKS[name]]));
+
+    writeIndexPage();
+
+    // site/.vitepress/config.mjs reads this to build the `/api/` sidebar,
+    // and ApiSearch.vue reads it to make both classes and namespaces/
+    // functions filterable — one source of truth for the layer grouping
+    // and the namespace/function link table (CLAUDE.md §1.1 DRY), rather
+    // than hand-maintaining second copies that would silently drift from
+    // what's actually generated.
     fs.writeFileSync(
       path.join(API_DOCS_DIR, 'manifest.json'),
-      JSON.stringify({ layerOrder: LAYER_ORDER, layerTitle: LAYER_TITLE, classesByLayer }, null, 2),
+      JSON.stringify({ layerOrder: LAYER_ORDER, layerTitle: LAYER_TITLE, classesByLayer, nonClassLinks }, null, 2),
     );
 
-    console.log(`docs:api — generated ${classDoclets.length} class page(s) under docs/api/`);
+    console.log(`docs:api — generated ${classDoclets.length} class page(s) under site/api/`);
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }

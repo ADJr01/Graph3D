@@ -5,9 +5,26 @@ import * as THREE from 'three';
 // pointlessly deep trees for lightly-populated regions.
 const DEFAULT_MAX_ITEMS_PER_NODE = 8;
 
-// Caps subdivision at 8^8 ≈ 16M leaf cells in the finest level, comfortably
-// covering the "millions of datums" charts this backs without unbounded recursion.
-const DEFAULT_MAX_DEPTH = 8;
+// Bounded by leaf CELL SIZE relative to real chart data, not by node count:
+// GraphInstancedObject's default bounds span 20,000 units, and subdivision is
+// lazy (a leaf only splits once it exceeds maxItemsPerNode), so a shallow
+// cap costs nothing for sparse data but silently stops working once a
+// cluster's spread is smaller than the smallest reachable cell — every item
+// then piles into one leaf, and remove()'s linear item scan (normally O(1),
+// bounded by maxItemsPerNode) degrades to true O(n), making a full
+// chart.update() O(n^2). 8 splits gave a smallest cell of 20,000/2^8 ≈ 78
+// units — bigger than most real chart data's actual spread (e.g. this
+// library's own examples typically span [0,10] or [-40,40]) — confirmed via
+// bench/stress-million.bench.js: 10,000 points/chart clustered inside
+// [-40,40] measured ~9fps against a 30fps target before this fix, vs. tight
+// custom bounds' 1.3ms/33.8ms ~26x gap the same bench documented for a
+// smaller case. 24 splits gives 20,000/2^24 ≈ 0.0012 units — small enough to
+// separate any realistic chart-data density, and deep enough that a further
+// increase can't meaningfully help float32-stored positions at this bounds'
+// magnitude anyway (float32 epsilon near 10,000 is already ~0.0012).
+// Subdivision only ever reaches this deep for a genuinely tight real-world
+// cluster; a uniformly spread dataset stays shallow regardless of the cap.
+const DEFAULT_MAX_DEPTH = 24;
 
 /**
  * One node of the tree: either a leaf (holds items directly) or an internal

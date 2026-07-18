@@ -1,5 +1,6 @@
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { guardExternalImport } from '../core/umdCompat.js';
 
 /**
  * @typedef {Object} PostFXPassContext
@@ -105,6 +106,8 @@ export class PostFX {
    *   (e.g. `ssr`'s weak-GPU auto-disable). Optional — omitting it just means
    *   capability-gated passes can't gate on anything.
    * @throws {TypeError} If `renderer`, `scene`, or `camera` is missing.
+   * @throws {Error} If constructed from the UMD `<script>`-tag build without the
+   *   `three/addons/postprocessing/{EffectComposer,RenderPass}.js` globals set (`core/umdCompat.js`).
    * @example new PostFX({ renderer: g.renderer.three, scene: scene.three, camera: scene.camera.three, capabilities: g.capabilities });
    */
   constructor({ renderer, scene, camera, capabilities } = {}) {
@@ -119,8 +122,8 @@ export class PostFX {
     }
     this.#renderer = renderer;
     this.#capabilities = capabilities;
-    this.#composer = new EffectComposer(renderer);
-    this.#renderPass = new RenderPass(scene, camera);
+    this.#composer = guardExternalImport('PostFX', () => new EffectComposer(renderer));
+    this.#renderPass = guardExternalImport('PostFX', () => new RenderPass(scene, camera));
     this.#composer.addPass(this.#renderPass);
     this.#autoActivateFogPasses(scene);
   }
@@ -190,6 +193,8 @@ export class PostFX {
    * @returns {this}
    * @throws {TypeError} If `name` is not a non-empty string.
    * @throws {Error} If `name` is not a registered pass, or if disposed.
+   * @throws {Error} If constructed from the UMD `<script>`-tag build without
+   *   the pass's required `three/addons`/`three/examples/jsm` global set (`core/umdCompat.js`).
    * @example fx.enable('bloom', { strength: 1.2 });
    */
   enable(name, opts = {}) {
@@ -220,7 +225,7 @@ export class PostFX {
     if (definition.canEnable && !definition.canEnable(ctx, opts)) {
       return this;
     }
-    const pass = definition.create(ctx, opts);
+    const pass = guardExternalImport(`PostFX '${name}' pass`, () => definition.create(ctx, opts));
     this.#active.set(name, { pass, opts });
     this.#reorder();
     return this;

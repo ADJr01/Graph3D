@@ -79,8 +79,9 @@ describe('Phase 1 / (b) loop tick delta', () => {
     tick(0.016); // 16 ms expressed as seconds
     tick(0.033); // 33 ms expressed as seconds
 
-    expect(recordSpy).toHaveBeenNthCalledWith(1, 16);
-    expect(recordSpy).toHaveBeenNthCalledWith(2, 33);
+    const emptyContext = { chartId: null, drawCalls: 0, triangleCount: 0, meshCount: 0 };
+    expect(recordSpy).toHaveBeenNthCalledWith(1, 16, emptyContext);
+    expect(recordSpy).toHaveBeenNthCalledWith(2, 33, emptyContext);
   });
 });
 
@@ -103,7 +104,7 @@ describe('Phase 1 / (c) pause / resume', () => {
     const [tick] = addSpy.mock.calls[0];
     const recordSpy = vi.spyOn(g.frameBudget, 'record');
     tick(0.016);
-    expect(recordSpy).toHaveBeenCalledWith(16);
+    expect(recordSpy).toHaveBeenCalledWith(16, { chartId: null, drawCalls: 0, triangleCount: 0, meshCount: 0 });
   });
 
   it('pause-resume-pause round-trip leaves the loop stopped', () => {
