@@ -52,6 +52,7 @@ Key behaviours:
 | **Auto-stop** | The RAF is cancelled when the last callback is removed — no idle spin. |
 | **Tab-hide pause** | `document.visibilitychange` cancels the RAF when the tab is hidden and reschedules it when visible again. Prevents wasted GPU work on invisible tabs. |
 | **Delta = 0 on first tick** | After a start (or a resume from tab-hide), `deltaSec` is `0` for the first frame to prevent a spike caused by the gap. |
+| **Per-callback error isolation** | Each registered callback runs inside its own `try`/`catch`; a thrown error is logged via `console.error` and that callback is skipped for the frame — it does not stop the other registered callbacks, and does not prevent the next frame from being scheduled. Without this, one broken callback (e.g. a stale reference into a disposed scene) would silently freeze rendering for every `Graph3D` instance on the page, forever — the `for` loop dispatching callbacks would exit early on the throw, skipping the code that schedules the next RAF, with no other callback left to trigger recovery. |
 
 ### Relationship to `Graph3D`
 

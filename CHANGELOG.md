@@ -16,7 +16,9 @@ streaming. Every item below is real, shipped code with tests and docs — see
 
 - `Graph3D` — the top-level entry point: canvas → renderer, single shared
   `requestAnimationFrame` loop (`Graph3DLoop`/`loop`, one per page, paused
-  automatically while the tab is backgrounded), multi-scene management
+  automatically while the tab is backgrounded, with per-callback error
+  isolation so one throwing callback can't silently freeze rendering for
+  every other chart on the page), multi-scene management
   (`createScene`/`setActiveScene`), the chart-type dispatch (`g.chart(...)`),
   serialization (`serialize()`/`deserialize()`), and SSR-safe construction.
 - `CapabilityProbe` — feature detection with graceful degradation.
@@ -87,7 +89,12 @@ streaming. Every item below is real, shipped code with tests and docs — see
   a hover/focus/select `StateMachine` with sensible defaults, `PointerRouter`
   (mouse/touch) and `KeyboardNav` (accessible, ARIA-live-region-driven)
   input, drag-and-drop, `Brush`/`Lasso` region selection, and cross-filter
-  linking between charts.
+  linking between charts. Picking stays precise while the camera is actively
+  rotating/panning (`Picker.camera` and `Brush`/`Lasso`'s region query both
+  refresh the camera's `matrixWorld` on every use, closing a gap where
+  `OrbitControls`' synchronous position/quaternion writes could otherwise
+  outrun the next render and leave a hover/click/drag ray-testing against a
+  frame-stale camera orientation).
 
 ### Added — Streaming & Scale
 

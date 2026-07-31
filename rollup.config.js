@@ -34,12 +34,16 @@ export default async function () {
       input: INPUT,
       external: EXTERNAL,
       plugins: [blobPlugin, resolve()],
-      output: {
-        file: 'dist/graph3d.umd.js',
-        format: 'umd',
-        name: 'Graph3D',
-        globals: { three: 'THREE' },
-      },
+      output: [
+        { file: 'dist/graph3d.umd.js', format: 'umd', name: 'Graph3D', globals: { three: 'THREE' } },
+        {
+          file: 'dist/graph3d.umd.min.js',
+          format: 'umd',
+          name: 'Graph3D',
+          globals: { three: 'THREE' },
+          plugins: [terser()],
+        },
+      ],
     },
   ];
 }

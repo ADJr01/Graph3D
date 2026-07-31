@@ -14,6 +14,7 @@ vi.mock('../../src/core/Graph3DRenderer.js', () => ({
         setViewport: vi.fn(),
         setScissor: vi.fn(),
         setScissorTest: vi.fn(),
+        getPixelRatio: vi.fn(() => 1),
         domElement: el,
         shadowMap: { enabled: false, type: 0 },
         clippingPlanes: [],

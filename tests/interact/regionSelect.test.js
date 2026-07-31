@@ -71,4 +71,25 @@ describe('matchedIndicesForChart', () => {
     expect([...matched].every((i) => i >= 28 && i <= 32)).toBe(true);
     expect(matched.size).toBeGreaterThan(0);
   });
+
+  it('refreshes the camera matrixWorld before projecting — mirrors OrbitControls writing position/quaternion synchronously without a render() in between', () => {
+    // Same stale-rotation setup as Picker.test.js's matching case:
+    // Object3D.lookAt() bakes the *old* quaternion's rotation into
+    // matrixWorld before assigning the new, correct quaternion.
+    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
+    camera.position.set(10, 0, 10);
+    camera.lookAt(0, 0, 0);
+    camera.updateProjectionMatrix();
+
+    const chart = new BarChart(new THREE.Scene()).x((d) => d.id).y((d) => d.value);
+    chart.data([{ id: 0, value: 1 }], (d) => d.id);
+    chart.render();
+    chart.selection().attr('position.x', 0).attr('position.y', 0).attr('position.z', 0);
+
+    // The datum sits exactly on this camera's look-at target, so it only
+    // projects near canvas center once the camera's actual rotation (not
+    // just its translation) is accounted for.
+    const matched = matchedIndicesForChart(chart, camera, CANVAS, (x, y) => Math.abs(x - 50) < 5 && Math.abs(y - 50) < 5);
+    expect(matched).toEqual(new Set([0]));
+  });
 });

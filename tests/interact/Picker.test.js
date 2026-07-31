@@ -183,6 +183,42 @@ describe('Picker.pickAt', () => {
   });
 });
 
+describe('Picker.camera matrixWorld freshness', () => {
+  it('picks correctly against a camera whose position/quaternion changed without an explicit updateMatrixWorld() call — mirrors OrbitControls writing them synchronously from its own pointer listener, before any render() recomputes matrixWorld', () => {
+    // THREE.Object3D.lookAt() recomputes matrixWorld's *translation* from
+    // whatever quaternion the object had BEFORE this call, then sets the new
+    // (correct) quaternion afterward — the new rotation is never baked into
+    // matrixWorld by lookAt() itself. So after this camera is positioned and
+    // aimed, camera.quaternion is correct but camera.matrixWorld's rotation
+    // is still the stale pre-lookAt one, exactly the state OrbitControls
+    // leaves the camera in between a drag's pointermove and the next render.
+    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
+    camera.position.set(10, 0, 10);
+    camera.lookAt(0, 0, 0);
+    camera.updateProjectionMatrix();
+
+    const picker = new Picker({ camera, domElement: CANVAS });
+    const chart = new ScatterChart(makeScene()).x((d) => d.x).y((d) => d.y).z((d) => d.z);
+    chart.data([{ x: 0, y: 0, z: 0 }]);
+    chart.render();
+    picker.register(chart);
+
+    // A ray cast with the stale (rotation-less) matrixWorld would travel
+    // straight down -z from (10, 0, 10) and never reach this datum at the
+    // origin — only a camera getter that refreshes matrixWorld first casts
+    // the correct, angled ray toward it.
+    const hit = picker.pickAt(CENTER_X, CENTER_Y);
+    expect(hit).not.toBeNull();
+    expect(hit.datum).toEqual({ x: 0, y: 0, z: 0 });
+  });
+
+  it('the camera getter returns the same camera instance, just with matrixWorld refreshed', () => {
+    const camera = makeCamera();
+    const picker = new Picker({ camera, domElement: CANVAS });
+    expect(picker.camera).toBe(camera);
+  });
+});
+
 describe('Picker.dispose', () => {
   it('clears registered charts and is idempotent', () => {
     const picker = new Picker({ camera: makeCamera(), domElement: CANVAS });

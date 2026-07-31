@@ -294,6 +294,88 @@ describe('GraphSceneCamera.setMaxZoomIn() / setMaxZoomOut()', () => {
   });
 });
 
+// ── setMinPolarAngle() / setMaxPolarAngle() ──────────────────────────────────
+
+describe('GraphSceneCamera.setMinPolarAngle() / setMaxPolarAngle()', () => {
+  let cam;
+  beforeEach(() => { cam = new GraphSceneCamera(); });
+
+  it('are chainable', () => {
+    expect(cam.setMinPolarAngle(0.5)).toBe(cam);
+    expect(cam.setMaxPolarAngle(2.5)).toBe(cam);
+  });
+
+  it('throw TypeError for values outside [0, Math.PI] or non-finite', () => {
+    for (const bad of [-0.1, Math.PI + 0.1, NaN, Infinity, '1', null, undefined]) {
+      expect(() => cam.setMinPolarAngle(bad)).toThrow(TypeError);
+      expect(() => cam.setMaxPolarAngle(bad)).toThrow(TypeError);
+    }
+  });
+
+  it('throw after dispose()', () => {
+    cam.dispose();
+    expect(() => cam.setMinPolarAngle(0.5)).toThrow(/disposed/);
+    expect(() => cam.setMaxPolarAngle(2.5)).toThrow(/disposed/);
+  });
+
+  it('do nothing observable when no OrbitControls are active yet', () => {
+    expect(() => cam.setMinPolarAngle(0.5).setMaxPolarAngle(2.5)).not.toThrow();
+  });
+
+  it('set minPolarAngle/maxPolarAngle on OrbitControls', async () => {
+    cam.setMinPolarAngle(0.5).setMaxPolarAngle(2.5);
+    await cam.enableOrbitControls(document.createElement('canvas'));
+    const controls = await getLastControls();
+    expect(controls.minPolarAngle).toBe(0.5);
+    expect(controls.maxPolarAngle).toBe(2.5);
+  });
+
+  it('apply immediately when OrbitControls are already active', async () => {
+    await cam.enableOrbitControls(document.createElement('canvas'));
+    const controls = await getLastControls();
+    cam.setMinPolarAngle(0.3);
+    expect(controls.minPolarAngle).toBe(0.3);
+  });
+
+  it('are reapplied after a setPreset() + re-enableOrbitControls() switch', async () => {
+    cam.setMinPolarAngle(0.5).setMaxPolarAngle(2.5);
+    cam.setPreset('top-down');
+    await cam.enableOrbitControls(document.createElement('canvas'));
+    const controls = await getLastControls();
+    expect(controls.minPolarAngle).toBe(0.5);
+    expect(controls.maxPolarAngle).toBe(2.5);
+  });
+
+  it('throw RangeError when set to cross an already-set opposite bound', () => {
+    cam.setMinPolarAngle(1.5);
+    expect(() => cam.setMaxPolarAngle(1.0)).toThrow(RangeError);
+
+    cam.setMaxPolarAngle(2.0);
+    expect(() => cam.setMinPolarAngle(2.5)).toThrow(RangeError);
+  });
+
+  it('allow setting min === max', () => {
+    cam.setMinPolarAngle(1.5);
+    expect(() => cam.setMaxPolarAngle(1.5)).not.toThrow();
+  });
+
+  it('leave the rejected bound unchanged after a RangeError', async () => {
+    cam.setMinPolarAngle(1.5).setMaxPolarAngle(2.5);
+    expect(() => cam.setMaxPolarAngle(1.0)).toThrow(RangeError);
+    await cam.enableOrbitControls(document.createElement('canvas'));
+    const controls = await getLastControls();
+    expect(controls.maxPolarAngle).toBe(2.5);
+  });
+
+  it('call orbitControls.update() to re-clamp a camera already outside new bounds', async () => {
+    await cam.enableOrbitControls(document.createElement('canvas'));
+    const controls = await getLastControls();
+    controls.update.mockClear();
+    cam.setMinPolarAngle(0.5);
+    expect(controls.update).toHaveBeenCalled();
+  });
+});
+
 // ── enableOrbitControls() / disableOrbitControls() ───────────────────────────
 
 describe('GraphSceneCamera orbit controls', () => {

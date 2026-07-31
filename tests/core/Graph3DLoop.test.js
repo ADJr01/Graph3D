@@ -187,6 +187,35 @@ describe('tick', () => {
     expect(b).toHaveBeenCalledOnce();
   });
 
+  it('a throwing callback does not prevent other callbacks from running', () => {
+    const throwing = vi.fn(() => { throw new Error('boom'); });
+    const healthy = vi.fn();
+    subject.add(throwing);
+    subject.add(healthy);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    tick(0);
+    expect(healthy).toHaveBeenCalledOnce();
+  });
+
+  it('a throwing callback does not permanently kill the loop — the next frame still schedules', () => {
+    subject.add(() => { throw new Error('boom'); });
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    tick(0);
+    // Without isolation, the throw would skip #scheduleRaf() entirely and no
+    // further frame would ever be scheduled — this is the exact "isRunning
+    // stays true but nothing ever ticks again" zombie state this fix targets.
+    expect(requestAnimationFrame).toHaveBeenCalledTimes(2);
+    expect(subject.isRunning).toBe(true);
+  });
+
+  it('logs a thrown callback error via console.error instead of swallowing it silently', () => {
+    const error = new Error('boom');
+    subject.add(() => { throw error; });
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    tick(0);
+    expect(consoleError).toHaveBeenCalledWith(expect.stringContaining('Graph3DLoop'), error);
+  });
+
   it('schedules the next RAF after each tick while running', () => {
     subject.add(vi.fn());
     tick(0);

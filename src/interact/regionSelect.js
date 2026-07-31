@@ -98,8 +98,13 @@ export function matchedIndicesForChart(chart, camera, domElement, containsFn) {
   // matrixWorld is only ever recomputed by a real WebGLRenderer.render()
   // call — a drag-end query requested between frames would otherwise
   // silently test against a stale world transform (the same gap Picker's
-  // own pickAt() closes for its ray, Prompt 147).
+  // own pickAt() closes for its ray, Prompt 147). Camera included: OrbitControls
+  // writes position/quaternion synchronously from its own pointer listener,
+  // so a brush/lasso finalized immediately after a rotate/pan needs its
+  // camera's matrixWorld refreshed too, not just the scene's (Picker.camera's
+  // getter closes the identical gap for hover/click/drag picking).
   chart.scene.updateMatrixWorld(true);
+  camera.updateMatrixWorld();
 
   const selection = chart.selection();
   const backend = selection.backend;

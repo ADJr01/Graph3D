@@ -1,15 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
   <component name="ChangeListManager">
-    <list default="true" id="33557d05-3974-4e5d-9972-8791b8163414" name="Changes" comment="Bug 1: Octree O(n²) degenerate-leaf performance cliff — src/object/Octree.js&#10;&#10;Root cause: DEFAULT_MAX_DEPTH was 8, giving a smallest leaf cell of 20,000 / 2⁸ ≈ 78 units against the default ±10,000 bounds — bigger than most real chart data's actual spread (e.g. [0,10], [-40,40]). Once all instances landed in one leaf, subdivision stopped (depth cap hit) and remove()'s linear scan degraded from O(1) to true O(n), making a full chart.update() O(n²).&#10;&#10;Fix: Bumped DEFAULT_MAX_DEPTH to 24 (smallest cell ≈0.0012 units — small enough to separate any realistic chart density, and right around float32's own precision floor at that bounds magnitude, so going deeper couldn't help further). Subdivision is lazy, so this costs nothing for normal, spread-out data.&#10;&#10;Verified empirically, reproducing the exact scenario from skipping_list.md's own bug report (4,000 rows in [0,10], one data()+update() call with 50 mutated rows):&#10;- Before: reported ~300ms, badly superlinear (30x slower at 8x more data)&#10;- After: ~47ms, now scaling roughly linearly with N (matches the 500-row case's per-item cost)&#10;&#10;Bug 2: Silent picking failure once a chart's mesh moves off-origin — src/object/GraphInstancedObject.js&#10;&#10;Root cause: #closestIntersection queried the octree with raycaster.ray directly — always world-space — but the octree stores each instance's local (mesh-relative) position. These only agreed while the mesh sat at the scene origin; OriginShift (or anything else that repositions the mesh) broke it silently, with zero errors.&#10;&#10;Fix: Convert the ray into the mesh's local space (raycaster.ray × inverse mesh.matrixWorld) before querying the octree — two new reused scratch objects, no new allocations per call.&#10;&#10;Tests added:&#10;- Two new unit tests in tests/object/GraphInstancedObject.test.js (pick/pickDetailed), moving the mesh off-origin and confirming hits resolve correctly in world space.&#10;- Un-skipped the exact regression this bug already had a placeholder for in tests/integration/phase10.test.js — a real Picker.pickAt() call through an OriginShift, previously documented as &quot;picking post-shift is a separate, real, currently-broken capability,&quot; now asserts it actually works.&#10;&#10;Full verification: 213/213 test files, 3335/3335 tests passing (+2 new), lint clean, typecheck clean, zero circular imports.&#10;&#10;✻ Sautéed for 12m 3s&#10;&#10;❯ write a commit message according to git diff&#10;&#10;  Ran 1 shell command&#10;&#10;● User answered Claude's questions:&#10;· The working tree has 182 changed files spanning several unrelated pieces of work (a docs/→site/ rename, the improvement.md initiatives, the bar-chart demo work, and my two bug fixes from this session). Which should the commit message cover? → The entire working tree diff&#10;&#10;  Ran 4 shell commands&#10;&#10;Given the scope (182 files across several independent initiatives), here's a commit message that honestly represents it — a summary line plus a body organized by area:&#10;&#10;feat: harden Phase 11, migrate docs to site/, fix octree and picking bugs&#10;&#10;Coordinate mapping fix:&#10;- BarChart/HeatmapChart bars now align with Axis tick labels. Both derive&#10;  the half-bandwidth offset from a new shared bandCenter() helper&#10;  (src/compose/scale/bandCenter.js) instead of Axis computing it inline&#10;  and chart/axisField.js's resolveAxisAccessor never applying it at all.&#10;&#10;Labeling system redesign:&#10;- New Label primitive (src/material/label/) wraps SDFText plus a shared&#10;  billboard registry. Axis, graphHTML, and annotation.label now all build&#10;  their real-mesh labels through it instead of three independent&#10;  hand-rolled implementations. Adds a bulk Selection.call(syncLabels /&#10;  removeLabels) form for per-datum chart labels.&#10;&#10;Production readiness:&#10;- FrameBudget's slow-frame event now carries real draw-call/triangle/mesh&#10;  counts instead of none.&#10;- New core/umdCompat.js guards every three/addons import so a &lt;script&gt;-tag&#10;  UMD consumer gets an actionable error instead of a load-time crash&#10;  (godRays/motionBlur, PostFX passes, GraphLine, ParticleSystem's GPU path).&#10;- Coverage thresholds raised to lines/branches/functions 85/80/85, matching&#10;  CLAUDE.md's stated policy.&#10;- Disposal-test policy documented to match the existing spy/structural&#10;  assertion pattern already used everywhere (jsdom has no real WebGL&#10;  context to check renderer.info.memory against).&#10;&#10;Dead code / tooling:&#10;- Removed Graph3D's unused hdr/theme constructor options (never wired to&#10;  any scene).&#10;- Added lint:circular (dpdm) as an npm script and CI step.&#10;&#10;Bug fixes:&#10;- GraphInstancedObject's octree no longer degrades to O(n) per&#10;  remove/insert (O(n^2) per full chart update) once instance data clusters&#10;  well inside the default +/-10,000 bounds. DEFAULT_MAX_DEPTH raised from&#10;  8 to 24 so leaf cells stay small enough to separate real chart-data&#10;  density; a 4,000-row update()-with-50-mutations benchmark drops from&#10;  ~300ms to ~47ms and now scales roughly linearly.&#10;- Picking (pick()/pickDetailed()/Picker) no longer silently misses every&#10;  instance once a chart's mesh is repositioned off the scene origin (e.g.&#10;  by OriginShift). The octree query now converts the world-space&#10;  raycaster ray into the mesh's local space before querying, matching the&#10;  space instance positions are actually stored in.&#10;&#10;Docs site:&#10;- Renamed docs/ to site/ (VitePress root).&#10;- Added the /example/&lt;type&gt; interactive demo route (ExampleDemo.vue), bar&#10;  chart fully wired with a midnight theme and an animated sort control.&#10;- Added CONTRIBUTING.md, CHANGELOG.md, accessibility/perf/troubleshooting/&#10;  comparison/cheatsheet pages, three migration guides, and several recipes.&#10;&#10;Examples:&#10;- Polish to examples/08-bar-chart and examples/21-bar-race.&#10;- New examples/24-GraphHTML-test/.">
+    <list default="true" id="33557d05-3974-4e5d-9972-8791b8163414" name="Changes" comment="Iconic label chart example added">
+      <change beforePath="$PROJECT_DIR$/.github/workflows/ci.yml" beforeDir="false" afterPath="$PROJECT_DIR$/.github/workflows/ci.yml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CHANGELOG.md" beforeDir="false" afterPath="$PROJECT_DIR$/CHANGELOG.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rollup.config.js" beforeDir="false" afterPath="$PROJECT_DIR$/rollup.config.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/scripts/docs-api.js" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/docs-api.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/site/api/manifest.json" beforeDir="false" afterPath="$PROJECT_DIR$/site/api/manifest.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/site/concepts/material.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/concepts/material.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/index.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/material/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/material/index.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/material/text/GraphHTML.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/material/text/GraphHTML.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/__snapshots__/api-surface.test.js.snap" beforeDir="false" afterPath="$PROJECT_DIR$/tests/__snapshots__/api-surface.test.js.snap" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/site/.vitepress/theme/components/ExampleDemo.vue" beforeDir="false" afterPath="$PROJECT_DIR$/site/.vitepress/theme/components/ExampleDemo.vue" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/site/concepts/core.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/concepts/core.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/site/concepts/interact.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/concepts/interact.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/core/Graph3D.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/Graph3D.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/core/Graph3DLoop.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/Graph3DLoop.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/interact/Picker.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/interact/Picker.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/interact/regionSelect.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/interact/regionSelect.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/scene/GraphSceneCamera.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/scene/GraphSceneCamera.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/core/Graph3D.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/core/Graph3D.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/core/Graph3DLoop.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/core/Graph3DLoop.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/interact/Picker.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/interact/Picker.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/interact/regionSelect.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/interact/regionSelect.test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/scene/GraphSceneCamera.test.js" beforeDir="false" afterPath="$PROJECT_DIR$/tests/scene/GraphSceneCamera.test.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/types/index.d.ts" beforeDir="false" afterPath="$PROJECT_DIR$/types/index.d.ts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -17,8 +33,74 @@
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
+  <component name="EmbeddingIndexingInfo">
+    <option name="cachedIndexableFilesCount" value="1555" />
+  </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="McpProjectServerCommands">
+    <commands />
+    <urls />
+  </component>
+  <component name="NextEditCompletionFeaturesState">
+    <decayedCancelled>
+      <entry key="MS100" value="1.00011485457618" />
+      <entry key="MS500" value="1.5112491243239097" />
+      <entry key="S2" value="4.704900261273862" />
+      <entry key="S5" value="7.916276190042225" />
+      <entry key="S10" value="10.659671557368842" />
+      <entry key="S30" value="13.788715934972677" />
+      <entry key="S60" value="14.827838029298086" />
+      <entry key="M2" value="15.396155345972845" />
+      <entry key="M5" value="15.7540446092029" />
+      <entry key="M10" value="15.87627694995288" />
+      <entry key="M15" value="15.91778961239235" />
+      <entry key="M30" value="16.005598848066764" />
+      <entry key="H1" value="16.464088517880224" />
+      <entry key="H2" value="17.54657524921567" />
+      <entry key="H4" value="18.784925254353237" />
+      <entry key="D1" value="20.535889704779702" />
+      <entry key="W1" value="20.930909354535956" />
+    </decayedCancelled>
+    <decayedSelected>
+      <entry key="MS100" value="0.0" />
+      <entry key="MS500" value="0.0" />
+      <entry key="S2" value="0.0" />
+      <entry key="S5" value="0.0" />
+      <entry key="S10" value="0.0" />
+      <entry key="S30" value="0.0" />
+      <entry key="S60" value="0.0" />
+      <entry key="M2" value="0.0" />
+      <entry key="M5" value="0.0" />
+      <entry key="M10" value="0.0" />
+      <entry key="M15" value="0.0" />
+      <entry key="M30" value="0.0" />
+      <entry key="H1" value="0.0" />
+      <entry key="H2" value="0.0" />
+      <entry key="H4" value="0.0" />
+      <entry key="D1" value="0.0" />
+      <entry key="W1" value="0.0" />
+    </decayedSelected>
+    <decayedShown>
+      <entry key="MS100" value="0.9593747019744181" />
+      <entry key="MS500" value="1.453534762108024" />
+      <entry key="S2" value="4.3247221567833005" />
+      <entry key="S5" value="7.549754152762151" />
+      <entry key="S10" value="10.40634807710445" />
+      <entry key="S30" value="13.682774835398519" />
+      <entry key="S60" value="14.77169091474125" />
+      <entry key="M2" value="15.367245263617308" />
+      <entry key="M5" value="15.742274112646498" />
+      <entry key="M10" value="15.870356804227473" />
+      <entry key="M15" value="15.913835044672972" />
+      <entry key="M30" value="16.003616995957987" />
+      <entry key="H1" value="16.46309349520142" />
+      <entry key="H2" value="17.546073674339155" />
+      <entry key="H4" value="18.784672209425228" />
+      <entry key="D1" value="20.535847003645976" />
+      <entry key="W1" value="20.930903237445804" />
+    </decayedShown>
   </component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 1,
@@ -35,18 +117,27 @@
   <component name="PropertiesComponent">{
   &quot;keyToString&quot;: {
     &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.MCP Project settings loaded&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
+    &quot;codeWithMe.voiceChat.enabledByDefault&quot;: &quot;false&quot;,
+    &quot;com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1&quot;: &quot;true&quot;,
     &quot;git-widget-placeholder&quot;: &quot;main&quot;,
     &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
     &quot;javascript.preferred.runtime.type.id&quot;: &quot;node&quot;,
+    &quot;junie.onboarding.icon.badge.shown&quot;: &quot;true&quot;,
     &quot;last_opened_file_path&quot;: &quot;C:/Users/AD/WebstormProjects/Graph3D/HDRI&quot;,
     &quot;node.js.detected.package.@glint/core&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
     &quot;node.js.selected.package.@glint/core&quot;: &quot;&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
     &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
     &quot;settings.editor.selected.configurable&quot;: &quot;com.kite.code.toll.settings.CodeAssistSettingsConfigurable&quot;,
+    &quot;to.speed.mode.migration.done&quot;: &quot;true&quot;,
     &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
 }</component>
@@ -58,7 +149,7 @@
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-js-predefined-d6986cc7102b-9b0f141eb926-JavaScript-WS-253.32098.39" />
+        <option value="bundled-js-predefined-d6986cc7102b-4abd2a77f808-JavaScript-WS-262.8665.341" />
       </set>
     </attachedChunks>
   </component>
@@ -105,7 +196,18 @@
       <workItem from="1784093066519" duration="19000" />
       <workItem from="1784187030468" duration="11070000" />
       <workItem from="1784208517441" duration="8505000" />
-      <workItem from="1784267306876" duration="33354000" />
+      <workItem from="1784267306876" duration="35444000" />
+      <workItem from="1784400258910" duration="73000" />
+      <workItem from="1784400353807" duration="1765000" />
+      <workItem from="1784476647126" duration="12899000" />
+      <workItem from="1784559186532" duration="9698000" />
+      <workItem from="1784609879637" duration="4153000" />
+      <workItem from="1784627626051" duration="2496000" />
+      <workItem from="1784657404448" duration="3696000" />
+      <workItem from="1784697325086" duration="498000" />
+      <workItem from="1785298402027" duration="645000" />
+      <workItem from="1785420678140" duration="12075000" />
+      <workItem from="1785478555960" duration="1545000" />
     </task>
     <task id="LOCAL-00001" summary="graph3D created">
       <option name="closed" value="true" />
@@ -219,7 +321,15 @@
       <option name="project" value="LOCAL" />
       <updated>1784394382008</updated>
     </task>
-    <option name="localTasksCounter" value="15" />
+    <task id="LOCAL-00015" summary="Iconic label chart example added">
+      <option name="closed" value="true" />
+      <created>1784398105888</created>
+      <option name="number" value="00015" />
+      <option name="presentableId" value="LOCAL-00015" />
+      <option name="project" value="LOCAL" />
+      <updated>1784398105888</updated>
+    </task>
+    <option name="localTasksCounter" value="16" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -238,6 +348,7 @@
     <MESSAGE value="updated few issues" />
     <MESSAGE value="step 188 complete" />
     <MESSAGE value="Bug 1: Octree O(n²) degenerate-leaf performance cliff — src/object/Octree.js&#10;&#10;Root cause: DEFAULT_MAX_DEPTH was 8, giving a smallest leaf cell of 20,000 / 2⁸ ≈ 78 units against the default ±10,000 bounds — bigger than most real chart data's actual spread (e.g. [0,10], [-40,40]). Once all instances landed in one leaf, subdivision stopped (depth cap hit) and remove()'s linear scan degraded from O(1) to true O(n), making a full chart.update() O(n²).&#10;&#10;Fix: Bumped DEFAULT_MAX_DEPTH to 24 (smallest cell ≈0.0012 units — small enough to separate any realistic chart density, and right around float32's own precision floor at that bounds magnitude, so going deeper couldn't help further). Subdivision is lazy, so this costs nothing for normal, spread-out data.&#10;&#10;Verified empirically, reproducing the exact scenario from skipping_list.md's own bug report (4,000 rows in [0,10], one data()+update() call with 50 mutated rows):&#10;- Before: reported ~300ms, badly superlinear (30x slower at 8x more data)&#10;- After: ~47ms, now scaling roughly linearly with N (matches the 500-row case's per-item cost)&#10;&#10;Bug 2: Silent picking failure once a chart's mesh moves off-origin — src/object/GraphInstancedObject.js&#10;&#10;Root cause: #closestIntersection queried the octree with raycaster.ray directly — always world-space — but the octree stores each instance's local (mesh-relative) position. These only agreed while the mesh sat at the scene origin; OriginShift (or anything else that repositions the mesh) broke it silently, with zero errors.&#10;&#10;Fix: Convert the ray into the mesh's local space (raycaster.ray × inverse mesh.matrixWorld) before querying the octree — two new reused scratch objects, no new allocations per call.&#10;&#10;Tests added:&#10;- Two new unit tests in tests/object/GraphInstancedObject.test.js (pick/pickDetailed), moving the mesh off-origin and confirming hits resolve correctly in world space.&#10;- Un-skipped the exact regression this bug already had a placeholder for in tests/integration/phase10.test.js — a real Picker.pickAt() call through an OriginShift, previously documented as &quot;picking post-shift is a separate, real, currently-broken capability,&quot; now asserts it actually works.&#10;&#10;Full verification: 213/213 test files, 3335/3335 tests passing (+2 new), lint clean, typecheck clean, zero circular imports.&#10;&#10;✻ Sautéed for 12m 3s&#10;&#10;❯ write a commit message according to git diff&#10;&#10;  Ran 1 shell command&#10;&#10;● User answered Claude's questions:&#10;· The working tree has 182 changed files spanning several unrelated pieces of work (a docs/→site/ rename, the improvement.md initiatives, the bar-chart demo work, and my two bug fixes from this session). Which should the commit message cover? → The entire working tree diff&#10;&#10;  Ran 4 shell commands&#10;&#10;Given the scope (182 files across several independent initiatives), here's a commit message that honestly represents it — a summary line plus a body organized by area:&#10;&#10;feat: harden Phase 11, migrate docs to site/, fix octree and picking bugs&#10;&#10;Coordinate mapping fix:&#10;- BarChart/HeatmapChart bars now align with Axis tick labels. Both derive&#10;  the half-bandwidth offset from a new shared bandCenter() helper&#10;  (src/compose/scale/bandCenter.js) instead of Axis computing it inline&#10;  and chart/axisField.js's resolveAxisAccessor never applying it at all.&#10;&#10;Labeling system redesign:&#10;- New Label primitive (src/material/label/) wraps SDFText plus a shared&#10;  billboard registry. Axis, graphHTML, and annotation.label now all build&#10;  their real-mesh labels through it instead of three independent&#10;  hand-rolled implementations. Adds a bulk Selection.call(syncLabels /&#10;  removeLabels) form for per-datum chart labels.&#10;&#10;Production readiness:&#10;- FrameBudget's slow-frame event now carries real draw-call/triangle/mesh&#10;  counts instead of none.&#10;- New core/umdCompat.js guards every three/addons import so a &lt;script&gt;-tag&#10;  UMD consumer gets an actionable error instead of a load-time crash&#10;  (godRays/motionBlur, PostFX passes, GraphLine, ParticleSystem's GPU path).&#10;- Coverage thresholds raised to lines/branches/functions 85/80/85, matching&#10;  CLAUDE.md's stated policy.&#10;- Disposal-test policy documented to match the existing spy/structural&#10;  assertion pattern already used everywhere (jsdom has no real WebGL&#10;  context to check renderer.info.memory against).&#10;&#10;Dead code / tooling:&#10;- Removed Graph3D's unused hdr/theme constructor options (never wired to&#10;  any scene).&#10;- Added lint:circular (dpdm) as an npm script and CI step.&#10;&#10;Bug fixes:&#10;- GraphInstancedObject's octree no longer degrades to O(n) per&#10;  remove/insert (O(n^2) per full chart update) once instance data clusters&#10;  well inside the default +/-10,000 bounds. DEFAULT_MAX_DEPTH raised from&#10;  8 to 24 so leaf cells stay small enough to separate real chart-data&#10;  density; a 4,000-row update()-with-50-mutations benchmark drops from&#10;  ~300ms to ~47ms and now scales roughly linearly.&#10;- Picking (pick()/pickDetailed()/Picker) no longer silently misses every&#10;  instance once a chart's mesh is repositioned off the scene origin (e.g.&#10;  by OriginShift). The octree query now converts the world-space&#10;  raycaster ray into the mesh's local space before querying, matching the&#10;  space instance positions are actually stored in.&#10;&#10;Docs site:&#10;- Renamed docs/ to site/ (VitePress root).&#10;- Added the /example/&lt;type&gt; interactive demo route (ExampleDemo.vue), bar&#10;  chart fully wired with a midnight theme and an animated sort control.&#10;- Added CONTRIBUTING.md, CHANGELOG.md, accessibility/perf/troubleshooting/&#10;  comparison/cheatsheet pages, three migration guides, and several recipes.&#10;&#10;Examples:&#10;- Polish to examples/08-bar-chart and examples/21-bar-race.&#10;- New examples/24-GraphHTML-test/." />
-    <option name="LAST_COMMIT_MESSAGE" value="Bug 1: Octree O(n²) degenerate-leaf performance cliff — src/object/Octree.js&#10;&#10;Root cause: DEFAULT_MAX_DEPTH was 8, giving a smallest leaf cell of 20,000 / 2⁸ ≈ 78 units against the default ±10,000 bounds — bigger than most real chart data's actual spread (e.g. [0,10], [-40,40]). Once all instances landed in one leaf, subdivision stopped (depth cap hit) and remove()'s linear scan degraded from O(1) to true O(n), making a full chart.update() O(n²).&#10;&#10;Fix: Bumped DEFAULT_MAX_DEPTH to 24 (smallest cell ≈0.0012 units — small enough to separate any realistic chart density, and right around float32's own precision floor at that bounds magnitude, so going deeper couldn't help further). Subdivision is lazy, so this costs nothing for normal, spread-out data.&#10;&#10;Verified empirically, reproducing the exact scenario from skipping_list.md's own bug report (4,000 rows in [0,10], one data()+update() call with 50 mutated rows):&#10;- Before: reported ~300ms, badly superlinear (30x slower at 8x more data)&#10;- After: ~47ms, now scaling roughly linearly with N (matches the 500-row case's per-item cost)&#10;&#10;Bug 2: Silent picking failure once a chart's mesh moves off-origin — src/object/GraphInstancedObject.js&#10;&#10;Root cause: #closestIntersection queried the octree with raycaster.ray directly — always world-space — but the octree stores each instance's local (mesh-relative) position. These only agreed while the mesh sat at the scene origin; OriginShift (or anything else that repositions the mesh) broke it silently, with zero errors.&#10;&#10;Fix: Convert the ray into the mesh's local space (raycaster.ray × inverse mesh.matrixWorld) before querying the octree — two new reused scratch objects, no new allocations per call.&#10;&#10;Tests added:&#10;- Two new unit tests in tests/object/GraphInstancedObject.test.js (pick/pickDetailed), moving the mesh off-origin and confirming hits resolve correctly in world space.&#10;- Un-skipped the exact regression this bug already had a placeholder for in tests/integration/phase10.test.js — a real Picker.pickAt() call through an OriginShift, previously documented as &quot;picking post-shift is a separate, real, currently-broken capability,&quot; now asserts it actually works.&#10;&#10;Full verification: 213/213 test files, 3335/3335 tests passing (+2 new), lint clean, typecheck clean, zero circular imports.&#10;&#10;✻ Sautéed for 12m 3s&#10;&#10;❯ write a commit message according to git diff&#10;&#10;  Ran 1 shell command&#10;&#10;● User answered Claude's questions:&#10;· The working tree has 182 changed files spanning several unrelated pieces of work (a docs/→site/ rename, the improvement.md initiatives, the bar-chart demo work, and my two bug fixes from this session). Which should the commit message cover? → The entire working tree diff&#10;&#10;  Ran 4 shell commands&#10;&#10;Given the scope (182 files across several independent initiatives), here's a commit message that honestly represents it — a summary line plus a body organized by area:&#10;&#10;feat: harden Phase 11, migrate docs to site/, fix octree and picking bugs&#10;&#10;Coordinate mapping fix:&#10;- BarChart/HeatmapChart bars now align with Axis tick labels. Both derive&#10;  the half-bandwidth offset from a new shared bandCenter() helper&#10;  (src/compose/scale/bandCenter.js) instead of Axis computing it inline&#10;  and chart/axisField.js's resolveAxisAccessor never applying it at all.&#10;&#10;Labeling system redesign:&#10;- New Label primitive (src/material/label/) wraps SDFText plus a shared&#10;  billboard registry. Axis, graphHTML, and annotation.label now all build&#10;  their real-mesh labels through it instead of three independent&#10;  hand-rolled implementations. Adds a bulk Selection.call(syncLabels /&#10;  removeLabels) form for per-datum chart labels.&#10;&#10;Production readiness:&#10;- FrameBudget's slow-frame event now carries real draw-call/triangle/mesh&#10;  counts instead of none.&#10;- New core/umdCompat.js guards every three/addons import so a &lt;script&gt;-tag&#10;  UMD consumer gets an actionable error instead of a load-time crash&#10;  (godRays/motionBlur, PostFX passes, GraphLine, ParticleSystem's GPU path).&#10;- Coverage thresholds raised to lines/branches/functions 85/80/85, matching&#10;  CLAUDE.md's stated policy.&#10;- Disposal-test policy documented to match the existing spy/structural&#10;  assertion pattern already used everywhere (jsdom has no real WebGL&#10;  context to check renderer.info.memory against).&#10;&#10;Dead code / tooling:&#10;- Removed Graph3D's unused hdr/theme constructor options (never wired to&#10;  any scene).&#10;- Added lint:circular (dpdm) as an npm script and CI step.&#10;&#10;Bug fixes:&#10;- GraphInstancedObject's octree no longer degrades to O(n) per&#10;  remove/insert (O(n^2) per full chart update) once instance data clusters&#10;  well inside the default +/-10,000 bounds. DEFAULT_MAX_DEPTH raised from&#10;  8 to 24 so leaf cells stay small enough to separate real chart-data&#10;  density; a 4,000-row update()-with-50-mutations benchmark drops from&#10;  ~300ms to ~47ms and now scales roughly linearly.&#10;- Picking (pick()/pickDetailed()/Picker) no longer silently misses every&#10;  instance once a chart's mesh is repositioned off the scene origin (e.g.&#10;  by OriginShift). The octree query now converts the world-space&#10;  raycaster ray into the mesh's local space before querying, matching the&#10;  space instance positions are actually stored in.&#10;&#10;Docs site:&#10;- Renamed docs/ to site/ (VitePress root).&#10;- Added the /example/&lt;type&gt; interactive demo route (ExampleDemo.vue), bar&#10;  chart fully wired with a midnight theme and an animated sort control.&#10;- Added CONTRIBUTING.md, CHANGELOG.md, accessibility/perf/troubleshooting/&#10;  comparison/cheatsheet pages, three migration guides, and several recipes.&#10;&#10;Examples:&#10;- Polish to examples/08-bar-chart and examples/21-bar-race.&#10;- New examples/24-GraphHTML-test/." />
+    <MESSAGE value="Iconic label chart example added" />
+    <option name="LAST_COMMIT_MESSAGE" value="Iconic label chart example added" />
   </component>
 </project>

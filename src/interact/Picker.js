@@ -85,10 +85,24 @@ export class Picker {
    * same camera, rather than requiring a second copy passed to its own
    * constructor (CLAUDE.md §1.1 DRY — one source of truth for "which camera
    * this interaction session uses").
+   *
+   * Refreshes `matrixWorld` before returning: controls like `OrbitControls`
+   * write `camera.position`/`.quaternion` synchronously from their own
+   * pointer listeners on the same canvas, but `matrixWorld` is a cached
+   * value only recomputed by the next `WebGLRenderer.render()` call. Without
+   * this, a rotate/pan gesture and a hover/click/drag pick both firing off
+   * the same `pointermove` would rays-test against a camera orientation up
+   * to one frame stale — imprecise picks exactly while the camera is
+   * actively moving. Every consumer of this camera (`#computePick`'s
+   * raycast, `PointerRouter`'s drag-unproject and label-click projection)
+   * reads it through this getter for that reason — one source of truth,
+   * matching the same gap `regionSelect.js#matchedIndicesForChart` closes
+   * for `Brush`/`Lasso`'s own camera reference.
    * @returns {THREE.Camera}
    * @example picker.camera.position;
    */
   get camera() {
+    this.#camera.updateMatrixWorld();
     return this.#camera;
   }
 
@@ -195,7 +209,7 @@ export class Picker {
   #computePick(x, y) {
     const { width, height } = this.#domElement;
     this.#ndcScratch.set((x / width) * 2 - 1, -(y / height) * 2 + 1);
-    this.#raycaster.setFromCamera(this.#ndcScratch, this.#camera);
+    this.#raycaster.setFromCamera(this.#ndcScratch, this.camera);
 
     // A GraphMesh's raycast tests against THREE.Object3D.matrixWorld, which
     // is only ever recomputed by a real WebGLRenderer.render() call — a

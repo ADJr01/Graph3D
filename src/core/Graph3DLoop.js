@@ -134,7 +134,19 @@ export class Graph3DLoop {
     const delta = this.#lastTime === null ? 0 : (now - this.#lastTime) * SEC;
     this.#lastTime = now;
     this.#elapsed += delta;
-    for (const cb of this.#callbacks) cb(delta, this.#elapsed);
+    // One misbehaving callback (e.g. a stale reference into a disposed
+    // scene) must not be able to kill every other chart's rendering: an
+    // uncaught exception here would skip `#scheduleRaf()` below and never
+    // recover, since nothing else re-invokes `#tick` once the RAF chain
+    // breaks — freezing the ENTIRE shared loop, silently, for the rest of
+    // the page's life. Isolate each callback instead.
+    for (const cb of this.#callbacks) {
+      try {
+        cb(delta, this.#elapsed);
+      } catch (error) {
+        console.error('Graph3DLoop: a registered callback threw and was skipped for this frame.', error);
+      }
+    }
     if (this.#running) this.#scheduleRaf();
   };
 }

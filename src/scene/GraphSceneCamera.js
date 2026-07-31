@@ -87,6 +87,12 @@ export class GraphSceneCamera {
   /** @type {number|null} — reapplied to OrbitControls on every enableOrbitControls() call */
   #maxZoomOut = null;
 
+  /** @type {number|null} radians — reapplied to OrbitControls on every enableOrbitControls() call */
+  #minPolarAngle = null;
+
+  /** @type {number|null} radians — reapplied to OrbitControls on every enableOrbitControls() call */
+  #maxPolarAngle = null;
+
   /** @type {boolean} */
   #disposed = false;
 
@@ -296,6 +302,76 @@ export class GraphSceneCamera {
     return this;
   }
 
+  // ── Orbit angle limits ─────────────────────────────────────────────────────
+
+  /**
+   * Set the closest-to-vertical polar angle the user may orbit to via
+   * OrbitControls, in radians (`0` = looking straight down from above,
+   * `Math.PI / 2` = eye-level). Guards against near-grazing or below-the-plane
+   * camera angles that make elevated data points (e.g. a tall line-chart
+   * marker) visually detach from their ground-level axis position under
+   * perspective projection — see `setMaxPolarAngle` for the matching lower
+   * bound. Takes effect immediately if OrbitControls are active, and is
+   * reapplied automatically on every future `enableOrbitControls()` call.
+   *
+   * @param {number} value - Radians in `[0, Math.PI]`.
+   * @returns {this}
+   * @throws {TypeError} If `value` is not a finite number in `[0, Math.PI]`.
+   * @throws {RangeError} If `value` is greater than an already-set `setMaxPolarAngle` value.
+   * @throws {Error} If called after `dispose()`.
+   * @example
+   * cam.setMinPolarAngle(Math.PI / 6); // never let the camera orbit above ~30° from vertical
+   */
+  setMinPolarAngle(value) {
+    this.#assertNotDisposed('setMinPolarAngle');
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > Math.PI) {
+      throw new TypeError(
+        `GraphSceneCamera.setMinPolarAngle: expected a finite number in [0, Math.PI], received ${value}.`,
+      );
+    }
+    if (this.#maxPolarAngle !== null && value > this.#maxPolarAngle) {
+      throw new RangeError(
+        `GraphSceneCamera.setMinPolarAngle: value (${value}) must be <= the current setMaxPolarAngle (${this.#maxPolarAngle}).`,
+      );
+    }
+    this.#minPolarAngle = value;
+    this.#applyPolarAngleLimits();
+    return this;
+  }
+
+  /**
+   * Set the closest-to-horizontal/below polar angle the user may orbit to via
+   * OrbitControls, in radians (`Math.PI / 2` = eye-level, `Math.PI` = looking
+   * straight up from below). Pairs with `setMinPolarAngle` to keep the camera
+   * within a range where axis-aligned data stays visually legible. Takes
+   * effect immediately if OrbitControls are active, and is reapplied
+   * automatically on every future `enableOrbitControls()` call.
+   *
+   * @param {number} value - Radians in `[0, Math.PI]`.
+   * @returns {this}
+   * @throws {TypeError} If `value` is not a finite number in `[0, Math.PI]`.
+   * @throws {RangeError} If `value` is less than an already-set `setMinPolarAngle` value.
+   * @throws {Error} If called after `dispose()`.
+   * @example
+   * cam.setMaxPolarAngle(Math.PI / 2.1); // never let the camera dip below near-eye-level
+   */
+  setMaxPolarAngle(value) {
+    this.#assertNotDisposed('setMaxPolarAngle');
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > Math.PI) {
+      throw new TypeError(
+        `GraphSceneCamera.setMaxPolarAngle: expected a finite number in [0, Math.PI], received ${value}.`,
+      );
+    }
+    if (this.#minPolarAngle !== null && value < this.#minPolarAngle) {
+      throw new RangeError(
+        `GraphSceneCamera.setMaxPolarAngle: value (${value}) must be >= the current setMinPolarAngle (${this.#minPolarAngle}).`,
+      );
+    }
+    this.#maxPolarAngle = value;
+    this.#applyPolarAngleLimits();
+    return this;
+  }
+
   // ── Cinematic animation primitives ────────────────────────────────────────
 
   /**
@@ -416,6 +492,7 @@ export class GraphSceneCamera {
     if (this.#disposed) return this;
     this.#orbitControls = new OrbitControls(this.#camera, domElement);
     this.#applyZoomLimits();
+    this.#applyPolarAngleLimits();
     return this;
   }
 
@@ -466,6 +543,20 @@ export class GraphSceneCamera {
       if (this.#maxZoomIn !== null) this.#orbitControls.minDistance = this.#maxZoomIn;
       if (this.#maxZoomOut !== null) this.#orbitControls.maxDistance = this.#maxZoomOut;
     }
+  }
+
+  /**
+   * Reapplies #minPolarAngle/#maxPolarAngle to the active OrbitControls, then
+   * calls `update()` so a camera already outside the new bounds is
+   * re-clamped immediately rather than drifting there on the next user
+   * interaction. No-op if OrbitControls aren't active — there's nothing to
+   * clamp yet.
+   */
+  #applyPolarAngleLimits() {
+    if (!this.#orbitControls) return;
+    if (this.#minPolarAngle !== null) this.#orbitControls.minPolarAngle = this.#minPolarAngle;
+    if (this.#maxPolarAngle !== null) this.#orbitControls.maxPolarAngle = this.#maxPolarAngle;
+    this.#orbitControls.update();
   }
 
   /** @param {string} method */

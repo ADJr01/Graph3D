@@ -28,6 +28,8 @@
     "typecheck": "tsc --noEmit",
     "test:types": "tsd",
     "bundle:budget": "node scripts/bundle-budget.js",
+    "verify:dist": "node scripts/verify-dist.js",
+    "release": "npm run lint && npm run lint:circular && npm run typecheck && npm run test:types && npm test && npm run build && npm run bundle:budget && npm run verify:dist",
     "bench": "node bench/harness.js",
     "bench:stress": "node bench/stress-million.bench.js",
     "docs:api": "node scripts/docs-api.js",

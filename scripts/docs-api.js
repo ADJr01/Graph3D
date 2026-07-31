@@ -17,34 +17,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import jsdoc2md from 'jsdoc-to-markdown';
+import { publicExportNames } from './publicExportNames.js';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const SRC_DIR = path.join(ROOT, 'src');
 const API_DOCS_DIR = path.join(ROOT, 'site', 'api');
 const INDEX_FILE = path.join(SRC_DIR, 'index.js');
-
-/**
- * The public export names declared by `src/index.js` — parsed statically
- * (regex over its own `export { A, B } from '...'`/`export const X` lines)
- * rather than executed, since `src/index.js` imports `virtual:worker-blob`
- * (a Rollup/Vite plugin-resolved specifier — see `vitest.config.js`'s own
- * stub for the same problem) which plain `node` can't resolve. `index.js`
- * is a pure re-export barrel with no other logic, so static parsing is both
- * simpler and doesn't need a real module evaluation at all.
- * @returns {Set<string>}
- */
-function publicExportNames() {
-  const source = fs.readFileSync(INDEX_FILE, 'utf8');
-  const names = new Set();
-  for (const match of source.matchAll(/export\s*\{([^}]*)\}/g)) {
-    for (const part of match[1].split(',')) {
-      const name = part.trim().split(/\s+as\s+/).pop().trim();
-      if (name) names.add(name);
-    }
-  }
-  for (const match of source.matchAll(/export\s+const\s+(\w+)/g)) names.add(match[1]);
-  return names;
-}
 
 // Matches CLAUDE.md §1.4's layer table — order used for site/api/index.md's grouping.
 const LAYER_ORDER = ['core', 'scene', 'object', 'compose', 'anim', 'material', 'postfx', 'chart', 'interact', 'stream'];
@@ -257,7 +235,7 @@ function writeIndexPage() {
 }
 
 async function main() {
-  const publicNames = publicExportNames();
+  const publicNames = publicExportNames(INDEX_FILE);
 
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'graph3d-docs-api-'));
   const tempSrcDir = path.join(tempRoot, 'src');

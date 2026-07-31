@@ -194,8 +194,21 @@ export class Graph3D {
 
       const threeRenderer = this.#renderer.three;
       const el = threeRenderer.domElement;
-      const W = el.width;
-      const H = el.height;
+      // `el.width`/`el.height` are the canvas's device-pixel drawing-buffer
+      // size, but `WebGLRenderer.setViewport()`/`setScissor()` (below) both
+      // take LOGICAL (CSS) pixels and multiply by the renderer's own pixel
+      // ratio internally — passing device pixels here double-applies it
+      // (verified live: on a 1.25 devicePixelRatio display the GPU viewport
+      // came out 1.25x too large in every dimension, silently rendering into
+      // more canvas than actually exists, which is what made the line-chart
+      // hover ring/tooltip land away from its rendered marker — the marker's
+      // own screen position, computed via `Vector3.project(camera)`, assumes
+      // NDC maps to the full canvas box, which stops being true once the GPU
+      // viewport itself no longer matches that box). Dividing back out here
+      // keeps W/H in the logical pixels these two calls actually expect.
+      const pixelRatio = threeRenderer.getPixelRatio();
+      const W = el.width / pixelRatio;
+      const H = el.height / pixelRatio;
       const threeScene = this.#activeScene.three;
       const threeCamera = this.#activeScene.camera.three;
       const viewports = this.#activeScene.viewports;

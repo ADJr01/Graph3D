@@ -1103,6 +1103,8 @@ export class GraphSceneCamera {
   useCustom(camera: THREE.Camera): this;
   setMaxZoomIn(value: number): this;
   setMaxZoomOut(value: number): this;
+  setMinPolarAngle(value: number): this;
+  setMaxPolarAngle(value: number): this;
   dollyZoom(targetFOV: number, duration?: number): CameraTour;
   tour(waypoints: CameraWaypoint[], options?: object): CameraTour;
   follow(target: THREE.Object3D): CameraTour;
